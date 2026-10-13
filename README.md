@@ -2,7 +2,7 @@
 
 React Native + TypeScript mobile prototype backed by a Node.js + SQLite API. The first increment implements a complete discovery flow: search or select a campus service, open a destination on the map, and submit a correction report stored in SQLite.
 
-The original `wireframes.html` remains the visual reference in this folder. The 14 seeded pins and service-to-office matches come from it. **They are sample records, not verified AUI navigation data.** The app labels them accordingly and does not draw an unverified walking route.
+The original `wireframes.html` remains the visual reference in this folder. The mobile map uses MapLibre GL JS and OpenFreeMap on iOS; Android uses Leaflet with image tiles because the WebGL map rendered black on the test phone. Both run in an Expo Go-compatible WebView. The 14 seeded pins and service-to-office matches come from the wireframe. **They are sample records, not verified AUI navigation data.** The app labels them accordingly and does not draw an unverified walking route. The map needs internet access for its tiles; if it fails, the app shows Retry and destination browsing.
 
 ## Run locally for the first time (Windows)
 
@@ -43,6 +43,24 @@ npx.cmd expo start
 Leave this running too. Expo displays a QR code. On Android, scan it from **Expo Go → Scan QR code**; on iPhone, scan it with the Camera app. If the phone cannot load the Expo project, check the network or try `npx.cmd expo start --tunnel`. A tunnel helps Expo reach the phone, but the phone still needs access to the API address in `.env.local`.
 
 An Android emulator uses `http://10.0.2.2:4000` by default and does not need `.env.local`; an iOS simulator uses `http://localhost:4000`. After changing `.env.local`, reload the app in Expo Go. Stop either terminal with **Ctrl+C**. This API is for local development only; it has no authentication and should not be exposed publicly.
+
+### Git Bash commands
+
+If you use Git Bash, open two terminals in the `GoMap` folder. Run the API in the first:
+
+```bash
+cd server
+"/c/Program Files/nodejs/node.exe" src/server.js
+```
+
+Run Expo in the second. Scan its QR code with Expo Go on Android:
+
+```bash
+cd mobile
+"/c/Program Files/nodejs/node.exe" node_modules/expo/bin/cli start --clear --lan
+```
+
+For a real phone, set `mobile/.env.local` to your computer's Wi-Fi IPv4 address as shown above before starting Expo. Restart Expo after changing it.
 
 ## Demo journey
 
