@@ -2,7 +2,16 @@
 
 React Native + TypeScript mobile prototype backed by a Node.js + SQLite API. The first increment implements a complete discovery flow: search or select a campus service, open a destination on the map, and submit a correction report stored in SQLite.
 
-The original `wireframes.html` remains the visual reference in this folder. The mobile map uses MapLibre GL JS and OpenFreeMap on iOS; Android uses Leaflet with image tiles because the WebGL map rendered black on the test phone. Both run in an Expo Go-compatible WebView. The 14 seeded pins and service-to-office matches come from the wireframe. **They are sample records, not verified AUI navigation data.** The app labels them accordingly and does not draw an unverified walking route. The map needs internet access for its tiles; if it fails, the app shows Retry and destination browsing.
+## What was implemented
+
+| Implemented | Current limit |
+| --- | --- |
+| React Native home, search, help, map, destination details, and saved places screens | Saved places last only for the app session |
+| Node API with SQLite for destinations, service suggestions, search, and correction reports | The 14 destinations and four service matches are sample data |
+| Category pins, map controls, loading errors, and retry | The latest Android map change still needs a phone check |
+| Report an issue from a destination | Reports are stored, but there is no reviewer screen yet |
+
+> **What needs to be done:** Talking to stakehodlers. There are no verified walking directions, AI assistant, AR navigation, or admin publishing flow yet. That matches the priorities in [SPRINT_PLAN.md](C:/Users/yarak/Desktop/GoMap/SPRINT_PLAN.md).
 
 ## Run locally for the first time (Windows)
 
