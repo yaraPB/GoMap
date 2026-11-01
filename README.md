@@ -11,7 +11,7 @@ React Native + TypeScript mobile prototype backed by a Node.js + SQLite API. The
 | Category pins, map controls, loading errors, and retry | The latest Android map change still needs a phone check |
 | Report an issue from a destination | Reports are stored, but there is no reviewer screen yet |
 
-> **What needs to be done:** Talking to stakehodlers. There are no verified walking directions, AI assistant, AR navigation, or admin publishing flow yet. That matches the priorities in [SPRINT_PLAN.md](C:/Users/yarak/Desktop/GoMap/SPRINT_PLAN.md).
+> **What needs to be done:** Talk to stakeholders. There are no verified walking directions, AI assistant, AR navigation, or admin publishing flow yet. That matches the priorities in [SPRINT_PLAN.md](SPRINT_PLAN.md).
 
 ## Run locally for the first time (Windows)
 
@@ -88,6 +88,8 @@ For a real phone, set `mobile/.env.local` to your computer's Wi-Fi IPv4 address 
 | `GET /api/places/:id` | Destination details |
 | `GET /api/services` | Need-to-service recommendations |
 | `POST /api/reports` | Save a correction report |
+
+Destination responses include linked `entrances`. An entrance appears as a separate map marker only after its coordinates are verified. It is eligible as a future route endpoint only after both its survey and access status are approved. The current sample dataset contains no verified entrance records, so its building pins are not route endpoints.
 
 Run the API integration test with `cd server; npm.cmd test`. Type-check the app with `cd mobile; npx.cmd tsc --noEmit`.
 
