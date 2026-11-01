@@ -1,94 +1,56 @@
-# GoMap Revamped
+# Welcome to your Expo app 👋
 
-React Native + TypeScript mobile prototype backed by a Node.js + SQLite API. The first increment implements a complete discovery flow: search or select a campus service, open a destination on the map, and submit a correction report stored in SQLite.
+This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
 
-## What was implemented
+## Get started
 
-| Implemented | Current limit |
-| --- | --- |
-| React Native home, search, help, map, destination details, and saved places screens | Saved places last only for the app session |
-| Node API with SQLite for destinations, service suggestions, search, and correction reports | The 14 destinations and four service matches are sample data |
-| Category pins, map controls, loading errors, and retry | The latest Android map change still needs a phone check |
-| Report an issue from a destination | Reports are stored, but there is no reviewer screen yet |
+1. Install dependencies
 
-> **What needs to be done:** Talking to stakehodlers. There are no verified walking directions, AI assistant, AR navigation, or admin publishing flow yet. That matches the priorities in [SPRINT_PLAN.md](C:/Users/yarak/Desktop/GoMap/SPRINT_PLAN.md).
+   ```bash
+   npm install
+   ```
 
-## Run locally for the first time (Windows)
+2. Start the app
 
-You do **not** need to install React Native globally. This project already has Expo and React Native in `mobile/node_modules`. You need Node.js 22.13+ and the **Expo Go** app on an Android or iPhone. An Android emulator also works.
+   ```bash
+   npx expo start
+   ```
 
-Open two PowerShell terminals in the `GoMap` folder. In **each** terminal, run this first so Node is on the path:
+In the output, you'll find options to open the app in a
 
-```powershell
-$env:Path = "C:\Program Files\nodejs;$env:Path"
-```
+- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
+- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
+- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
+- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
 
-Use `npm.cmd` and `npx.cmd` in PowerShell. On some Windows setups, the plain `npm` or `npx` command resolves to a blocked `.ps1` script.
+You can start developing by editing the files inside the **src/app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
 
-**Terminal 1 — API and SQLite:**
+## Get a fresh project
 
-```powershell
-cd server
-npm.cmd start
-```
-
-Leave it running. It should print `GoMap API on http://localhost:4000`. Open `http://localhost:4000/api/health` in your computer's browser; it should show `{"ok":true}`. The SQLite file is created at `server/data/gomap.sqlite`.
-
-**Before Terminal 2, if using a real phone:** run `ipconfig` and find your computer's Wi-Fi adapter **IPv4 Address** (for example `192.168.1.23`). Create `mobile/.env.local` with one line, replacing the example address with *your* IPv4 address:
-
-```text
-EXPO_PUBLIC_API_URL=http://192.168.1.23:4000
-```
-
-The line belongs in `.env.local`, not in `api.ts` or `seed.js`. The file is ignored by Git. Your phone and computer must be on the same network, and the firewall must allow port 4000.
-
-**Terminal 2 — mobile app:**
-
-```powershell
-cd mobile
-npx.cmd expo start
-```
-
-Leave this running too. Expo displays a QR code. On Android, scan it from **Expo Go → Scan QR code**; on iPhone, scan it with the Camera app. If the phone cannot load the Expo project, check the network or try `npx.cmd expo start --tunnel`. A tunnel helps Expo reach the phone, but the phone still needs access to the API address in `.env.local`.
-
-An Android emulator uses `http://10.0.2.2:4000` by default and does not need `.env.local`; an iOS simulator uses `http://localhost:4000`. After changing `.env.local`, reload the app in Expo Go. Stop either terminal with **Ctrl+C**. This API is for local development only; it has no authentication and should not be exposed publicly.
-
-### Git Bash commands
-
-If you use Git Bash, open two terminals in the `GoMap` folder. Run the API in the first:
+When you're ready, run:
 
 ```bash
-cd server
-"/c/Program Files/nodejs/node.exe" src/server.js
+npm run reset-project
 ```
 
-Run Expo in the second. Scan its QR code with Expo Go on Android:
+This command will move the starter code to the **example** directory and create a blank **src/app** directory where you can start developing.
 
-```bash
-cd mobile
-"/c/Program Files/nodejs/node.exe" node_modules/expo/bin/cli start --clear --lan
-```
+### Other setup steps
 
-For a real phone, set `mobile/.env.local` to your computer's Wi-Fi IPv4 address as shown above before starting Expo. Restart Expo after changing it.
+- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
+- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
+- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
 
-## Demo journey
+## Learn more
 
-1. Open **Find Help** and select **Ask about a scholarship**.
-2. See the suggested Financial Aid Office on the map, including the note that the match and pin need verification.
-3. Open **Search** and try `library` or `registration`; results come from the SQLite API.
-4. Open a destination and submit **Report an issue**. The API stores it in the `reports` table for review.
-5. Show a nonsense search to demonstrate the empty state; stop the API and tap **Retry** to demonstrate the connection error state.
+To learn more about developing your project with Expo, look at the following resources:
 
-## API
+- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
+- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
 
-| Endpoint | Purpose |
-| --- | --- |
-| `GET /api/health` | Health check |
-| `GET /api/places?q=&category=` | Search or filter seeded destinations |
-| `GET /api/places/:id` | Destination details |
-| `GET /api/services` | Need-to-service recommendations |
-| `POST /api/reports` | Save a correction report |
+## Join the community
 
-Run the API integration test with `cd server; npm.cmd test`. Type-check the app with `cd mobile; npx.cmd tsc --noEmit`.
+Join our community of developers creating universal apps.
 
-See [SPRINT_PLAN.md](SPRINT_PLAN.md) for the two-person plan, story priorities, stakeholder questions, and acceptance criteria.
+- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
+- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
