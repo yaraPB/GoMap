@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Platform, StyleSheet, View } from 'react-native';
 import { WebView, type WebViewMessageEvent } from 'react-native-webview';
+import CampusWebMap from './CampusWebMap';
 import type { Place } from './api';
 
 type Props = {
@@ -53,6 +54,7 @@ function vectorHtmlForPlaces(places: Place[]) {
       .pin.entrance{width:29px;height:29px;border-radius:6px;transform:rotate(45deg)}
       .pin.entrance:after{content:'E';width:auto;height:auto;background:transparent;color:#152b29;font:bold 12px Arial,sans-serif;transform:rotate(-45deg)}
       .maplibregl-ctrl-attrib{font:10px Arial,sans-serif!important}
+      .maplibregl-canvas{outline:none}
     </style>
     <script src="https://unpkg.com/maplibre-gl@5.6.1/dist/maplibre-gl.js"></script>
     </head><body><div id="map" role="img" aria-label="Interactive map of Al Akhawayn University"></div>
@@ -62,7 +64,7 @@ function vectorHtmlForPlaces(places: Place[]) {
         if(!window.maplibregl){send('error','MapLibre could not load. Check internet access.');return;}
         var data=${markers}; var pins=[]; var ready=false;
         try {
-          var map=new window.maplibregl.Map({container:'map',center:${JSON.stringify(center)},zoom:16.5,pitch:53,bearing:-23,
+          var map=new window.maplibregl.Map({container:'map',center:${JSON.stringify(center)},zoom:16.5,pitch:0,bearing:0,
             style:{version:8,sources:{campus:{type:'vector',url:'https://tiles.openfreemap.org/planet',attribution:'OpenFreeMap © OpenStreetMap'}},layers:[
               {id:'ground',type:'background',paint:{'background-color':'#484354'}},
               {id:'land',type:'fill',source:'campus','source-layer':'landcover',paint:{'fill-color':'#425c50','fill-opacity':0.85}},
@@ -82,12 +84,13 @@ function vectorHtmlForPlaces(places: Place[]) {
           window.gomap={
             focus:function(id){var p=data.find(function(item){return item.id===id;});if(p){map.flyTo({center:p.xy,zoom:17.5,pitch:52,offset:[0,-120],duration:550});}},
             filter:function(category){pins.forEach(function(item){item.pin.getElement().style.display=category==='All'||category===item.category?'':'none';});},
-            reset:function(){map.flyTo({center:${JSON.stringify(center)},zoom:16.5,pitch:53,bearing:-23,duration:500});},
+            reset:function(){map.flyTo({center:${JSON.stringify(center)},zoom:16.5,pitch:0,bearing:0,duration:500});},
             tilt:function(){map.easeTo({pitch:map.getPitch()>10?0:53,duration:500});}
           };
           map.on('load',function(){ready=true;send('ready');});
-          map.on('error',function(e){if(!ready){send('error',(e&&e.error&&e.error.message)||'Map tiles could not load.');}});
-          setTimeout(function(){if(!ready)send('error','Map tiles did not load. Check internet access.');},15000);
+          map.on('error',function(e){console.error('MapLibre error',e);send('error',(e&&e.error&&e.error.message)||'Map tiles could not load.');});
+          map.on('sourcedata',function(e){if(e.sourceId==='campus'&&e.isSourceLoaded){document.body.dataset.basemap='loaded';}});
+          setTimeout(function(){if(!ready)send('error','Map style did not load. Check browser network access.');},15000);
         }catch(e){send('error',String(e));}
       })();
     </script></body></html>`;
@@ -141,7 +144,8 @@ function rasterHtmlForPlaces(places: Place[]) {
 }
 
 export default function CampusMap({ places, category, focusPlaceId, resetToken, tiltToken, onSelect, onMapError, onMapReady }: Props) {
-  const web = useRef<WebView>(null);
+  if (Platform.OS === 'web') return <CampusWebMap places={places} category={category} focusPlaceId={focusPlaceId} resetToken={resetToken} tiltToken={tiltToken} onSelect={onSelect} onMapError={onMapError} onMapReady={onMapReady} />;
+  const web = useRef<any>(null);
   const [ready, setReady] = useState(false);
   const html = useMemo(() => htmlForPlaces(places, Platform.OS === 'android' ? 'raster' : 'vector'), [places]);
   const run = (script: string) => web.current?.injectJavaScript(`${script}; true;`);
@@ -160,8 +164,9 @@ export default function CampusMap({ places, category, focusPlaceId, resetToken, 
       if (message.type === 'select') onSelect(message.detail);
     } catch { onMapError('Map response could not be read.'); }
   };
+  const NativeMap = WebView;
   return <View style={StyleSheet.absoluteFill}>
-    <WebView ref={web} style={styles.web} originWhitelist={['*']} source={{ html, baseUrl: 'https://tiles.openfreemap.org/' }}
+    <NativeMap ref={web} style={styles.web} originWhitelist={['*']} source={{ html, baseUrl: 'https://tiles.openfreemap.org/' }}
       javaScriptEnabled domStorageEnabled onMessage={handleMessage}
       androidLayerType={Platform.OS === 'android' ? 'software' : undefined}
       onError={() => onMapError('Map view could not load.')}

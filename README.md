@@ -1,15 +1,14 @@
 # GoMap Revamped
 
-React Native + TypeScript mobile prototype backed by a Node.js + SQLite API. The first increment implements a complete discovery flow: search or select a campus service, open a destination on the map, and submit a correction report stored in SQLite.
+React Native + TypeScript mobile prototype backed by a Node.js + SQLite API. The mobile experience is a single, map-first GoMap screen for exploring AUI, searching campus destinations, and filtering the map. The browser map uses MapTiler satellite hybrid imagery, terrain, and 3D building shapes when a local MapTiler key is configured.
 
 ## What was implemented
 
 | Implemented | Current limit |
 | --- | --- |
-| React Native home, search, help, map, destination details, and saved places screens | Saved places last only for the app session |
-| Node API with SQLite for destinations, service suggestions, search, and correction reports | The 14 destinations and four service matches are sample data |
-| Category pins, map controls, loading errors, and retry | The latest Android map change still needs a phone check |
-| Report an issue from a destination | Reports are stored, but there is no reviewer screen yet |
+| Single-screen campus map with search, category filters, 3D toggle, and selected-place card | The 14 destinations are sample locations pending AUI verification |
+| Browser map with MapTiler satellite hybrid imagery, terrain, and building extrusions | MapTiler key is local development configuration; set a permitted origin for deployment |
+| API with SQLite destination search and service suggestions | Entrances and walking routes are not verified; the current sample data has no verified entrances |
 
 > **What needs to be done:** Talk to stakeholders. There are no verified walking directions, AI assistant, AR navigation, or admin publishing flow yet. That matches the priorities in [SPRINT_PLAN.md](SPRINT_PLAN.md).
 
@@ -73,11 +72,10 @@ For a real phone, set `mobile/.env.local` to your computer's Wi-Fi IPv4 address 
 
 ## Demo journey
 
-1. Open **Find Help** and select **Ask about a scholarship**.
-2. See the suggested Financial Aid Office on the map, including the note that the match and pin need verification.
-3. Open **Search** and try `library` or `registration`; results come from the SQLite API.
-4. Open a destination and submit **Report an issue**. The API stores it in the `reports` table for review.
-5. Show a nonsense search to demonstrate the empty state; stop the API and tap **Retry** to demonstrate the connection error state.
+1. Open the map and try the **Academic**, **Services**, **Dining**, and **Housing** filters.
+2. Search for `library`, `registration`, or `sports` and select a result to focus it on the map.
+3. Use the **3D/2D** toggle and center control to inspect the campus view.
+4. Select a place and point out the notice that its sample pin needs AUI verification.
 
 ## API
 
