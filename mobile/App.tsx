@@ -1,10 +1,11 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, KeyboardAvoidingView, Platform, Pressable, ScrollView, StatusBar, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
-import { api, API_URL, type Place, type Service } from './src/api';
+import { api, API_URL, type ChatTurn, type Place, type Service } from './src/api';
 import CampusMap from './src/CampusMap';
+import ARPreview from './src/ARPreview';
 
-type Screen = 'home' | 'map' | 'search' | 'help' | 'saved' | 'report';
+type Screen = 'home' | 'map' | 'search' | 'help' | 'saved' | 'report' | 'assistant' | 'ar';
 const green = '#138c67', dark = '#152b29';
 const colors: Record<string, string> = { 'Dining Services': '#db686b', Residential: '#dc8500', Facilities: '#6c7a8c', 'Campus Services': '#119d97', Academic: '#3269d5', Administrative: '#6650dd', 'Athletics & Recreation': '#1da853' };
 const categories = ['All', ...Object.keys(colors)];
@@ -40,6 +41,10 @@ function GoMapApp() {
   const [mapReloadKey, setMapReloadKey] = useState(0);
   const [resetToken, setResetToken] = useState(0);
   const [tiltToken, setTiltToken] = useState(0);
+  const [question, setQuestion] = useState('');
+  const [chat, setChat] = useState<(ChatTurn & { suggestions?: string[] })[]>([]);
+  const [asking, setAsking] = useState(false);
+  const [assistantError, setAssistantError] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true); setError('');
@@ -70,13 +75,26 @@ function GoMapApp() {
     catch (e) { Alert.alert('Could not submit', e instanceof Error ? e.message : 'Try again.'); }
     finally { setSending(false); }
   };
+  const ask = async () => {
+    const message = question.trim();
+    if (!message || asking) return;
+    const history = chat.slice(-6).map(({ role, text }) => ({ role, text }));
+    setChat(current => [...current, { role: 'user', text: message }]);
+    setQuestion(''); setAssistantError(''); setAsking(true);
+    try {
+      const result = await api.askAssistant(message, history);
+      setChat(current => [...current, { role: 'assistant', text: result.answer, suggestions: result.suggestedPlaces.map(place => place.id) }]);
+    } catch (error) {
+      setAssistantError(error instanceof Error ? error.message : 'Assistant unavailable. Try again.');
+    } finally { setAsking(false); }
+  };
   const header = (title: string) => <View style={styles.header}><Text style={styles.brand}>⌘</Text><Text style={styles.headerTitle}>{title}</Text><Pressable accessibilityLabel="Open campus map" onPress={() => go('map')}><Text style={styles.brand}>◈</Text></Pressable></View>;
 
-  return <SafeAreaView style={[styles.safe, screen === 'map' && { backgroundColor: '#484354' }]}>
-    <StatusBar barStyle={screen === 'map' ? 'light-content' : 'dark-content'} />
+  return <SafeAreaView style={[styles.safe, (screen === 'map' || screen === 'ar') && { backgroundColor: '#152b29' }]}>
+    <StatusBar barStyle={screen === 'map' || screen === 'ar' ? 'light-content' : 'dark-content'} />
     {screen === 'home' && <ScrollView style={styles.page}>{header('Home')}<View style={styles.hero}><Text style={styles.heroSmall}>Good day,</Text><Text style={styles.heroTitle}>Welcome to GoCampus</Text><Text style={styles.heroSmall}>Your campus companion</Text></View><View style={styles.content}>
       <View style={styles.quickGrid}>{([['◈', 'Campus Map', 'map'], ['⌕', 'Search', 'search'], ['✦', 'Find Help', 'help']] as const).map(([icon, label, target]) => <Pressable key={target} onPress={() => go(target)} style={styles.quick}><Text style={styles.quickIcon}>{icon}</Text><Text style={styles.quickText}>{label}</Text></Pressable>)}</View>
-      <Text style={styles.section}>Quick Access</Text><Text style={styles.muted}>Find a destination or the right service</Text><Button title="What do you need help with?" onPress={() => go('help')} />
+      <Text style={styles.section}>Quick Access</Text><Text style={styles.muted}>Find a destination or the right service</Text><Button title="What do you need help with?" onPress={() => go('help')} /><Button title="Ask the AI campus assistant" secondary onPress={() => go('assistant')} />
       <Text style={styles.section}>Popular destinations</Text><Text style={styles.muted}>Curated examples; not search analytics</Text>
       {places.filter(p => ['financial-aid', 'm6-library', 'academic-building'].includes(p.id)).map(p => <PlaceRow key={p.id} place={p} onPress={() => openPlace(p)} />)}
     </View></ScrollView>}
@@ -92,7 +110,7 @@ function GoMapApp() {
         <Pressable onPress={() => go('saved')} style={styles.circle} accessibilityLabel="Saved places"><Text style={styles.circleText}>☆</Text></Pressable>
       </View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll} contentContainerStyle={styles.chips}>{categories.map(c => <Pressable key={c} onPress={() => setCategory(c)} style={[styles.chip, category === c && { backgroundColor: green }]}><Text style={[styles.chipText, category === c && { color: '#fff' }]}>{c}</Text></Pressable>)}</ScrollView>
-      {!selected && <View style={styles.mapTools}>{Platform.OS !== 'android' && <Pressable onPress={() => setTiltToken(n => n + 1)} style={styles.tool} accessibilityLabel="Toggle map tilt"><Text style={styles.toolText}>▱</Text></Pressable>}<Pressable onPress={() => setResetToken(n => n + 1)} style={styles.tool} accessibilityLabel="Center on campus"><Text style={styles.toolText}>◎</Text></Pressable></View>}
+      {!selected && <View style={styles.mapTools}><Pressable onPress={() => setTiltToken(n => n + 1)} style={styles.tool} accessibilityLabel="Toggle map tilt"><Text style={styles.toolText}>▱</Text></Pressable><Pressable onPress={() => setResetToken(n => n + 1)} style={styles.tool} accessibilityLabel="Center on campus"><Text style={styles.toolText}>◎</Text></Pressable></View>}
       {!!mapError && <View style={styles.mapError}><Text style={styles.mapErrorTitle}>Map could not load</Text><Text style={styles.mapErrorText}>{mapError}</Text><Button title="Retry map" onPress={() => { setMapError(''); setMapReloadKey(n => n + 1); }} /><Button title="Browse destinations" secondary onPress={() => go('search')} /></View>}
       {!selected && <View style={styles.mapBottom}><Text style={styles.sample}>Live map · sample pins</Text><View style={styles.inline}><Pressable onPress={() => go('help')} style={styles.mapAction}><Text style={styles.mapActionText}>⌖  Find help</Text></Pressable><Pressable onPress={() => go('search')} style={styles.mapAction}><Text style={styles.mapActionText}>⌕  Search</Text></Pressable></View></View>}
       {selected && <View style={styles.sheet}><View style={styles.handle} /><Pressable onPress={() => { setSelected(null); setService(null); }} style={styles.close}><Text style={styles.closeText}>×</Text></Pressable><Text style={styles.badge}>{selected.category}</Text>
@@ -101,9 +119,12 @@ function GoMapApp() {
         {service && <View style={styles.notice}><Text style={styles.noticeTitle}>{service.title}</Text><Text style={styles.noticeText}>{service.note}</Text></View>}
         <Text style={styles.meta}>◷  {selected.hours || 'Hours awaiting verification'}</Text><Text style={styles.meta}>⌖  {selected.entrance || 'Sample pin · entrance to be confirmed'}</Text>
         <View style={styles.notice}><Text style={styles.noticeText}>Walking directions will be enabled after entrances and paths are checked on campus.</Text></View>
+        <Button title="Open camera guide" onPress={() => setScreen('ar')} />
         <Button title="Report an issue" secondary onPress={() => { setIssue(issues[0]); setDetails(''); setScreen('report'); }} />
       </View>}
     </View>}
+
+    {screen === 'ar' && selected && <ARPreview place={selected} onClose={() => setScreen('map')} />}
 
     {screen === 'search' && <View style={styles.page}>{header('Search')}<View style={styles.content}><Text style={styles.screenTitle}>Where are you going?</Text><TextInput autoFocus value={query} onChangeText={setQuery} placeholder="Building, service, office…" placeholderTextColor="#82918d" style={styles.input} accessibilityLabel="Search campus" /><Text style={styles.label}>{query ? 'SEARCH RESULTS' : 'QUICK DESTINATIONS'}</Text></View>
       <FlatList data={query ? searchResults : places.filter(p => ['financial-aid', 'm6-library', 'academic-building', 'it-service-desk'].includes(p.id))} keyExtractor={p => p.id} renderItem={({ item }) => <PlaceRow place={item} onPress={() => openPlace(item)} />} ListEmptyComponent={<Text style={styles.empty}>No matching destination. Try a service name or another spelling.</Text>} />
@@ -112,7 +133,26 @@ function GoMapApp() {
     {screen === 'help' && <ScrollView style={styles.page}>{header('Find help')}<View style={styles.content}><Text style={styles.screenTitle}>What problem do you have?</Text><Text style={styles.muted}>Choose a request to see its suggested contact and map location.</Text><Text style={styles.label}>CAMPUS SERVICES</Text>
       {services.map(s => <Pressable key={s.id} onPress={() => openService(s)} style={styles.service}><Text style={styles.serviceIcon}>✦</Text><View style={{ flex: 1 }}><Text style={styles.rowTitle}>{s.title}</Text><Text style={styles.sub}>{s.description}</Text></View><Text style={styles.chevron}>›</Text></Pressable>)}
       <View style={styles.notice}><Text style={styles.noticeText}>These matches are suggestions from sample records. AUI staff need to confirm the offices and processes.</Text></View>
+      <Button title="Ask the AI campus assistant" onPress={() => go('assistant')} />
     </View></ScrollView>}
+
+    {screen === 'assistant' && <View style={styles.page}>{header('AI assistant')}
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        <Text style={styles.screenTitle}>Ask about campus</Text>
+        <Text style={styles.muted}>Answers use the sample campus records. Verify offices, hours and entrances with AUI.</Text>
+        {chat.length === 0 && <View style={styles.notice}><Text style={styles.noticeText}>Try “Where can I ask about a scholarship?” or “How do I find Wi-Fi help?”</Text></View>}
+        {chat.map((turn, index) => <View key={index} style={[styles.chatBubble, turn.role === 'user' && styles.chatUser]}>
+          <Text style={styles.body}>{turn.text}</Text>
+          {turn.suggestions?.map(id => {
+            const place = places.find(item => item.id === id);
+            return place ? <Pressable key={id} onPress={() => openPlace(place)}><Text style={styles.chatLink}>View {place.name} on map →</Text></Pressable> : null;
+          })}
+        </View>)}
+        {asking && <ActivityIndicator color={green} />}
+        {!!assistantError && <Text style={styles.assistantError}>{assistantError}</Text>}
+      </ScrollView>
+      <View style={styles.chatComposer}><TextInput value={question} onChangeText={setQuestion} placeholder="Ask a campus question…" placeholderTextColor="#82918d" style={[styles.input, { flex: 1 }]} maxLength={500} accessibilityLabel="Question for AI assistant" onSubmitEditing={ask} /><Pressable onPress={ask} disabled={asking || !question.trim()} style={[styles.chatSend, (asking || !question.trim()) && { opacity: 0.5 }]}><Text style={styles.buttonText}>Send</Text></Pressable></View>
+    </View>}
 
     {screen === 'saved' && <View style={styles.page}>{header('Saved places')}<View style={styles.content}><Text style={styles.screenTitle}>Saved places</Text><Text style={styles.muted}>Shortcuts saved for this app session</Text></View><FlatList data={places.filter(p => saved.includes(p.id))} keyExtractor={p => p.id} renderItem={({ item }) => <PlaceRow place={item} onPress={() => openPlace(item)} />} ListEmptyComponent={<Text style={styles.empty}>No saved places yet. Open a destination and tap Save.</Text>} /></View>}
 
@@ -124,7 +164,7 @@ function GoMapApp() {
 
     {loading && <View style={styles.overlay}><ActivityIndicator size="large" color={green} /><Text style={styles.muted}>Loading campus information…</Text></View>}
     {!!error && <View style={styles.error}><Text style={styles.section}>Campus data unavailable</Text><Text style={styles.body}>{error}</Text><Button title="Retry" onPress={load} /></View>}
-    {screen !== 'map' && screen !== 'report' && <View style={styles.nav}>{([['⌂', 'Home', 'home'], ['◈', 'GoMap', 'map'], ['✦', 'Help', 'help'], ['☆', 'Saved', 'saved']] as const).map(([icon, label, target]) => <Pressable key={target} onPress={() => go(target)} style={styles.navItem}><Text style={[styles.navIcon, screen === target && { color: green }]}>{icon}</Text><Text style={[styles.navLabel, screen === target && { color: green }]}>{label}</Text></Pressable>)}</View>}
+    {screen !== 'map' && screen !== 'report' && screen !== 'ar' && <View style={styles.nav}>{([['⌂', 'Home', 'home'], ['◈', 'GoMap', 'map'], ['✦', 'Help', 'help'], ['◎', 'AI', 'assistant'], ['☆', 'Saved', 'saved']] as const).map(([icon, label, target]) => <Pressable key={target} onPress={() => go(target)} style={styles.navItem}><Text style={[styles.navIcon, screen === target && { color: green }]}>{icon}</Text><Text style={[styles.navLabel, screen === target && { color: green }]}>{label}</Text></Pressable>)}</View>}
   </SafeAreaView>;
 }
 
@@ -147,4 +187,10 @@ const styles = StyleSheet.create({
   service: { backgroundColor: '#fff', borderRadius: 12, borderWidth: 1, borderColor: '#e3ede8', padding: 14, marginBottom: 9, flexDirection: 'row', alignItems: 'center' }, serviceIcon: { color: green, fontSize: 24, marginRight: 12 }, back: { color: green, fontWeight: '700', marginBottom: 15 }, issue: { backgroundColor: '#fff', padding: 11, borderRadius: 9, borderWidth: 1, borderColor: '#e2eae5', marginBottom: 6 }, details: { height: 116, textAlignVertical: 'top', paddingTop: 12, marginBottom: 11 },
   nav: { height: 62, backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: '#e2e9e5', flexDirection: 'row' }, navItem: { flex: 1, alignItems: 'center', justifyContent: 'center' }, navIcon: { color: '#84948d', fontSize: 23 }, navLabel: { color: '#84948d', fontSize: 11, marginTop: 2 },
   overlay: { ...StyleSheet.absoluteFill, backgroundColor: '#ffffffec', alignItems: 'center', justifyContent: 'center', zIndex: 10 }, error: { position: 'absolute', left: 20, right: 20, top: '27%', backgroundColor: '#fff', padding: 20, borderRadius: 13, elevation: 9, zIndex: 11 },
+  chatBubble: { alignSelf: 'flex-start', maxWidth: '92%', backgroundColor: '#fff', borderRadius: 12, padding: 12, marginVertical: 6, borderWidth: 1, borderColor: '#e5ece8' },
+  chatUser: { alignSelf: 'flex-end', backgroundColor: '#e4f5ec' },
+  chatLink: { color: green, fontWeight: '700', marginTop: 10 },
+  chatComposer: { flexDirection: 'row', gap: 8, padding: 12, backgroundColor: '#fff' },
+  chatSend: { backgroundColor: green, borderRadius: 10, minWidth: 60, alignItems: 'center', justifyContent: 'center' },
+  assistantError: { color: '#b23636', marginTop: 10 },
 });

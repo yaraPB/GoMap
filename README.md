@@ -1,94 +1,92 @@
-# GoMap Revamped
+# GoMap
 
-React Native + TypeScript mobile prototype backed by a Node.js + SQLite API. The first increment implements a complete discovery flow: search or select a campus service, open a destination on the map, and submit a correction report stored in SQLite.
+Expo SDK 58 React Native app with a TypeScript/Express/SQLite API. Search sample AUI campus places, view them on Mapbox, ask a Gemini-powered assistant about the records, report corrections, and open a camera guide for a selected destination.
 
-## What was implemented
+## Requirements
 
-| Implemented | Current limit |
+- Node.js 22.13+ (Node 24 is recommended for the built-in SQLite module)
+- Android phone with [Expo Go for SDK 58](https://expo.dev/go?device=true&platform=android&sdkVersion=58)
+- A [Mapbox public token](https://account.mapbox.com/access-tokens/) beginning with `pk.`
+- Optional: a [Gemini API key](https://aistudio.google.com/app/apikey) for the AI assistant. The default model is `gemini-3.5-flash-lite`; check Google's current [free-tier limits](https://ai.google.dev/gemini-api/docs/pricing).
+
+The Mapbox token is public and goes in the Expo environment file. Keep the Gemini key in the server environment file only.
+
+## Run on an Android phone
+
+Use two terminals in this folder. In PowerShell, use `npm.cmd` and `npx.cmd` if script execution blocks `npm` or `npx`.
+
+1. Install dependencies:
+
+   ```powershell
+   cd server
+   npm.cmd ci
+   cd ../mobile
+   npm.cmd ci
+   ```
+
+2. Find your computer's Wi-Fi IPv4 address with `ipconfig`. The phone and computer must use the same network. Copy `mobile/.env.example` to `mobile/.env.local`, replace the sample IP, and add your Mapbox token:
+
+   ```text
+   EXPO_PUBLIC_API_URL=http://192.168.1.23:4000
+   EXPO_PUBLIC_MAPBOX_TOKEN=pk.your-public-token
+   ```
+
+   For an Android emulator, use `http://10.0.2.2:4000` as the API URL. The Mapbox token is still required.
+
+3. Optional AI setup: copy `server/.env.example` to `server/.env` and set `GEMINI_API_KEY`. If no key is configured, the rest of the app works and the assistant shows a setup message. The server reads `.env` at startup.
+
+4. Start the API in the first terminal:
+
+   ```powershell
+   cd server
+   npm.cmd start
+   ```
+
+   Check `http://localhost:4000/api/health` in a computer browser; it should return `{"ok":true}`.
+
+5. Start Expo in the second terminal:
+
+   ```powershell
+   cd mobile
+   npx.cmd expo start --clear --lan
+   ```
+
+   Scan the QR code from Expo Go. If Expo Go says the project SDK is incompatible, install the **SDK 58 Android build** from the link above, then restart Expo. If the QR code cannot reach Metro, try `npx.cmd expo start --clear --tunnel`. The phone must still reach the API IP and port 4000; allow it through the Windows firewall if needed. Restart Expo after changing `.env.local`.
+
+## Features and limits
+
+| Feature | Current behavior |
 | --- | --- |
-| React Native home, search, help, map, destination details, and saved places screens | Saved places last only for the app session |
-| Node API with SQLite for destinations, service suggestions, search, and correction reports | The 14 destinations and four service matches are sample data |
-| Category pins, map controls, loading errors, and retry | The latest Android map change still needs a phone check |
-| Report an issue from a destination | Reports are stored, but there is no reviewer screen yet |
+| Map | Mapbox GL JS in an Expo Go compatible WebView, using a public token. Place pins remain sample coordinates. Requires internet and device WebGL support. |
+| AI assistant | Sends the question and short conversation history to the Express API. The server supplies the sample place/service records to Gemini and checks returned place IDs before linking them. It can still make mistakes, so verify details with AUI. |
+| Camera guide | Opens the real camera, estimates straight-line distance and turn direction from phone GPS/compass, and captures a temporary photo preview. It is a visual aid, not spatial AR or a verified walking route. No photo is uploaded. |
+| Reports | Stores corrections in SQLite for review without changing published place data. |
 
-> **What needs to be done:** Talking to stakehodlers. There are no verified walking directions, AI assistant, AR navigation, or admin publishing flow yet. That matches the priorities in [SPRINT_PLAN.md](C:/Users/yarak/Desktop/GoMap/SPRINT_PLAN.md).
-
-## Run locally for the first time (Windows)
-
-You do **not** need to install React Native globally. This project already has Expo and React Native in `mobile/node_modules`. You need Node.js 22.13+ and the **Expo Go** app on an Android or iPhone. An Android emulator also works.
-
-Open two PowerShell terminals in the `GoMap` folder. In **each** terminal, run this first so Node is on the path:
-
-```powershell
-$env:Path = "C:\Program Files\nodejs;$env:Path"
-```
-
-Use `npm.cmd` and `npx.cmd` in PowerShell. On some Windows setups, the plain `npm` or `npx` command resolves to a blocked `.ps1` script.
-
-**Terminal 1 — API and SQLite:**
-
-```powershell
-cd server
-npm.cmd start
-```
-
-Leave it running. It should print `GoMap API on http://localhost:4000`. Open `http://localhost:4000/api/health` in your computer's browser; it should show `{"ok":true}`. The SQLite file is created at `server/data/gomap.sqlite`.
-
-**Before Terminal 2, if using a real phone:** run `ipconfig` and find your computer's Wi-Fi adapter **IPv4 Address** (for example `192.168.1.23`). Create `mobile/.env.local` with one line, replacing the example address with *your* IPv4 address:
-
-```text
-EXPO_PUBLIC_API_URL=http://192.168.1.23:4000
-```
-
-The line belongs in `.env.local`, not in `api.ts` or `seed.js`. The file is ignored by Git. Your phone and computer must be on the same network, and the firewall must allow port 4000.
-
-**Terminal 2 — mobile app:**
-
-```powershell
-cd mobile
-npx.cmd expo start
-```
-
-Leave this running too. Expo displays a QR code. On Android, scan it from **Expo Go → Scan QR code**; on iPhone, scan it with the Camera app. If the phone cannot load the Expo project, check the network or try `npx.cmd expo start --tunnel`. A tunnel helps Expo reach the phone, but the phone still needs access to the API address in `.env.local`.
-
-An Android emulator uses `http://10.0.2.2:4000` by default and does not need `.env.local`; an iOS simulator uses `http://localhost:4000`. After changing `.env.local`, reload the app in Expo Go. Stop either terminal with **Ctrl+C**. This API is for local development only; it has no authentication and should not be exposed publicly.
-
-### Git Bash commands
-
-If you use Git Bash, open two terminals in the `GoMap` folder. Run the API in the first:
-
-```bash
-cd server
-"/c/Program Files/nodejs/node.exe" src/server.js
-```
-
-Run Expo in the second. Scan its QR code with Expo Go on Android:
-
-```bash
-cd mobile
-"/c/Program Files/nodejs/node.exe" node_modules/expo/bin/cli start --clear --lan
-```
-
-For a real phone, set `mobile/.env.local` to your computer's Wi-Fi IPv4 address as shown above before starting Expo. Restart Expo after changing it.
-
-## Demo journey
-
-1. Open **Find Help** and select **Ask about a scholarship**.
-2. See the suggested Financial Aid Office on the map, including the note that the match and pin need verification.
-3. Open **Search** and try `library` or `registration`; results come from the SQLite API.
-4. Open a destination and submit **Report an issue**. The API stores it in the `reports` table for review.
-5. Show a nonsense search to demonstrate the empty state; stop the API and tap **Retry** to demonstrate the connection error state.
+Mapbox usage can incur charges beyond its account limits. Gemini free-tier availability and limits depend on the Google account and model. API keys and tokens are not included in this repository.
 
 ## API
 
 | Endpoint | Purpose |
 | --- | --- |
 | `GET /api/health` | Health check |
-| `GET /api/places?q=&category=` | Search or filter seeded destinations |
-| `GET /api/places/:id` | Destination details |
-| `GET /api/services` | Need-to-service recommendations |
+| `GET /api/places?q=&category=` | Search/filter places |
+| `GET /api/places/:id` | Place details |
+| `GET /api/services` | Suggested service matches |
 | `POST /api/reports` | Save a correction report |
+| `POST /api/assistant` | Gemini answer grounded in sample records |
 
-Run the API integration test with `cd server; npm.cmd test`. Type-check the app with `cd mobile; npx.cmd tsc --noEmit`.
+## Verify
 
-See [SPRINT_PLAN.md](SPRINT_PLAN.md) for the two-person plan, story priorities, stakeholder questions, and acceptance criteria.
+```powershell
+cd server
+npm.cmd run check
+npm.cmd test
+npm.cmd run build
+cd ../mobile
+npx.cmd expo install --check
+npx.cmd tsc --noEmit
+npm.cmd test
+npx.cmd expo export --platform android
+```
+
+The SQLite database is created at `server/data/gomap.sqlite`. Set `GOMAP_DB` to use another file. The API is designed for local development and has no authentication; do not expose it on a public network.

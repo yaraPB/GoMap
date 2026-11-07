@@ -6,6 +6,11 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
+    "plugins": [
+      ["expo-camera", { "cameraPermission": "Allow GoMap to show the camera guide and capture a photo.", "recordAudioAndroid": false }],
+      ["expo-location", { "locationWhenInUsePermission": "Allow GoMap to estimate the direction to a selected campus place." }],
+      "expo-status-bar"
+    ],
     "ios": {
       "supportsTablet": true
     },

@@ -1,3 +1,6 @@
 wireframes.html
 server/data/
+server/node_modules/
 mobile/.env.local
+server/.env
+server/dist/

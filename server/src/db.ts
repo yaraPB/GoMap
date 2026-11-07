@@ -3,7 +3,7 @@ import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { seedPlaces, seedServices } from './seed.js';
 
-export function openDatabase(file) {
+export function openDatabase(file: string): DatabaseSync {
   if (file !== ':memory:') mkdirSync(dirname(file), { recursive: true });
   const db = new DatabaseSync(file);
   db.exec(`
