@@ -41,6 +41,8 @@ function GoMapApp() {
   const [mapReloadKey, setMapReloadKey] = useState(0);
   const [resetToken, setResetToken] = useState(0);
   const [tiltToken, setTiltToken] = useState(0);
+  const [satelliteToken, setSatelliteToken] = useState(0);
+  const [satelliteOn, setSatelliteOn] = useState(false);
   const [question, setQuestion] = useState('');
   const [chat, setChat] = useState<(ChatTurn & { suggestions?: string[] })[]>([]);
   const [asking, setAsking] = useState(false);
@@ -101,7 +103,7 @@ function GoMapApp() {
 
     {screen === 'map' && <View style={styles.mapWrap}>
       <CampusMap key={mapReloadKey} places={places} category={category} focusPlaceId={selected?.id || null}
-        resetToken={resetToken} tiltToken={tiltToken}
+        resetToken={resetToken} tiltToken={tiltToken} satelliteToken={satelliteToken}
         onSelect={id => { const place = places.find(p => p.id === id); if (place) { setSelected(place); setService(null); } }}
         onMapError={setMapError} onMapReady={() => setMapError('')} />
       <View style={styles.mapTop}>
@@ -110,7 +112,7 @@ function GoMapApp() {
         <Pressable onPress={() => go('saved')} style={styles.circle} accessibilityLabel="Saved places"><Text style={styles.circleText}>☆</Text></Pressable>
       </View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll} contentContainerStyle={styles.chips}>{categories.map(c => <Pressable key={c} onPress={() => setCategory(c)} style={[styles.chip, category === c && { backgroundColor: green }]}><Text style={[styles.chipText, category === c && { color: '#fff' }]}>{c}</Text></Pressable>)}</ScrollView>
-      {!selected && <View style={styles.mapTools}><Pressable onPress={() => setTiltToken(n => n + 1)} style={styles.tool} accessibilityLabel="Toggle map tilt"><Text style={styles.toolText}>▱</Text></Pressable><Pressable onPress={() => setResetToken(n => n + 1)} style={styles.tool} accessibilityLabel="Center on campus"><Text style={styles.toolText}>◎</Text></Pressable></View>}
+      {!selected && <View style={styles.mapTools}><Pressable onPress={() => setTiltToken(n => n + 1)} style={styles.tool} accessibilityLabel="Toggle 3D view"><Text style={styles.toolText}>3D</Text></Pressable><Pressable onPress={() => { setSatelliteOn(on => !on); setSatelliteToken(n => n + 1); }} style={styles.tool} accessibilityLabel={satelliteOn ? 'Switch to standard map' : 'Switch to satellite map'}><Text style={styles.toolText}>◉</Text></Pressable><Pressable onPress={() => setResetToken(n => n + 1)} style={styles.tool} accessibilityLabel="Center on campus"><Text style={styles.toolText}>◎</Text></Pressable></View>}
       {!!mapError && <View style={styles.mapError}><Text style={styles.mapErrorTitle}>Map could not load</Text><Text style={styles.mapErrorText}>{mapError}</Text><Button title="Retry map" onPress={() => { setMapError(''); setMapReloadKey(n => n + 1); }} /><Button title="Browse destinations" secondary onPress={() => go('search')} /></View>}
       {!selected && <View style={styles.mapBottom}><Text style={styles.sample}>Live map · sample pins</Text><View style={styles.inline}><Pressable onPress={() => go('help')} style={styles.mapAction}><Text style={styles.mapActionText}>⌖  Find help</Text></Pressable><Pressable onPress={() => go('search')} style={styles.mapAction}><Text style={styles.mapActionText}>⌕  Search</Text></Pressable></View></View>}
       {selected && <View style={styles.sheet}><View style={styles.handle} /><Pressable onPress={() => { setSelected(null); setService(null); }} style={styles.close}><Text style={styles.closeText}>×</Text></Pressable><Text style={styles.badge}>{selected.category}</Text>
