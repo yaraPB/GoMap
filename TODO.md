@@ -68,7 +68,6 @@ This is the roadmap for moving the current local prototype toward a dependable c
 
 ### Reliability, privacy, and quality
 
-- [ ] Persist saved places across app launches; consider accounts and sync only if users need them.
 - [ ] Add API authentication and authorization before exposing reports or editing tools publicly. Restrict CORS and protect write endpoints.
 - [ ] Add meaningful tests for search, AI validation, camera permission failures, and on-device map behavior. Test on the actual Android phones used by students.
 - [ ] Add offline or poor-connection behavior for essential place details, subject to the map provider's caching rules.

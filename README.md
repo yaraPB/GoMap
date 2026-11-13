@@ -2,7 +2,23 @@
 
 GoMap is a campus discovery prototype for Al Akhawayn University. The mobile app helps someone find a place or the office likely to handle a request, view a sample pin, and report information that needs correction. It also includes an AI assistant and a camera-based direction guide.
 
-**Project status:** local prototype. The seeded destinations, coordinates, service matches, hours, and entrances have not been approved as official campus information. The camera guide is not a verified walking route.
+**Project status:** local prototype. The seeded destinations, coordinates, service matches, hours, and entrances have not been approved as official campus information. The camera guide is not a verified walking route.#
+
+## Running the application
+
+Server
+
+```bash
+cd ~/Desktop/GoMap/server
+npm run dev
+```
+
+Mobile
+
+```bash
+cd ~/Desktop/GoMap/mobile
+npm start
+```
 
 ## Features
 
@@ -13,7 +29,6 @@ GoMap is a campus discovery prototype for Al Akhawayn University. The mobile app
 | Search | Searches places by name, description, and service terms through the API; includes an empty state. |
 | Find help | Shows sample needs such as scholarship, registration, Wi-Fi, and library help, then opens the suggested destination. |
 | Place details | Shows a description, category, and any available hours or entrance information. Missing details are labeled as awaiting verification. |
-| Saved places | Lets users bookmark places during the current app session. |
 | Correction reports | Accepts an issue type and details for a place. The API stores the report in SQLite without changing the published place record. |
 | AI assistant | Sends a question and recent chat history to the server. The server gives Gemini the sample place and service records, requests a JSON answer, and links only place IDs found in the database. The assistant can still be wrong. |
 | Camera guide | Opens the phone camera for a selected place, estimates straight-line distance and turn direction from GPS and compass readings, and captures a photo preview in the app cache. It does not upload photos or provide spatial AR routing. |
@@ -154,7 +169,6 @@ npx expo export --platform android
 ## Current limits
 
 - Pins and service suggestions are sample data. AUI staff must verify locations, entrances, hours, contacts, and processes before public use.
-- Saved places exist only for the current app session. There is no account or synchronization.
 - The camera arrow uses approximate GPS and compass readings; it does not account for buildings, paths, closures, or accessible entrances.
 - The assistant is limited to the seeded records but can still produce an inaccurate answer. It needs evaluation against approved information.
 - The API has no authentication or report review interface and is intended for local development. Do not expose it directly to the public internet.

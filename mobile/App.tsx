@@ -4,8 +4,9 @@ import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { api, API_URL, type ChatTurn, type Place, type Service } from './src/api';
 import CampusMap from './src/CampusMap';
 import ARPreview from './src/ARPreview';
+import AdminDashboard from './src/AdminDashboard';
 
-type Screen = 'home' | 'map' | 'search' | 'help' | 'saved' | 'report' | 'assistant' | 'ar';
+type Screen = 'home' | 'map' | 'search' | 'help' | 'report' | 'assistant' | 'ar' | 'admin';
 const green = '#138c67', dark = '#152b29';
 const colors: Record<string, string> = { 'Dining Services': '#db686b', Residential: '#dc8500', Facilities: '#6c7a8c', 'Campus Services': '#119d97', Academic: '#3269d5', Administrative: '#6650dd', 'Athletics & Recreation': '#1da853' };
 const categories = ['All', ...Object.keys(colors)];
@@ -31,7 +32,6 @@ function GoMapApp() {
   const [category, setCategory] = useState('All');
   const [query, setQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Place[]>([]);
-  const [saved, setSaved] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [issue, setIssue] = useState(issues[0]);
@@ -99,7 +99,10 @@ function GoMapApp() {
       <Text style={styles.section}>Quick Access</Text><Text style={styles.muted}>Find a destination or the right service</Text><Button title="What do you need help with?" onPress={() => go('help')} /><Button title="Ask the AI campus assistant" secondary onPress={() => go('assistant')} />
       <Text style={styles.section}>Popular destinations</Text><Text style={styles.muted}>Curated examples; not search analytics</Text>
       {places.filter(p => ['financial-aid', 'm6-library', 'academic-building'].includes(p.id)).map(p => <PlaceRow key={p.id} place={p} onPress={() => openPlace(p)} />)}
+      <View style={styles.notice}><Text style={styles.noticeTitle}>Admin dashboard preview</Text><Text style={styles.noticeText}>Explore the future editing sections. This preview is view-only and has no admin sign-in yet.</Text><Button title="Open admin preview" secondary onPress={() => go('admin')} /></View>
     </View></ScrollView>}
+
+    {screen === 'admin' && <AdminDashboard places={places} services={services} onBack={() => go('home')} onOpenPlace={openPlace} />}
 
     {screen === 'map' && <View style={styles.mapWrap}>
       <CampusMap key={mapReloadKey} places={places} category={category} focusPlaceId={selected?.id || null}
@@ -109,14 +112,13 @@ function GoMapApp() {
       <View style={styles.mapTop}>
         <Pressable onPress={() => go('home')} style={styles.circle} accessibilityLabel="Go back home"><Text style={styles.circleText}>‹</Text></Pressable>
         <Pressable onPress={() => go('search')} style={styles.mapSearch}><Text style={styles.mapSearchText}>⌕  Search campus</Text></Pressable>
-        <Pressable onPress={() => go('saved')} style={styles.circle} accessibilityLabel="Saved places"><Text style={styles.circleText}>☆</Text></Pressable>
       </View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll} contentContainerStyle={styles.chips}>{categories.map(c => <Pressable key={c} onPress={() => setCategory(c)} style={[styles.chip, category === c && { backgroundColor: green }]}><Text style={[styles.chipText, category === c && { color: '#fff' }]}>{c}</Text></Pressable>)}</ScrollView>
       {!selected && <View style={styles.mapTools}><Pressable onPress={() => setTiltToken(n => n + 1)} style={styles.tool} accessibilityLabel="Toggle 3D view"><Text style={styles.toolText}>3D</Text></Pressable><Pressable onPress={() => { setSatelliteOn(on => !on); setSatelliteToken(n => n + 1); }} style={styles.tool} accessibilityLabel={satelliteOn ? 'Switch to standard map' : 'Switch to satellite map'}><Text style={styles.toolText}>◉</Text></Pressable><Pressable onPress={() => setResetToken(n => n + 1)} style={styles.tool} accessibilityLabel="Center on campus"><Text style={styles.toolText}>◎</Text></Pressable></View>}
       {!!mapError && <View style={styles.mapError}><Text style={styles.mapErrorTitle}>Map could not load</Text><Text style={styles.mapErrorText}>{mapError}</Text><Button title="Retry map" onPress={() => { setMapError(''); setMapReloadKey(n => n + 1); }} /><Button title="Browse destinations" secondary onPress={() => go('search')} /></View>}
       {!selected && <View style={styles.mapBottom}><Text style={styles.sample}>Live map · sample pins</Text><View style={styles.inline}><Pressable onPress={() => go('help')} style={styles.mapAction}><Text style={styles.mapActionText}>⌖  Find help</Text></Pressable><Pressable onPress={() => go('search')} style={styles.mapAction}><Text style={styles.mapActionText}>⌕  Search</Text></Pressable></View></View>}
       {selected && <View style={styles.sheet}><View style={styles.handle} /><Pressable onPress={() => { setSelected(null); setService(null); }} style={styles.close}><Text style={styles.closeText}>×</Text></Pressable><Text style={styles.badge}>{selected.category}</Text>
-        <View style={styles.sheetHeading}><Text style={styles.sheetTitle}>{selected.name}</Text><Pressable onPress={() => setSaved(current => current.includes(selected.id) ? current.filter(id => id !== selected.id) : [...current, selected.id])} style={styles.saveTop}><Text style={styles.saveTopText}>{saved.includes(selected.id) ? '★ Saved' : '☆ Save'}</Text></Pressable></View>
+        <View style={styles.sheetHeading}><Text style={styles.sheetTitle}>{selected.name}</Text></View>
         <Text style={styles.body}>{selected.description}</Text>
         {service && <View style={styles.notice}><Text style={styles.noticeTitle}>{service.title}</Text><Text style={styles.noticeText}>{service.note}</Text></View>}
         <Text style={styles.meta}>◷  {selected.hours || 'Hours awaiting verification'}</Text><Text style={styles.meta}>⌖  {selected.entrance || 'Sample pin · entrance to be confirmed'}</Text>
@@ -156,7 +158,6 @@ function GoMapApp() {
       <View style={styles.chatComposer}><TextInput value={question} onChangeText={setQuestion} placeholder="Ask a campus question…" placeholderTextColor="#82918d" style={[styles.input, { flex: 1 }]} maxLength={500} accessibilityLabel="Question for AI assistant" onSubmitEditing={ask} /><Pressable onPress={ask} disabled={asking || !question.trim()} style={[styles.chatSend, (asking || !question.trim()) && { opacity: 0.5 }]}><Text style={styles.buttonText}>Send</Text></Pressable></View>
     </View>}
 
-    {screen === 'saved' && <View style={styles.page}>{header('Saved places')}<View style={styles.content}><Text style={styles.screenTitle}>Saved places</Text><Text style={styles.muted}>Shortcuts saved for this app session</Text></View><FlatList data={places.filter(p => saved.includes(p.id))} keyExtractor={p => p.id} renderItem={({ item }) => <PlaceRow place={item} onPress={() => openPlace(item)} />} ListEmptyComponent={<Text style={styles.empty}>No saved places yet. Open a destination and tap Save.</Text>} /></View>}
 
     {screen === 'report' && selected && <KeyboardAvoidingView style={styles.page} behavior={Platform.OS === 'ios' ? 'padding' : undefined}><ScrollView keyboardShouldPersistTaps="handled">{header('Report an issue')}<View style={styles.content}><Pressable onPress={() => setScreen('map')}><Text style={styles.back}>‹  Back to destination</Text></Pressable><Text style={styles.screenTitle}>Report an issue</Text><Text style={styles.muted}>{selected.name}</Text><Text style={styles.label}>WHAT NEEDS UPDATING?</Text>
       {issues.map(option => <Pressable key={option} onPress={() => setIssue(option)} style={[styles.issue, option === issue && { borderColor: green, backgroundColor: '#eff8f3' }]}><Text style={styles.body}>{option === issue ? '◉' : '○'}  {option}</Text></Pressable>)}
@@ -166,7 +167,7 @@ function GoMapApp() {
 
     {loading && <View style={styles.overlay}><ActivityIndicator size="large" color={green} /><Text style={styles.muted}>Loading campus information…</Text></View>}
     {!!error && <View style={styles.error}><Text style={styles.section}>Campus data unavailable</Text><Text style={styles.body}>{error}</Text><Button title="Retry" onPress={load} /></View>}
-    {screen !== 'map' && screen !== 'report' && screen !== 'ar' && <View style={styles.nav}>{([['⌂', 'Home', 'home'], ['◈', 'GoMap', 'map'], ['✦', 'Help', 'help'], ['◎', 'AI', 'assistant'], ['☆', 'Saved', 'saved']] as const).map(([icon, label, target]) => <Pressable key={target} onPress={() => go(target)} style={styles.navItem}><Text style={[styles.navIcon, screen === target && { color: green }]}>{icon}</Text><Text style={[styles.navLabel, screen === target && { color: green }]}>{label}</Text></Pressable>)}</View>}
+    {screen !== 'map' && screen !== 'report' && screen !== 'ar' && screen !== 'admin' && <View style={styles.nav}>{([['⌂', 'Home', 'home'], ['◈', 'GoMap', 'map'], ['✦', 'Help', 'help'], ['◎', 'AI', 'assistant']] as const).map(([icon, label, target]) => <Pressable key={target} onPress={() => go(target)} style={styles.navItem}><Text style={[styles.navIcon, screen === target && { color: green }]}>{icon}</Text><Text style={[styles.navLabel, screen === target && { color: green }]}>{label}</Text></Pressable>)}</View>}
   </SafeAreaView>;
 }
 
@@ -183,7 +184,7 @@ const styles = StyleSheet.create({
   mapBottom: { position: 'absolute', bottom: 30, left: 16, right: 16 }, sample: { alignSelf: 'center', overflow: 'hidden', backgroundColor: '#ffffffee', color: '#586b62', borderRadius: 8, padding: 6, fontSize: 11, marginBottom: 10 }, inline: { flexDirection: 'row', gap: 9 }, mapAction: { flex: 1, height: 48, backgroundColor: '#fff', borderRadius: 12, justifyContent: 'center', alignItems: 'center', elevation: 3 }, mapActionText: { color: dark, fontWeight: '700' },
   mapTools: { position: 'absolute', top: 131, right: 15, gap: 8 }, tool: { width: 44, height: 44, borderRadius: 12, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', elevation: 3 }, toolText: { color: dark, fontSize: 25 },
   mapError: { position: 'absolute', top: '32%', left: 25, right: 25, backgroundColor: '#fff', borderRadius: 15, padding: 18, elevation: 6 }, mapErrorTitle: { color: dark, fontSize: 17, fontWeight: '700' }, mapErrorText: { color: '#5b6d63', fontSize: 13, lineHeight: 19, marginVertical: 8 },
-  sheet: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: '#fff', borderTopLeftRadius: 22, borderTopRightRadius: 22, padding: 20, paddingBottom: 28, elevation: 8 }, handle: { width: 42, height: 4, backgroundColor: '#ced8d2', borderRadius: 4, alignSelf: 'center', marginBottom: 14 }, close: { position: 'absolute', top: 14, right: 18, zIndex: 1 }, closeText: { color: '#64766e', fontSize: 30 }, badge: { color: green, backgroundColor: '#e7f5ed', padding: 6, alignSelf: 'flex-start', borderRadius: 7, overflow: 'hidden', fontSize: 12, fontWeight: '700' }, sheetHeading: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 7 }, sheetTitle: { flex: 1, color: dark, fontSize: 22, fontWeight: '700' }, saveTop: { borderWidth: 1, borderColor: '#bdd9ce', borderRadius: 9, paddingVertical: 8, paddingHorizontal: 9, marginRight: 20 }, saveTopText: { color: green, fontSize: 12, fontWeight: '700' }, meta: { color: '#657a70', fontSize: 13, marginTop: 9 },
+  sheet: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: '#fff', borderTopLeftRadius: 22, borderTopRightRadius: 22, padding: 20, paddingBottom: 28, elevation: 8 }, handle: { width: 42, height: 4, backgroundColor: '#ced8d2', borderRadius: 4, alignSelf: 'center', marginBottom: 14 }, close: { position: 'absolute', top: 14, right: 18, zIndex: 1 }, closeText: { color: '#64766e', fontSize: 30 }, badge: { color: green, backgroundColor: '#e7f5ed', padding: 6, alignSelf: 'flex-start', borderRadius: 7, overflow: 'hidden', fontSize: 12, fontWeight: '700' }, sheetHeading: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 7 }, sheetTitle: { flex: 1, color: dark, fontSize: 22, fontWeight: '700' }, meta: { color: '#657a70', fontSize: 13, marginTop: 9 },
   notice: { backgroundColor: '#f0f7f3', padding: 12, borderRadius: 10, marginTop: 13 }, noticeTitle: { color: dark, fontWeight: '700', marginBottom: 3 }, noticeText: { color: '#4d685b', fontSize: 12, lineHeight: 18 },
   input: { height: 50, backgroundColor: '#fff', borderColor: '#cddcd4', borderWidth: 1, borderRadius: 11, paddingHorizontal: 14, color: dark, fontSize: 15 }, label: { color: '#71877b', fontSize: 11, fontWeight: '800', letterSpacing: 1, marginTop: 22, marginBottom: 9 }, empty: { color: '#697d73', margin: 25, lineHeight: 21 },
   service: { backgroundColor: '#fff', borderRadius: 12, borderWidth: 1, borderColor: '#e3ede8', padding: 14, marginBottom: 9, flexDirection: 'row', alignItems: 'center' }, serviceIcon: { color: green, fontSize: 24, marginRight: 12 }, back: { color: green, fontWeight: '700', marginBottom: 15 }, issue: { backgroundColor: '#fff', padding: 11, borderRadius: 9, borderWidth: 1, borderColor: '#e2eae5', marginBottom: 6 }, details: { height: 116, textAlignVertical: 'top', paddingTop: 12, marginBottom: 11 },

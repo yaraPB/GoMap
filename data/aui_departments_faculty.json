@@ -1,0 +1,2130 @@
+{
+  "university": {
+    "name": "Al Akhawayn University in Ifrane (AUI)",
+    "address": "P.O. Box 104, Hassan II Avenue, 53000 Ifrane, Morocco",
+    "phone": "+212 535-862-000",
+    "email": "communication@aui.ma",
+    "website": "https://aui.ma",
+    "academic_catalog": "https://aui.ma/hubfs/Academic%20Catalog%202024-2025%20V2.pdf"
+  },
+  "retrieved_on": "2026-11-13",
+  "notes": [
+    "Faculty data comes from each professor's profile page on aui.ma (teacher-bio pages); school details from each school's page and the Language Center page.",
+    "Phone numbers shown as 'ext. NNNN' are internal extensions; from outside dial +212 535-86 followed by the extension (e.g. ext. 2114 -> +212 535-862-114).",
+    "null means the field is not published on the profile. 'TBA' means the profile itself says office hours are to be announced.",
+    "Office hours are as posted on the website and may be for a past semester; confirm with the professor or the office door.",
+    "Known website issues: Eda Orhun's profile repeats Adil Akaaboune's extension and email, so those were left out; Frances Loustau-Williams has two profiles with different offices (Building 7/102 and Building 8/102).",
+    "Buildings: 'NAB' = New Academic Building (Building 16)."
+  ],
+  "departments": [
+    {
+      "id": "SBA",
+      "name": "School of Business Administration",
+      "location": {
+        "main_building": "Building 11",
+        "notes": "School office, project manager and administrative assistant are in Building 11; some faculty offices are in Buildings 8B, 10, 16 (NAB) and 6."
+      },
+      "website": "https://aui.ma/school-of-business-administration",
+      "description": "Business and management education at undergraduate, graduate and executive levels; BBA program accredited by EFMD (EPAS).",
+      "programs": [
+        "Bachelor of Business Administration (concentrations: Finance, Management, Marketing, Logistics, International Business, AI and Analytics for Business)",
+        "Master of Business Administration (MBA)",
+        "Part-Time MBA (Casablanca)",
+        "Executive Master of Business Administration (EMBA)",
+        "Master of Science in Digital Marketing and Analytics",
+        "SBA Executive Leadership Academy"
+      ],
+      "services": [
+        "Academic advising (every student is assigned an academic advisor who approves degree plans and course registration)",
+        "SBA Internship Program (INT 4301, mandatory for graduation; internship agreement, convention de stage, report and presentation guidelines)",
+        "Program sheets and recommended degree pathway",
+        "Research & Publications",
+        "Experiential learning and student engagement",
+        "Trading room, case-study and simulation-based teaching",
+        "Exchange / study abroad with partner institutions",
+        "Executive education"
+      ],
+      "staff_contacts": [
+        {
+          "name": "Rachida Azelmad",
+          "role": "Project Manager",
+          "office": "Building 11, Office 103",
+          "hours": "8:30-17:30",
+          "phone": "+212 535-862-692",
+          "email": "ra.azelmad@aui.ma"
+        },
+        {
+          "name": "Nassira Souaf",
+          "role": "Administrative Assistant",
+          "office": "Building 11, Office 10",
+          "hours": "8:30-13:00 / 14:00-17:30",
+          "phone": "+212 535-862-692",
+          "email": "n.souaf@aui.ma"
+        },
+        {
+          "name": "Mustafa Ettoualy",
+          "role": "Experiential Learning and Student Engagement Associate",
+          "office": "Building 11, Office 111",
+          "hours": null,
+          "phone": null,
+          "email": "m.ettoualy@aui.ma"
+        },
+        {
+          "name": "Youssef Chetioui",
+          "role": "Academic Coordinator for Undergraduate Programs",
+          "office": "Building 11, Office 108",
+          "hours": null,
+          "phone": null,
+          "email": "y.chetioui@aui.ma"
+        },
+        {
+          "name": "Comlanvi Martin Konou",
+          "role": "Academic Advisor for Undergraduate Programs",
+          "office": "Building 10, Office 11",
+          "hours": null,
+          "phone": null,
+          "email": "c.konou@aui.ma"
+        }
+      ],
+      "faculty_count": 37,
+      "faculty": [
+        {
+          "name": "Lakshmi Goel",
+          "title": null,
+          "office": null,
+          "building": null,
+          "office_hours": null,
+          "phone": null,
+          "email": null,
+          "profile_url": "https://aui.ma/teacher-bio/lakshmi-goel"
+        },
+        {
+          "name": "Harit Satt",
+          "title": "Professor of Finance, Accounting, and Economics",
+          "office": "Building 11, Office 111",
+          "building": "11",
+          "office_hours": "Monday, Wednesday & Friday 9:00-11:00 and 13:00-14:00",
+          "phone": "(+212) 535-862-322",
+          "email": "h.satt@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/harit-satt"
+        },
+        {
+          "name": "Kawtar Abouhazim",
+          "title": "Assistant Professor of Marketing",
+          "office": "Building 11, Office 4",
+          "building": "11",
+          "office_hours": "Monday 14:00-18:30; Tuesday 14:00-18:30",
+          "phone": "(+212) 535-862-374",
+          "email": "k.abouhazim@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/kawtar-abouhazim"
+        },
+        {
+          "name": "Jawad Abrache",
+          "title": null,
+          "office": "Building 8B, Office 313",
+          "building": "8B",
+          "office_hours": "Monday 15:00-18:00; Thursday 8:00-11:00",
+          "phone": "(+212) 535-862-335",
+          "email": null,
+          "profile_url": "https://aui.ma/teacher-bio/jawad-abrache"
+        },
+        {
+          "name": "Samir Aguenaou",
+          "title": "Full Professor of Finance",
+          "office": "Building 16 (NAB), Office 146",
+          "building": "16 (NAB)",
+          "office_hours": "Tuesday & Thursday 8:00-10:00 and 16:00-18:30",
+          "phone": "(+212) 535-862-315",
+          "email": "s.aguenaou@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/samir-aguenaou"
+        },
+        {
+          "name": "Adil Akaaboune",
+          "title": "Assistant Professor of Supply Chain Management and Operations Management",
+          "office": "Building 10, Office 5",
+          "building": "10",
+          "office_hours": "Monday, Wednesday & Friday 9:00-10:00, 12:00-14:00",
+          "phone": "(+212) 535-862-437",
+          "email": "a.akaaboune@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/adil-akaaboune"
+        },
+        {
+          "name": "Abdelhamid Bennani Bouchiba",
+          "title": null,
+          "office": "Building 11, Office 107",
+          "building": "11",
+          "office_hours": "Wednesday 9:00-13:00, 13:30-18:30",
+          "phone": "(+212) 535-862-014",
+          "email": "a.bennani@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/abdelhamid-bennani-bouchiba"
+        },
+        {
+          "name": "Yassine Benrqya",
+          "title": "Professor of Supply Chain Management",
+          "office": "Building 11, Office 108",
+          "building": "11",
+          "office_hours": "Wednesday 10:00-17:00; Tuesday & Thursday 17:30-18:30 or by appointment",
+          "phone": "(+212) 535-862-382",
+          "email": "y.benrqya@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/yassine-benrqya"
+        },
+        {
+          "name": "Youssef Chetioui",
+          "title": "Assistant Vice-President for Academic Research; Academic Coordinator for Undergraduate Programs (SBA)",
+          "office": "Building 11, Office 109",
+          "building": "11",
+          "office_hours": "Tuesday & Thursday 15:30-18:30; Wednesday 11:00-14:00",
+          "phone": "(+212) 535-862-376",
+          "email": "y.chetioui@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/youssef-chetioui"
+        },
+        {
+          "name": "Murat Doganlar",
+          "title": null,
+          "office": "Building 8B, Office 301",
+          "building": "8B",
+          "office_hours": "Monday, Tuesday & Wednesday 13:00-16:00",
+          "phone": "(+212) 535-863-508",
+          "email": "m.doganlar@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/murat-doganlar"
+        },
+        {
+          "name": "Wafa Elgarah",
+          "title": "Professor of Management Information Systems (MIS)",
+          "office": "Building 8B, Office 312",
+          "building": "8B",
+          "office_hours": "Monday 12:00-13:00; Tuesday 9:30-13:30; Wednesday 9:30-10:00 & 12:00-12:30",
+          "phone": "(+212) 535-863-697",
+          "email": "w.elgarah@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/wafa-elgarah"
+        },
+        {
+          "name": "Ahlam Fakhar",
+          "title": null,
+          "office": "Building 11, Office 110",
+          "building": "11",
+          "office_hours": "Monday & Wednesday 12:00-16:30",
+          "phone": "(+212) 535-862-348",
+          "email": "a.fakhar@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/ahlam-fakhar"
+        },
+        {
+          "name": "Alae Gamar",
+          "title": null,
+          "office": "Building 11, Office 111",
+          "building": "11",
+          "office_hours": "Tuesday & Thursday 15:30-17:00; Wednesday 10:30-13:30 & 15:00-18:00",
+          "phone": "(+212) 535-862-479",
+          "email": "a.gamar@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/alae-gamar"
+        },
+        {
+          "name": "Abdelhamid Hamidi Alaoui",
+          "title": null,
+          "office": "Building 8B, Office 219",
+          "building": "8B",
+          "office_hours": "Tuesday & Thursday 12:30-15:20; Tuesday 17:00-17:20",
+          "phone": "(+212) 535-862-706",
+          "email": "a.hamidialaoui@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/abdelhamid-hamidi-alaoui"
+        },
+        {
+          "name": "Rhizlane Hammoud",
+          "title": "Teaches Accounting and Economics (Fulbright scholar)",
+          "office": "Building 8B, Office 313",
+          "building": "11",
+          "office_hours": "Tuesday & Thursday 9:00-9:30, 15:20-17:20; Wednesday 9:30-13:30",
+          "phone": "(+212) 535-862-944",
+          "email": "r.hammoud@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/rhizlane-hammoud"
+        },
+        {
+          "name": "Hissam Kamal Hassan",
+          "title": "Finance faculty",
+          "office": "Building 6, Office 101",
+          "building": "6",
+          "office_hours": "Wednesday 9:00-12:00 and 14:00-17:00",
+          "phone": "(+212) 535-863-396",
+          "email": "khk.hassan@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/hissam-kamal-hassan"
+        },
+        {
+          "name": "Abderrahman Hassi",
+          "title": "Associate Professor of Management",
+          "office": "Building 10, Office 5",
+          "building": "10",
+          "office_hours": "Monday, Wednesday & Friday 11:00-12:00; Tuesday 9:00-12:00",
+          "phone": "(+212) 535-862-334",
+          "email": "a.hassi@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/abderrahman-hassi"
+        },
+        {
+          "name": "Muhammad Ikram",
+          "title": "Assistant Professor of Management",
+          "office": "Building 11, Office 6",
+          "building": "11",
+          "office_hours": "Monday, Wednesday & Friday 11:00-13:00, 14:00-15:00",
+          "phone": "(+212) 535-862-318",
+          "email": "i.muhammad@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/muhammad-ikram"
+        },
+        {
+          "name": "Imad Jabbouri",
+          "title": "Associate Professor of Finance and Accounting",
+          "office": "Building 11, Office 108",
+          "building": "11",
+          "office_hours": "Monday, Wednesday & Friday 9:00-11:00, 13:00-14:00",
+          "phone": "(+212) 535-862-371",
+          "email": "i.jabbouri@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/imad-jabbouri"
+        },
+        {
+          "name": "Sallem Koubida",
+          "title": "Associate Professor of Economics and Finance",
+          "office": "Building 11, Office 106",
+          "building": "11",
+          "office_hours": "Tuesday & Thursday 14:30-17:30",
+          "phone": "(+212) 535-862-360",
+          "email": "s.koubida@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/sallem-koubida"
+        },
+        {
+          "name": "Hind Lebdaoui",
+          "title": "Associate Professor of Finance and Economics",
+          "office": "Building 11, Office 109",
+          "building": "11",
+          "office_hours": "Tuesday & Thursday 11:00-12:30; Wednesday 10:00-13:00",
+          "phone": "(+212) 535-862-320",
+          "email": null,
+          "profile_url": "https://aui.ma/teacher-bio/hind-lebdaoui"
+        },
+        {
+          "name": "Onur Ozsoy",
+          "title": null,
+          "office": "Building 8B, Office 304",
+          "building": "8B",
+          "office_hours": "Monday, Wednesday & Friday 10:30-11:30",
+          "phone": "(+212) 535-863-507",
+          "email": "o.ozsoy@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/onur-ozsoy"
+        },
+        {
+          "name": "Malek Sarhani",
+          "title": null,
+          "office": "Building 11, Office 6",
+          "building": "11",
+          "office_hours": "Monday & Wednesday 15:00-17:30; Tuesday & Thursday 15:00-17:00",
+          "phone": "(+212) 535-862-310",
+          "email": "m.sarhani@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/malek-sarhani"
+        },
+        {
+          "name": "Maryem Naili",
+          "title": null,
+          "office": null,
+          "building": null,
+          "office_hours": null,
+          "phone": null,
+          "email": null,
+          "profile_url": "https://aui.ma/teacher-bio/maryem-naili"
+        },
+        {
+          "name": "Yassine El Bouchikhi",
+          "title": "Marketing faculty",
+          "office": null,
+          "building": null,
+          "office_hours": null,
+          "phone": null,
+          "email": null,
+          "profile_url": "https://aui.ma/teacher-bio/yassine-el-bouchikhi"
+        },
+        {
+          "name": "Hicham Safieddine",
+          "title": "Assistant Professor of Accounting & Business Law",
+          "office": "Building 11, Office 112",
+          "building": "11",
+          "office_hours": "TBA",
+          "phone": "(+212) 535-863-314",
+          "email": "h.safieddine@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/hicham-safieddine"
+        },
+        {
+          "name": "Khurrum Mughal",
+          "title": "Associate Professor of Economics",
+          "office": "Building 11, Office 102",
+          "building": "11",
+          "office_hours": "Tuesday & Thursday 12:00-15:00",
+          "phone": "ext. 2341",
+          "email": "k.mughal@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/khurrum-mughal"
+        },
+        {
+          "name": "Hayat El Asri",
+          "title": null,
+          "office": "Building 11, Office 4",
+          "building": "11",
+          "office_hours": "Monday 14:00-18:30; Tuesday 14:00-18:30",
+          "phone": "(+212) 535-862-374",
+          "email": "h.elasri@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/hayat-elasri"
+        },
+        {
+          "name": "Eda Orhun",
+          "title": "Associate Professor of Finance",
+          "office": "Building 11, Office 113",
+          "building": "11",
+          "office_hours": "Monday, Wednesday & Friday 9:00-10:00, 12:00-14:00",
+          "phone": "not reliably listed (profile repeats another professor's extension and email)",
+          "email": "not reliably listed",
+          "profile_url": "https://aui.ma/teacher-bio/eda-orhun"
+        },
+        {
+          "name": "Elias Erragragui",
+          "title": "Associate Professor of Finance",
+          "office": "Building 11, Office 7",
+          "building": "11",
+          "office_hours": "Monday, Wednesday & Friday 9:00-10:00, 12:00-14:00",
+          "phone": null,
+          "email": null,
+          "profile_url": "https://aui.ma/teacher-bio/elias-erragragui"
+        },
+        {
+          "name": "Sara Dassouli",
+          "title": "Assistant Professor of Marketing",
+          "office": "Building 16, Office 10",
+          "building": "16",
+          "office_hours": "Monday, Wednesday & Friday 9:30-10:30, 15:00-17:00, or by appointment",
+          "phone": null,
+          "email": "s.dassouli@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/sara-dassouli"
+        },
+        {
+          "name": "Abtin Nourmohammadzadeh",
+          "title": "Operations Research faculty",
+          "office": "Building 16, Office 136",
+          "building": "16",
+          "office_hours": "Monday, Wednesday & Friday 10:40-12:10 & 16:00-18:00",
+          "phone": null,
+          "email": null,
+          "profile_url": "https://aui.ma/teacher-bio/abtin-nourmohammadzadeh"
+        },
+        {
+          "name": "Suleiman Jamal Mohammad",
+          "title": "Associate Professor",
+          "office": "Building 16, Office 136",
+          "building": "16",
+          "office_hours": "Monday, Wednesday & Friday 8:30-9:30, 11:30-12:20, 13:30-14:30",
+          "phone": null,
+          "email": null,
+          "profile_url": "https://aui.ma/teacher-bio/suleiman-jamal-mohammad"
+        },
+        {
+          "name": "Wafa Oulad Benaissa",
+          "title": "Assistant Professor",
+          "office": "Building 16, Office 127",
+          "building": "16",
+          "office_hours": "Monday & Wednesday 11:25-13:55; Tuesday 12:00-16:00",
+          "phone": null,
+          "email": null,
+          "profile_url": "https://aui.ma/teacher-bio/wafa-oulad-benaissa"
+        },
+        {
+          "name": "El Mehdi Ibnoulouafi",
+          "title": null,
+          "office": "Building 16, Office 017",
+          "building": "16",
+          "office_hours": "Monday & Wednesday 11:20-12:30, 13:20-15:00; Friday 11:20-12:30, 13:20-15:00, 15:50-16:20",
+          "phone": null,
+          "email": null,
+          "profile_url": "https://aui.ma/teacher-bio/el-mehdi-ibnoulouafi"
+        },
+        {
+          "name": "Omer Cayirli",
+          "title": null,
+          "office": "Building 16, Office 017",
+          "building": "16",
+          "office_hours": "Monday 10:00-12:00, 13:00-15:00; Tuesday 14:30-15:30; Wednesday 10:00-12:00, 13:00-15:00",
+          "phone": null,
+          "email": null,
+          "profile_url": "https://aui.ma/teacher-bio/omer-cayirli"
+        },
+        {
+          "name": "William Shibuya",
+          "title": "Assistant Professor of Marketing",
+          "office": "Building 11, Room 107",
+          "building": "11",
+          "office_hours": "Monday, Wednesday & Friday 10:00-13:00",
+          "phone": null,
+          "email": null,
+          "profile_url": "https://aui.ma/teacher-bio/william-shibuya"
+        }
+      ]
+    },
+    {
+      "id": "SSE",
+      "name": "School of Science and Engineering",
+      "location": {
+        "main_building": "Building 5",
+        "notes": "Dean's office and student affairs are in Building 5; labs in Buildings 6, 7 and 9; faculty offices also in Buildings 7, 8B, 9 and 16 (NAB)."
+      },
+      "website": "https://aui.ma/school-of-science-and-engineering",
+      "description": "English-language engineering and science school; ABET-accredited programs; education, research and service mission.",
+      "programs": [
+        "BSc in Computer Science",
+        "BSc in Cloud Computing & Big Data Analytics",
+        "BSc in Cloud and Mobile Software Engineering",
+        "BSc in Artificial Intelligence and Robotization",
+        "BSc in Renewable Energy Systems Engineering",
+        "BSc in Engineering and Management Science",
+        "BSc in General Engineering",
+        "MSc in Software Engineering",
+        "MSc in Sustainable Energy Management"
+      ],
+      "services": [
+        "Faculty academic advising (advisor and coordinator approval required for each course)",
+        "Capstone design project and internships (incl. conventions de stage with employers)",
+        "Program sheets",
+        "Undergraduate Research School (URS)",
+        "Renewable Energy and Sustainability Laboratory (RESlab) - https://www.reslab.ma/",
+        "Food Control Lab (Building 9, Lab 107)",
+        "Biology and Chemistry Lab (Building 6, Lab 6)",
+        "Physics and Engineering Lab (Building 7, Lab 108)"
+      ],
+      "staff_contacts": [
+        {
+          "name": "Bouchra Saad",
+          "role": "Administrative Assistant to the Dean",
+          "office": "Building 5, Office 8",
+          "hours": "8:30-17:30",
+          "phone": "ext. 2114",
+          "email": "b.saad@aui.ma"
+        },
+        {
+          "name": "Hamza Bourjila",
+          "role": "Student Affairs Supporting Coordinator",
+          "office": "Building 5, Office 9",
+          "hours": "8:30-17:30",
+          "phone": null,
+          "email": "h.bourjila@aui.ma"
+        },
+        {
+          "name": "Zineb Dehbi-Alaoui",
+          "role": "Administrative Assistant",
+          "office": "Building 5, Office 9",
+          "hours": "8:30-17:30",
+          "phone": null,
+          "email": "z.dehbialaoui@aui.ma"
+        },
+        {
+          "name": "Rachida Oubakalla",
+          "role": "Food Control Lab Technician",
+          "office": "Building 9, Lab 107",
+          "hours": null,
+          "phone": "ext. 3164",
+          "email": "r.oubakalla@aui.ma"
+        },
+        {
+          "name": "Wijdane Benabbou",
+          "role": "Biology and Chemistry Lab Assistant",
+          "office": "Building 6, Lab 6",
+          "hours": "8:30-17:30",
+          "phone": null,
+          "email": "w.benabbou@aui.ma"
+        },
+        {
+          "name": "Abderrahim Boulakrouch",
+          "role": "Physics and Engineering Lab Technician",
+          "office": "Building 7, Lab 108",
+          "hours": "8:30-17:30",
+          "phone": "0535-863-164",
+          "email": "a.boulakrouch@aui.ma"
+        }
+      ],
+      "faculty_count": 63,
+      "faculty": [
+        {
+          "name": "Samer K. Al Kork",
+          "title": "Dean of the School of Science and Engineering; Professor of Bioengineering",
+          "office": "Building 5 (Dean's Office)",
+          "building": "5",
+          "office_hours": null,
+          "phone": "(+212) 535-862-114",
+          "email": "s.alkork@aui.ma; ssedean@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/samer-al-kork"
+        },
+        {
+          "name": "Khalid Sendide",
+          "title": "Biotechnology faculty",
+          "office": "Building 5, Office 1",
+          "building": "5",
+          "office_hours": "Monday & Wednesday 15:30-16:30; Tuesday & Thursday 15:00-16:30",
+          "phone": "(+212) 535-862-105",
+          "email": "k.sendide@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/khalid-sendide"
+        },
+        {
+          "name": "Naeem Nisar Sheikh",
+          "title": null,
+          "office": "Building 6, Office 102",
+          "building": "6",
+          "office_hours": "Communicated to students at the beginning of every semester",
+          "phone": "ext. 2355",
+          "email": null,
+          "profile_url": "https://aui.ma/teacher-bio/naeem-nisar-sheikh"
+        },
+        {
+          "name": "Hicham Assoudi",
+          "title": "Assistant Professor of Computer Science",
+          "office": "Building 16, Office 126",
+          "building": "16",
+          "office_hours": "Monday, Wednesday & Friday 9:00-10:00, 12:00-14:00",
+          "phone": null,
+          "email": null,
+          "profile_url": "https://aui.ma/teacher-bio/hicham-assoudi"
+        },
+        {
+          "name": "Ahmad Ahmad Mohammed",
+          "title": "Assistant Professor of Computer Science and Software Engineering",
+          "office": "Building 16, Office 139",
+          "building": "16",
+          "office_hours": null,
+          "phone": null,
+          "email": "ah.mohammed@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/ahmad-ahmad-mohammed"
+        },
+        {
+          "name": "Mohammed A. Obeidat",
+          "title": "Associate Professor of Mathematics",
+          "office": "Building 16, Room 118",
+          "building": "16",
+          "office_hours": "Monday & Wednesday 8:30-9:30, 11:30-12:30; Tuesday 10:30-13:30; Friday 8:30-9:30, 11:30-13:30",
+          "phone": null,
+          "email": "m.obeidat@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/mohammed-a.-obeidat"
+        },
+        {
+          "name": "Youssef Lazar",
+          "title": null,
+          "office": "Building 16, Room 128",
+          "building": "16",
+          "office_hours": "Tuesday & Thursday 12:30-14:15",
+          "phone": null,
+          "email": "yo.lazar@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/youssef-lazar"
+        },
+        {
+          "name": "Musa Mustapha",
+          "title": "Assistant Professor of Computer Science",
+          "office": "Building 16, Office 139",
+          "building": "16",
+          "office_hours": "Monday, Wednesday & Friday 15:00-18:00 (or by appointment)",
+          "phone": "(+212) 710-091-892",
+          "email": "m.mustapha@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/musa-mustapha"
+        },
+        {
+          "name": "Houda Boukham",
+          "title": "Assistant Professor of Computer Science",
+          "office": "Building 16, Room 117",
+          "building": "16",
+          "office_hours": null,
+          "phone": null,
+          "email": "h.boukham@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/houda-boukham"
+        },
+        {
+          "name": "Yassir Rabhi",
+          "title": "Assistant Professor",
+          "office": "Building 16, Room 130",
+          "building": "16",
+          "office_hours": null,
+          "phone": null,
+          "email": "y.rabhi@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/yassir-rabhi"
+        },
+        {
+          "name": "Bouali Et-taibi",
+          "title": "Assistant Professor of Engineering and Physics",
+          "office": "Building 16, Room 128",
+          "building": "16",
+          "office_hours": null,
+          "phone": null,
+          "email": "b.ettaibi@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/bouali-et-taibi"
+        },
+        {
+          "name": "Fouad Mohammed Abbou",
+          "title": "Professor",
+          "office": "Building 6, Office 1",
+          "building": "6",
+          "office_hours": "Tuesday & Thursday 13:30-14:30, 19:00-19:30",
+          "phone": "(+212) 535-862-107",
+          "email": "f.abbou@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/fouad-mohammed-abbou"
+        },
+        {
+          "name": "Amine Amar",
+          "title": "Associate Professor of Applied Mathematics and Data Science",
+          "office": "Building 16, Office 116",
+          "building": "16",
+          "office_hours": "Monday 14:30-18:00; Wednesday 9:00-10:45, 14:45-16:45; Friday 9:00-10:45",
+          "phone": "(+212) 535-863-514",
+          "email": "a.amar@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/amine-amar"
+        },
+        {
+          "name": "Nasser Assem",
+          "title": null,
+          "office": "Building 7, Office 9",
+          "building": "7",
+          "office_hours": "Tuesday & Thursday 9:00-10:00, 14:30-16:00; Wednesday 9:00-13:00",
+          "phone": "(+212) 535-862-111",
+          "email": "n.assem@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/nasser-assem"
+        },
+        {
+          "name": "Mohamed Azzouz",
+          "title": "Full Professor of Physics",
+          "office": "Building 8B, Office 204",
+          "building": "8B",
+          "office_hours": null,
+          "phone": "ext. 2301",
+          "email": null,
+          "profile_url": "https://aui.ma/teacher-bio/mohamed-azzouz"
+        },
+        {
+          "name": "Anas Bentamy",
+          "title": null,
+          "office": "Building 7, Office 109",
+          "building": "7",
+          "office_hours": "TBA",
+          "phone": "(+212) 535-862-140",
+          "email": "a.bentamy@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/anas-bentamy"
+        },
+        {
+          "name": "Lamiae Bouanane",
+          "title": "Assistant Professor of Computer Science",
+          "office": "Building 8B, Office 302",
+          "building": "8B",
+          "office_hours": null,
+          "phone": "ext. 3307",
+          "email": "l.bouanane@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/lamiae-bouanane"
+        },
+        {
+          "name": "Sara Bouri",
+          "title": null,
+          "office": null,
+          "building": null,
+          "office_hours": null,
+          "phone": null,
+          "email": "s.bouri@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/sara-bouri"
+        },
+        {
+          "name": "Violetta Laura Cavalli-Sforza",
+          "title": "Computer Science faculty",
+          "office": "Building 7, Office 110",
+          "building": "7",
+          "office_hours": "See office door for current office hours",
+          "phone": "(+212) 535-862-106",
+          "email": "v.cavallisforza@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/violetta-laura-cavalli-sforza"
+        },
+        {
+          "name": "Houda Chakiri",
+          "title": "Assistant Professor of Computer Science",
+          "office": "Building 8B, Office 220",
+          "building": "8B",
+          "office_hours": null,
+          "phone": "ext. 3161",
+          "email": "h.chakiri@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/houda-chakiri"
+        },
+        {
+          "name": "Yousra Chtouki",
+          "title": "Assistant Professor of Computer Science",
+          "office": "Building 5, Office 102",
+          "building": "5",
+          "office_hours": "TBA",
+          "phone": "ext. 2379",
+          "email": "y.chtouki@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/yousra-chtouki"
+        },
+        {
+          "name": "Hassane Darhmaoui",
+          "title": "Full Professor of Physics; Learning and Teaching Lead",
+          "office": "Building 7, Office 016",
+          "building": "7",
+          "office_hours": "Tuesday & Thursday 9:00-11:30, 13:00-13:30, 16:00-17:30; otherwise by appointment",
+          "phone": "(+212) 535-862-141",
+          "email": "h.darhmaoui@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/hassane-darhmaoui"
+        },
+        {
+          "name": "Abdelghani El Asli",
+          "title": "Full Professor",
+          "office": "Building 5, Office 4",
+          "building": "5",
+          "office_hours": "Tuesday 16:30-18:30; Wednesday 9:30-12:30, 14:30-17:30; or by appointment",
+          "phone": "(+212) 535-862-123",
+          "email": "a.elasli@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/abdelghani-el-asli"
+        },
+        {
+          "name": "Moulay El Hassan El Azhari",
+          "title": "Assistant Professor",
+          "office": "Building 8B, Office 206",
+          "building": "8B",
+          "office_hours": "Monday, Wednesday & Friday 13:55-14:55, 15:55-16:55, 18:00-19:00 (or by appointment)",
+          "phone": "ext. 2372",
+          "email": "m.elazhari@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/moulay-el-hassan-el-azhari"
+        },
+        {
+          "name": "Abderrazzak El Boukili",
+          "title": "Associate Professor of Applied Mathematics",
+          "office": "Building 8B, Office 310",
+          "building": "8B",
+          "office_hours": "Monday, Wednesday & Friday 9:00-10:30, 11:30-12:30, 13:30-14:00",
+          "phone": "(+212) 535-863-687",
+          "email": "a.elboukili@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/abderrazzak-el-boukili"
+        },
+        {
+          "name": "Samir El Hajjaji",
+          "title": null,
+          "office": "Building 5, Office 104",
+          "building": "5",
+          "office_hours": "Tuesday & Thursday 9:00-11:15; Wednesday 8:00-12:30",
+          "phone": "(+212) 535-862-330",
+          "email": "s.elhajjaji@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/samir-el-hajjaji"
+        },
+        {
+          "name": "Omar Iraqi Houssaini",
+          "title": "Professor of Computer Science",
+          "office": "Building 7, Office 104",
+          "building": "7",
+          "office_hours": "TBA",
+          "phone": "(+212) 535-862-414",
+          "email": "o.iraqi@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/omar-iraqi-houssaini"
+        },
+        {
+          "name": "El Mostafa Kalmoun",
+          "title": "Associate Professor of Mathematics",
+          "office": "Building 16, Office 113",
+          "building": "16",
+          "office_hours": "Monday 9:55-11:25, 12:25-13:55, 16:00-16:30; Tuesday & Thursday by appointment; Wednesday 9:55-11:25, 12:25-13:55; Friday 9:55-11:25, 12:55-13:55",
+          "phone": "ext. 2139",
+          "email": null,
+          "profile_url": "https://aui.ma/teacher-bio/el-mostafa-kalmoun"
+        },
+        {
+          "name": "Driss Kettani",
+          "title": "Computer Science faculty",
+          "office": "Building 9, Office 102",
+          "building": "9",
+          "office_hours": "TBA",
+          "phone": "(+212) 535-862-178",
+          "email": "d.kettani@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/driss-kettani"
+        },
+        {
+          "name": "Asmae Khaldoun",
+          "title": "Professor; Lead of Science and Engineering",
+          "office": "Building 7, Office 113",
+          "building": "7",
+          "office_hours": "Monday, Wednesday & Friday 8:30-11:30",
+          "phone": "(+212) 535-862-154 / 114",
+          "email": "a.khaldoune@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/asmae-khaldoun"
+        },
+        {
+          "name": "Mohamed Hassan Khalili",
+          "title": "Assistant Professor of Mechanical Engineering",
+          "office": "Building 16, Office 116",
+          "building": "16",
+          "office_hours": null,
+          "phone": "ext. 2300",
+          "email": null,
+          "profile_url": "https://aui.ma/teacher-bio/mohamed-hassan-khalili"
+        },
+        {
+          "name": "Ahmed Khallaayoun",
+          "title": "Full Professor of Engineering",
+          "office": "Building 7, Office 102",
+          "building": "7",
+          "office_hours": "TBA",
+          "phone": "(+212) 535-862-196",
+          "email": "a.khallayoun@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/ahmed-khallaayoun"
+        },
+        {
+          "name": "Ilham Kissani",
+          "title": "Assistant Professor, Engineering and Management Science",
+          "office": "Building 7, Office 1",
+          "building": "7",
+          "office_hours": "TBA",
+          "phone": "(+212) 535-862-122",
+          "email": "i.kissani@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/ilham-kissani"
+        },
+        {
+          "name": "Lahcen Laayouni",
+          "title": null,
+          "office": "Building 7, Office 5",
+          "building": "7",
+          "office_hours": "Tuesday & Thursday 10:30-13:00, 14:30-16:00; Friday 11:00-12:00",
+          "phone": "(+212) 535-862-112",
+          "email": "l.laayouni@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/lahcen-laayouni"
+        },
+        {
+          "name": "Ibtissam Latachi",
+          "title": "Full-Time Lecturer",
+          "office": "Building 8B, Office 205",
+          "building": "8B",
+          "office_hours": "None this semester",
+          "phone": "ext. 3165",
+          "email": null,
+          "profile_url": "https://aui.ma/teacher-bio/ibtissam-latachi"
+        },
+        {
+          "name": "Rachid Lghoul",
+          "title": "Engineering Lecturer",
+          "office": "Building 9, Office 106",
+          "building": "9",
+          "office_hours": "Monday & Wednesday 9:00-10:30, 15:00-18:00",
+          "phone": "ext. 2160",
+          "email": "r.lghoul@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/rachid-lghoul"
+        },
+        {
+          "name": "Houssame Limami",
+          "title": "Assistant Professor, Engineering",
+          "office": "Building 8B, Office 307",
+          "building": "8B",
+          "office_hours": null,
+          "phone": "ext. 3519",
+          "email": null,
+          "profile_url": "https://aui.ma/teacher-bio/houssame-limami"
+        },
+        {
+          "name": "Jawad Lotfi",
+          "title": "Computer Science Lecturer",
+          "office": "Building 8B, Office 205",
+          "building": "8B",
+          "office_hours": null,
+          "phone": "ext. 3165",
+          "email": null,
+          "profile_url": "https://aui.ma/teacher-bio/jawad-lotfi"
+        },
+        {
+          "name": "Asmaa Mourhir",
+          "title": "Associate Professor of Computer Science",
+          "office": "Building 7, Office 006",
+          "building": "7",
+          "office_hours": "Tuesday & Thursday 8:30-10:00, 16:00-19:00",
+          "phone": "(+212) 535-862-144",
+          "email": "a.mourhir@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/asmaa-mourhir"
+        },
+        {
+          "name": "Abdelkrim Ouardaoui",
+          "title": "Professor",
+          "office": "Building 6, Office 7",
+          "building": "6",
+          "office_hours": "TBA",
+          "phone": "(+212) 535-862-151",
+          "email": "a.ouardaoui@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/abdelkrim-ouardaoui"
+        },
+        {
+          "name": "Nabil Rhiati",
+          "title": "Mathematics Instructor",
+          "office": "Building 9, Office 106",
+          "building": "9",
+          "office_hours": "Monday, Wednesday & Friday 9:00-9:30, 11:30-12:30, 13:30-15:00",
+          "phone": "(+212) 535-862-127",
+          "email": "n.rhiati@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/nabil-rhiati"
+        },
+        {
+          "name": "Yassine Salih Alj",
+          "title": null,
+          "office": "Building 7, Office 105",
+          "building": "7",
+          "office_hours": "TBA",
+          "phone": "(+212) 535-862-101",
+          "email": "y.salihalj@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/yassine-salih-alj"
+        },
+        {
+          "name": "Sedki Samadi",
+          "title": "Assistant Professor of Mathematics",
+          "office": "Building 5, Office 102",
+          "building": "5",
+          "office_hours": "Tuesday & Thursday 15:55-17:25, 18:55-20:25; Wednesday 14:30-17:30; or by appointment",
+          "phone": "(+212) 535-862-179",
+          "email": null,
+          "profile_url": "https://aui.ma/teacher-bio/sedki-samadi"
+        },
+        {
+          "name": "Kevin Scott Smith",
+          "title": "Associate Professor of Computer Science",
+          "office": "Building 16, Office 12",
+          "building": "16",
+          "office_hours": "TBA",
+          "phone": "(+212) 535-863-182",
+          "email": "k.smith@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/kevin-scott-smith"
+        },
+        {
+          "name": "Hanaa Talei",
+          "title": null,
+          "office": "Building 5, Office 101",
+          "building": "5",
+          "office_hours": "TBA",
+          "phone": "ext. 2193",
+          "email": "h.talei@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/hanaa-talei"
+        },
+        {
+          "name": "Lhoussaine Tenghiri",
+          "title": "Professor of Physics and Energy",
+          "office": "Building 8B, Office 221",
+          "building": "8B",
+          "office_hours": "Monday, Wednesday & Friday 15:00-18:00",
+          "phone": "ext. 2121 / 4013",
+          "email": "l.tenghiri@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/lhoussaine-tenghiri"
+        },
+        {
+          "name": "Veronique Mireille Marie Van Lierde",
+          "title": "Associate Professor of Mathematics",
+          "office": "Building 7, Office 018",
+          "building": "7",
+          "office_hours": "Monday 9:30-11:00, 15:00-17:00; Tuesday 13:00-15:30; Wednesday 9:30-11:00; Thursday by appointment; Friday 15:00-16:30",
+          "phone": "ext. 2447",
+          "email": "v.lierde@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/veronique-mireille-marie-van-lierde"
+        },
+        {
+          "name": "Rabie Zine",
+          "title": null,
+          "office": "Building 8B, Office 221",
+          "building": "8B",
+          "office_hours": "TBA",
+          "phone": "ext. 2093",
+          "email": "r.zine@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/rabie-zine"
+        },
+        {
+          "name": "Ahmed Aly",
+          "title": null,
+          "office": "Building 8B, Office 210",
+          "building": "8B",
+          "office_hours": null,
+          "phone": "ext. 3512",
+          "email": "a.aly@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/ahmed-aly"
+        },
+        {
+          "name": "Amine Abouaomar",
+          "title": "Assistant Professor of Computer Science",
+          "office": "Building 16, Office 122",
+          "building": "16",
+          "office_hours": null,
+          "phone": "ext. 3503",
+          "email": "a.abouaomar@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/amine-abouaomar"
+        },
+        {
+          "name": "Houssain Kettani",
+          "title": "Full Professor of Computer Science",
+          "office": "Building 16, Office 145",
+          "building": "16",
+          "office_hours": "Monday-Thursday 10:10-11:50",
+          "phone": "(+212) 535-863-306",
+          "email": "houssain.kettani@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/houssain-kettani"
+        },
+        {
+          "name": "Elias Saleeby",
+          "title": "Associate Professor of Mathematics",
+          "office": "Building 8B, Office 206",
+          "building": "8B",
+          "office_hours": "Monday, Wednesday & Friday 13:30-15:30; Tuesday 13:30-15:30, 16:00-17:00",
+          "phone": "ext. 2326",
+          "email": "e.saleeby@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/elias-saleeby"
+        },
+        {
+          "name": "Raifa Akkaoui",
+          "title": "Assistant Professor of Computer Science",
+          "office": "Building 8, Office 106",
+          "building": "8",
+          "office_hours": "TBC",
+          "phone": "ext. 2309",
+          "email": "r.akkaoui@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/raifa-akkaoui"
+        },
+        {
+          "name": "Nadia Arrousse",
+          "title": "Assistant Professor of Chemistry",
+          "office": "Building 6, Office 105",
+          "building": "6",
+          "office_hours": "Tuesday & Thursday 9:00-10:00, 11:30-13:00, 16:00-18:00",
+          "phone": "ext. 2146",
+          "email": "n.arrousse@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/nadia-arrousse"
+        },
+        {
+          "name": "Oumaima Hourrane",
+          "title": "Assistant Professor of Computer Science",
+          "office": "Building 16, Office 122",
+          "building": "16",
+          "office_hours": "Monday, Wednesday & Friday 9:00-10:00, 12:00-14:00",
+          "phone": "ext. 2347",
+          "email": null,
+          "profile_url": "https://aui.ma/teacher-bio/oumaima-hourrane"
+        },
+        {
+          "name": "Mohammed Benzaouia",
+          "title": "Assistant Professor of Electrical Engineering",
+          "office": "Building 8B, Office 210",
+          "building": "8B",
+          "office_hours": "Monday, Wednesday & Friday 9:00-10:00, 12:00-14:00",
+          "phone": "ext. 3515",
+          "email": "m.benzaouia@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/mohammed-benzaouia-0"
+        },
+        {
+          "name": "Fiaz Ahmad",
+          "title": "Associate Professor of Engineering",
+          "office": "Building 5, Office 101",
+          "building": "5",
+          "office_hours": "Monday & Wednesday 14:15-17:15; Friday 11:30-12:30, 14:30-16:30",
+          "phone": "ext. 2153",
+          "email": "f.ahmad@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/fiaz-ahmad"
+        },
+        {
+          "name": "Oualid Kafi",
+          "title": "Post-doctoral Researcher in Applied Mathematics",
+          "office": "Building 7, Office 104",
+          "building": "7",
+          "office_hours": "Monday, Wednesday & Friday 9:00-10:00, 12:00-14:00",
+          "phone": "ext. 2108",
+          "email": "o.kafi@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/oualid-kafi"
+        },
+        {
+          "name": "Mouna Kettani",
+          "title": "Senior Lecturer of Computer Science",
+          "office": "Building 11, Office 104",
+          "building": "11",
+          "office_hours": "Monday, Wednesday & Friday 9:00-12:00 or by appointment",
+          "phone": "ext. 2186",
+          "email": "m.kettani@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/mouna-kettani"
+        },
+        {
+          "name": "Sanae Kouismi",
+          "title": "Assistant Professor of Applied Mathematics and Operations Research",
+          "office": "Building 8, Office 106",
+          "building": "8",
+          "office_hours": "Monday, Wednesday & Friday 9:00-10:00, 12:00-14:00",
+          "phone": "ext. 2302",
+          "email": "s.kouismi@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/sanae-kouismi"
+        },
+        {
+          "name": "Samer Shafiq Ashhab",
+          "title": "Associate Professor of Mathematics",
+          "office": "Building 16, Office 126",
+          "building": "16",
+          "office_hours": "Tuesday & Thursday 10:30-14:30; Wednesday 11:25-12:25",
+          "phone": "ext. 2472",
+          "email": "s.ashhab@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/samer-shafiq-ashhab"
+        },
+        {
+          "name": "Sofiane Grira",
+          "title": "Associate Professor of Mathematics",
+          "office": "Building 16, Office 126",
+          "building": "16",
+          "office_hours": null,
+          "phone": "ext. 2110",
+          "email": "s.grira@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/sofiane-grira"
+        },
+        {
+          "name": "Hoda Khalafalla",
+          "title": "Assistant Professor of Computer Science",
+          "office": "Building 8B, Office 202",
+          "building": "8B",
+          "office_hours": null,
+          "phone": null,
+          "email": "h.khalafalla@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/hoda-khalafalla"
+        }
+      ]
+    },
+    {
+      "id": "SSAH",
+      "name": "School of Social Sciences, Arts and Humanities (formerly School of Humanities and Social Sciences, SHSS)",
+      "location": {
+        "main_building": "Building 8",
+        "notes": "Dean's office is Building 8, Office 1; faculty offices also in Buildings 4, 6, 7, 8B, 10 and 16 (NAB)."
+      },
+      "website": "https://aui.ma/school-of-social-sciences-arts-and-humanities",
+      "description": "Provides the liberal-arts general education program for all AUI students plus majors and minors in applied humanities and social sciences.",
+      "programs": [
+        "BA in International Studies",
+        "BA in Communication Studies",
+        "BA in Digital Humanities and Cultural Production",
+        "BSc in Territorial Planning and Management",
+        "BSc in Environmental Studies & Sustainability",
+        "BSc in Human Resource Development",
+        "Bachelor in Psychology",
+        "MA in International Studies & Diplomacy",
+        "MA in North African and Middle Eastern Studies",
+        "MA in Communication Studies and Digital Media",
+        "MA in AI and Human Society",
+        "MSc in Human Resource Development",
+        "MSc in Governance, Development and Public Policy"
+      ],
+      "services": [
+        "General education (liberal arts core) program for all AUI students",
+        "Academic advising",
+        "Internship program (INT 4300, required for all SSAH students)",
+        "Program sheets",
+        "Arabic and North African Studies program (ARANAS) - Modern Standard Arabic, Moroccan Darija, North African studies",
+        "Hillary Clinton Center for Women's Empowerment",
+        "Social Science Research Institute (SSRI)",
+        "Politics and International Studies Research Unit (PISRU)",
+        "Human and Economic Development Research Unit (HEDRU)"
+      ],
+      "staff_contacts": [
+        {
+          "name": "Kenza Oumlil",
+          "role": "Dean and Professor",
+          "office": "Building 8, Office 1",
+          "hours": null,
+          "phone": null,
+          "email": "k.oumlil@aui.ma"
+        }
+      ],
+      "faculty_count": 60,
+      "faculty": [
+        {
+          "name": "Kenza Oumlil",
+          "title": "Dean of the School of Social Sciences, Arts, and Humanities; Professor",
+          "office": "Building 8, Office 1 (Dean's Office)",
+          "building": "8",
+          "office_hours": null,
+          "phone": "ext. 2473",
+          "email": "k.oumlil@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/kenza-oumlil"
+        },
+        {
+          "name": "Qazi Fazli Azeem",
+          "title": "Educator and designer",
+          "office": "Building 8B, Room 303",
+          "building": "8B",
+          "office_hours": "Tuesday & Thursday 10:00-16:00 (online at time of posting)",
+          "phone": "ext. 2365",
+          "email": "q.azeem@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/qazi-fazli-azeem"
+        },
+        {
+          "name": "Hicham Marbouh",
+          "title": "Teacher of English",
+          "office": "Building 10, Office 1",
+          "building": "10",
+          "office_hours": "TBA",
+          "phone": "ext. 2999",
+          "email": "h.marbouh@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/hicham-marbouh"
+        },
+        {
+          "name": "Abdelkrim Marzouk",
+          "title": "Geography faculty (Ph.D. in Geography)",
+          "office": "Building 10, Office 8",
+          "building": "10",
+          "office_hours": "TBA",
+          "phone": "ext. 2440",
+          "email": "a.marzouk@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/abdelkrim-marzouk"
+        },
+        {
+          "name": "Nizar Messari",
+          "title": null,
+          "office": "Building 8, Room 001",
+          "building": "8",
+          "office_hours": "Tuesday & Thursday 10:15-12:45, 15:30-17:30",
+          "phone": "ext. 2025",
+          "email": null,
+          "profile_url": "https://aui.ma/teacher-bio/nizar-messari"
+        },
+        {
+          "name": "Severine Minot",
+          "title": null,
+          "office": "Building 7, Office 012",
+          "building": "7",
+          "office_hours": "Walk-in Monday & Wednesday 16:00-18:30; on-campus appointments Tuesday & Thursday 13:30-16:00; online appointments (MS Teams) Friday 10:30-15:00",
+          "phone": "ext. 3388",
+          "email": "s.minot@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/severine-minot"
+        },
+        {
+          "name": "Fatma Mohamed",
+          "title": "Assistant Professor of Arabic Literature",
+          "office": "Building 6, Office 101",
+          "building": "6",
+          "office_hours": "Wednesday 15:00-18:00; Tuesday & Thursday by appointment",
+          "phone": "ext. 2710",
+          "email": null,
+          "profile_url": "https://aui.ma/teacher-bio/fatma-mohamed"
+        },
+        {
+          "name": "Karim Moustaghfir",
+          "title": "Associate Vice President for 21st Century Learning Innovation and Faculty Development; Associate Professor of Human Resource Development",
+          "office": "Building 8, Office 105",
+          "building": "8",
+          "office_hours": "Monday, Wednesday & Friday 9:00-10:30",
+          "phone": "ext. 2143",
+          "email": "k.moustaghfir@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/karim-moustaghfir"
+        },
+        {
+          "name": "Woongbae Park",
+          "title": "Assistant Professor",
+          "office": "Building 7, Office 112",
+          "building": "7",
+          "office_hours": "Tuesday & Thursday 13:30-17:00; Wednesday 9:30-12:00",
+          "phone": "ext. 2459",
+          "email": null,
+          "profile_url": "https://aui.ma/teacher-bio/woongbae-park"
+        },
+        {
+          "name": "Biliana Jordanova Popova",
+          "title": "Philosophy faculty",
+          "office": "Building 10, Office 3",
+          "building": "10",
+          "office_hours": "TBA",
+          "phone": "(+212) 535-862-468",
+          "email": "b.popova@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/biliana-jordanova-popova"
+        },
+        {
+          "name": "Massimo Ramaioli",
+          "title": "Associate Professor of Political Science",
+          "office": "Building 6, Room 9",
+          "building": "6",
+          "office_hours": "Tuesday & Thursday 10:00-12:00 or by appointment",
+          "phone": "ext. 2464",
+          "email": "m.ramaioli@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/massimo-ramaioli"
+        },
+        {
+          "name": "Eric Ross",
+          "title": "Cultural and urban geographer",
+          "office": "Building 10, Room 8",
+          "building": "10",
+          "office_hours": "Monday & Wednesday 13:30-17:00; Tuesday 10:00-12:30; Thursday 10:00-12:30, 14:00-17:00",
+          "phone": "ext. 2481",
+          "email": "e.ross@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/eric-ross"
+        },
+        {
+          "name": "Meriem Sahli",
+          "title": "Assistant Professor; Lead of the Arabic Unit",
+          "office": "Building 10, Office 104",
+          "building": "10",
+          "office_hours": "TBA",
+          "phone": "ext. 2470",
+          "email": "m.sahli@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/meriem-sahli"
+        },
+        {
+          "name": "Aure Florence Veyssière",
+          "title": "Clinical Psychologist",
+          "office": "Building 6, Room 108",
+          "building": "6",
+          "office_hours": "8:30-17:30",
+          "phone": "(+212) 535-862-034",
+          "email": "a.veyssiere@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/aure-florence-veyssi%C3%A8re"
+        },
+        {
+          "name": "Jenna Jeong-Ha Yim",
+          "title": "Assistant Professor",
+          "office": "Building 8B, Room 134",
+          "building": "8B",
+          "office_hours": "TBA",
+          "phone": "(+212) 535-863-518",
+          "email": "j.yim@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/jenna-jeong-ha-yim"
+        },
+        {
+          "name": "Loubna El Abbadi",
+          "title": "not listed (profile lists Language Center)",
+          "office": "Building 8B, Office 215",
+          "building": "8B",
+          "office_hours": "TBA",
+          "phone": "(+212) 535-863-297",
+          "email": null,
+          "profile_url": "https://aui.ma/teacher-bio/loubna-el-abbadi"
+        },
+        {
+          "name": "Abderrahim Agnaou",
+          "title": "Associate Professor of Communications & Rhetoric",
+          "office": "Building 8, Office 108",
+          "building": "8",
+          "office_hours": "TBA",
+          "phone": "(+212) 535-862-462",
+          "email": "a.agnaou@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/abderrahim-agnaou"
+        },
+        {
+          "name": "Fatima-Zahra Bendriouch",
+          "title": "Lecturer",
+          "office": null,
+          "building": null,
+          "office_hours": null,
+          "phone": null,
+          "email": null,
+          "profile_url": "https://aui.ma/teacher-bio/fatima-zahra-bendriouch"
+        },
+        {
+          "name": "Stefano Bigliardi",
+          "title": null,
+          "office": "Building 6, Office 4",
+          "building": "6",
+          "office_hours": "TBA",
+          "phone": "(+212) 535-862-343",
+          "email": null,
+          "profile_url": "https://aui.ma/teacher-bio/stefano-bigliardi"
+        },
+        {
+          "name": "Awatif Boudihaj",
+          "title": null,
+          "office": "Building 10, Office 1",
+          "building": "10",
+          "office_hours": "TBA",
+          "phone": "ext. 2482",
+          "email": "a.boudihaj@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/awatif-boudihaj"
+        },
+        {
+          "name": "Abdellah Chekayri",
+          "title": "Full Professor",
+          "office": "Building 8, Office 109",
+          "building": "8",
+          "office_hours": "Monday, Wednesday & Friday 8:30-10:30; Tuesday 9:00-12:00",
+          "phone": "(+212) 535-862-448",
+          "email": "a.chekayri@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/abdellah-chekayri"
+        },
+        {
+          "name": "Khadija Darmame",
+          "title": "Geographer",
+          "office": "Building 10, Office 103",
+          "building": "10",
+          "office_hours": "TBA",
+          "phone": "ext. 4921",
+          "email": "k.darmame@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/khadija-darmame"
+        },
+        {
+          "name": "Mohamed El Amri",
+          "title": "Assistant Professor",
+          "office": "Building 8, Room 115",
+          "building": "8",
+          "office_hours": "Monday, Wednesday & Friday 9:30-11:00, 16:00-17:00",
+          "phone": "ext. 3138",
+          "email": "m.elamri@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/mohamed-el-amri"
+        },
+        {
+          "name": "Latifa El Mortaji",
+          "title": null,
+          "office": "Building 4, Office 11",
+          "building": "4",
+          "office_hours": "Tuesday & Thursday 15:00-19:30",
+          "phone": "ext. 2150",
+          "email": "l.elmortaji@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/latifa-el-mortaji"
+        },
+        {
+          "name": "Said Ennahid",
+          "title": "Archaeologist; Professor of Islamic Art and Architecture",
+          "office": "Building 8, Office 107",
+          "building": "8",
+          "office_hours": "TBA",
+          "phone": "(+212) 535-862-477",
+          "email": null,
+          "profile_url": "https://aui.ma/teacher-bio/said-ennahid"
+        },
+        {
+          "name": "Krishna Gajjar",
+          "title": "Assistant Professor of Human Resource Development",
+          "office": "Building 8, Room 103",
+          "building": "8",
+          "office_hours": null,
+          "phone": "ext. 2344",
+          "email": null,
+          "profile_url": "https://aui.ma/teacher-bio/krishna-gajjar"
+        },
+        {
+          "name": "Claris Harboun",
+          "title": "Law faculty (doctorate in law, McGill)",
+          "office": "Building 10, Office 106",
+          "building": "10",
+          "office_hours": "Tuesday & Thursday 10:00-13:00, 13:30-15:00",
+          "phone": "ext. 3159",
+          "email": null,
+          "profile_url": "https://aui.ma/teacher-bio/claris-harboun"
+        },
+        {
+          "name": "Naziha Houki",
+          "title": null,
+          "office": "Building 6, Room 105",
+          "building": "6",
+          "office_hours": "Tuesday 9:00-18:00",
+          "phone": "ext. 2463",
+          "email": null,
+          "profile_url": "https://aui.ma/teacher-bio/naziha-houki"
+        },
+        {
+          "name": "Ahmed Kabel",
+          "title": "Associate Professor",
+          "office": "Building 10, Room 108",
+          "building": "10",
+          "office_hours": "Wednesday 14:00-17:00",
+          "phone": "ext. 2319",
+          "email": "a.kabel@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/ahmed-kabel"
+        },
+        {
+          "name": "Jack Vahram Kalpakian",
+          "title": null,
+          "office": "Building 7, Room 103",
+          "building": "7",
+          "office_hours": null,
+          "phone": "ext. 2461",
+          "email": "j.kalpakian@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/jack-vahram-kalpakian"
+        },
+        {
+          "name": "Djallil Lounnas",
+          "title": "Associate Professor of International Relations",
+          "office": "Building 10, Office 6",
+          "building": "10",
+          "office_hours": "TBA",
+          "phone": "(+212) 535-862-441",
+          "email": "d.lounnas@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/djallil-lounnas"
+        },
+        {
+          "name": "Frances Danielle Loustau-Williams",
+          "title": null,
+          "office": "Building 7, Office 102",
+          "building": "7",
+          "office_hours": "TBA",
+          "phone": "(+212) 535-863-701",
+          "email": "f.williams@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/frances-danielle-loustau-williams"
+        },
+        {
+          "name": "Paul Mitchell Love",
+          "title": "Associate Professor of North African, Middle Eastern, and Islamic History",
+          "office": "Mohammed VI Library, Office of the Library Director",
+          "building": null,
+          "office_hours": "By appointment",
+          "phone": "ext. 2171",
+          "email": "p.love@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/paul-mitchell-love"
+        },
+        {
+          "name": "Sara Maderious",
+          "title": null,
+          "office": "Building 8B, Room 202",
+          "building": "8B",
+          "office_hours": "Tuesday & Thursday 9:00-14:30",
+          "phone": "(+212) 535-863-113",
+          "email": null,
+          "profile_url": "https://aui.ma/teacher-bio/sara-maderious"
+        },
+        {
+          "name": "Sidi Driss Maghraoui",
+          "title": "Associate Professor of History and International Relations",
+          "office": "Building 4, Office 10",
+          "building": "4",
+          "office_hours": "TBA",
+          "phone": "(+212) 535-862-460",
+          "email": "d.maghraoui@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/sidi-driss-maghraoui"
+        },
+        {
+          "name": "Muneeb Hussain Gattoo",
+          "title": null,
+          "office": "Building 6, Room 4",
+          "building": "6",
+          "office_hours": null,
+          "phone": null,
+          "email": "m.hussaingattoo@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/muneeb-hussain-gattoo"
+        },
+        {
+          "name": "Alina Kasanova",
+          "title": null,
+          "office": "Building 4, Office 110",
+          "building": "4",
+          "office_hours": "TBA",
+          "phone": null,
+          "email": "a.kasanova@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/alina-kasanova"
+        },
+        {
+          "name": "Christopher Arasanmi",
+          "title": "Business Information Systems faculty (PhD)",
+          "office": "Building 8B, Room 211",
+          "building": "8B",
+          "office_hours": "Monday, Wednesday & Friday (times not listed)",
+          "phone": null,
+          "email": null,
+          "profile_url": "https://aui.ma/teacher-bio/christopher-arasanmi"
+        },
+        {
+          "name": "Claudine Moise",
+          "title": "Program Chair",
+          "office": "Building 8B, Room 208",
+          "building": "8B",
+          "office_hours": null,
+          "phone": null,
+          "email": "c.moise@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/claudine-moise"
+        },
+        {
+          "name": "Aliye Fatma Mataraci",
+          "title": null,
+          "office": "Building 16 (NAB), Office 115",
+          "building": "16 (NAB)",
+          "office_hours": "Monday 10:30-12:30, 14:30-16:30; Wednesday 11:00-12:00, 14:00-17:00; Thursday 16:00-17:00",
+          "phone": "(+212) 535-864-922",
+          "email": "a.mataraci@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/aliye-fatma-mataraci"
+        },
+        {
+          "name": "Soukaïna Aijou",
+          "title": "Lecturer",
+          "office": "Building 7, Room 111",
+          "building": "7",
+          "office_hours": "Monday & Wednesday 14:00-18:00",
+          "phone": "ext. 2823",
+          "email": null,
+          "profile_url": "https://aui.ma/teacher-bio/souka%C3%AFna-aijou"
+        },
+        {
+          "name": "Ali Humayun Akhtar",
+          "title": null,
+          "office": null,
+          "building": null,
+          "office_hours": null,
+          "phone": null,
+          "email": "a.akhtar@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/ali-humayun-akhtar"
+        },
+        {
+          "name": "Taleb Ali",
+          "title": "Lecturer",
+          "office": "Building 4, Room 110",
+          "building": "4",
+          "office_hours": null,
+          "phone": "ext. 2480",
+          "email": "t.ali@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/taleb-ali"
+        },
+        {
+          "name": "Manal Lamouine",
+          "title": "Assistant Professor of Psychology",
+          "office": "Building 16 (NAB), Office 117",
+          "building": "16 (NAB)",
+          "office_hours": null,
+          "phone": null,
+          "email": null,
+          "profile_url": "https://aui.ma/teacher-bio/manal-lamouine"
+        },
+        {
+          "name": "Hajar Berghabi",
+          "title": null,
+          "office": "Building 8B, Room 208",
+          "building": "8B",
+          "office_hours": "Monday 13:00-15:00; Tuesday 10:00-15:00; Wednesday 13:00-15:00",
+          "phone": null,
+          "email": null,
+          "profile_url": "https://aui.ma/teacher-bio/hajar-berghabi"
+        },
+        {
+          "name": "Soukaina Chakkour",
+          "title": "Assistant Professor",
+          "office": "Building 10, Office 011",
+          "building": "10",
+          "office_hours": null,
+          "phone": null,
+          "email": "s.chakkour@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/soukaina-chakkour"
+        },
+        {
+          "name": "Adam Davies",
+          "title": null,
+          "office": "Building 11, Room 006",
+          "building": "11",
+          "office_hours": "Monday & Wednesday 10:00-14:00",
+          "phone": null,
+          "email": "a.jonathandavies@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/adam-davies"
+        },
+        {
+          "name": "Isabel Eddouks Taurel",
+          "title": null,
+          "office": "Building 4, Room 109",
+          "building": "4",
+          "office_hours": "Monday-Thursday 9:30-12:30",
+          "phone": null,
+          "email": "i.eddouks@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/isabel-eddouks-taurel"
+        },
+        {
+          "name": "Maria Hanzazi",
+          "title": null,
+          "office": "Building 8B, Office 14",
+          "building": "8B",
+          "office_hours": "Monday, Wednesday & Friday 9:00-12:00",
+          "phone": null,
+          "email": "m.hanzazi@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/maria-hanzazi"
+        },
+        {
+          "name": "Ryan Davidson",
+          "title": "Poet and scholar",
+          "office": "Building 10, Room 101",
+          "building": "10",
+          "office_hours": "Tuesday & Thursday 14:00-16:00",
+          "phone": null,
+          "email": "r.davidson@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/ryan-davidson"
+        },
+        {
+          "name": "Rawae Karmim",
+          "title": null,
+          "office": "Building 8B, Office 213",
+          "building": "8B",
+          "office_hours": "Tuesday & Thursday 10:00-14:30",
+          "phone": "ext. 2345",
+          "email": "r.karmim@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/rawae-karmim"
+        },
+        {
+          "name": "Taylor Robb",
+          "title": null,
+          "office": "Building 8B, Room 209",
+          "building": "8B",
+          "office_hours": "Tuesday & Thursday 9:50-12:50; Wednesday 9:00-12:00",
+          "phone": "ext. 3501",
+          "email": "t.robb@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/taylor-robb"
+        },
+        {
+          "name": "Vladimir Shcherbak",
+          "title": null,
+          "office": "Building 7, Room 111",
+          "building": "7",
+          "office_hours": "Monday 13:30-17:00; Wednesday & Friday 13:30-16:00",
+          "phone": "ext. 2476",
+          "email": "v.shcherbak@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/vladimir-shcherbak"
+        },
+        {
+          "name": "Frances Loustau-Williams (second profile)",
+          "title": "Full-time Assistant Professor",
+          "office": "Building 8, Office 102",
+          "building": "8",
+          "office_hours": null,
+          "phone": "ext. 3701",
+          "email": null,
+          "profile_url": "https://aui.ma/teacher-bio/frances-loustau-williams"
+        },
+        {
+          "name": "Munene Mugambi",
+          "title": "Assistant Professor of Environmental Studies and Sustainability",
+          "office": "Building 10, Room 007",
+          "building": "10",
+          "office_hours": "Monday & Wednesday 14:30-17:30; Tuesday 12:45-15:45",
+          "phone": "ext. 3170",
+          "email": "mu.mugambi@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/munene-mugambi"
+        },
+        {
+          "name": "Hannah Mweru Mwangi Mugambi",
+          "title": "Assistant Professor",
+          "office": "Building 6, Room 107",
+          "building": "6",
+          "office_hours": "Monday 8:00-11:00; Tuesday & Thursday 10:00-11:30, 14:30-16:00",
+          "phone": "ext. 2672",
+          "email": "h.mwangimugambi@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/hannah-mweru-mwangi-mugambi"
+        },
+        {
+          "name": "Tabassum Rashid",
+          "title": null,
+          "office": "Building 8B, Room 213",
+          "building": "8B",
+          "office_hours": "Monday 12:00-16:00; Wednesday 11:00-16:00",
+          "phone": "ext. 2345",
+          "email": "t.rashid@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/tabassum-rashid"
+        },
+        {
+          "name": "Zain Saeed",
+          "title": "Author",
+          "office": "Building 8B, Room 207",
+          "building": "8B",
+          "office_hours": null,
+          "phone": null,
+          "email": null,
+          "profile_url": "https://aui.ma/teacher-bio/zain-saeed"
+        },
+        {
+          "name": "Ibtissama Sebti",
+          "title": null,
+          "office": "Building 8, Room 008",
+          "building": "8",
+          "office_hours": "Tuesday & Thursday 9:00-10:00, 14:00-14:30, 16:00-17:30; Wednesday 15:00-17:00, 18:30-19:30",
+          "phone": "ext. 2457",
+          "email": "i.sebti@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/ibtissama-sebti"
+        },
+        {
+          "name": "Kumail Ali Shareef",
+          "title": null,
+          "office": "Building 8B, Room 206",
+          "building": "8B",
+          "office_hours": "Tuesday & Thursday 10:00-13:00; Wednesday 14:00-16:00",
+          "phone": null,
+          "email": "k.shareef@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/kumail-ali-shareef"
+        }
+      ]
+    },
+    {
+      "id": "LC",
+      "name": "Language Center",
+      "location": {
+        "main_building": "Building 8",
+        "notes": "Director in Building 8, Room 6; instructors spread across Buildings 4, 5, 6, 8, 8B and 9."
+      },
+      "website": "https://aui.ma/language-center",
+      "description": "Language instruction in English, French and other languages for students, staff and external clients.",
+      "programs": [],
+      "services": [
+        "English Program (Intensive English Program, academic English)",
+        "French Program (French as a Foreign Language for international students; French as a Second Language for Moroccan students; beginner to advanced)",
+        "Elective courses in Spanish, Tamazight and Korean",
+        "Professional (business) English for public and private institutions, via the Executive Education Center",
+        "English for Staff (EFS) - 45-hour courses for AUI faculty and staff"
+      ],
+      "staff_contacts": [
+        {
+          "name": "Karim Achibat",
+          "role": "Director",
+          "office": "Building 8, Room 6",
+          "hours": null,
+          "phone": null,
+          "email": "k.achibat@aui.ma"
+        },
+        {
+          "name": "Karima Maazouz",
+          "role": "Program Coordinator",
+          "office": "Building 8, Office 5",
+          "hours": "8:30-17:30",
+          "phone": null,
+          "email": "k.maazouz@aui.ma"
+        }
+      ],
+      "faculty_count": 23,
+      "faculty": [
+        {
+          "name": "Karim Achibat",
+          "title": "Assistant Professor in Rhetoric and Communication; (Interim) Director of the Language Center",
+          "office": "Building 8, Room 6 (per Language Center page)",
+          "building": "8",
+          "office_hours": null,
+          "phone": null,
+          "email": "k.achibat@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/karim-achibat"
+        },
+        {
+          "name": "Chafiq Abdelghani",
+          "title": null,
+          "office": "Building 4, Office 109",
+          "building": "4",
+          "office_hours": "TBA",
+          "phone": "(+212) 535-863-297",
+          "email": "c.abdelghani@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/chafiq-abdelghani"
+        },
+        {
+          "name": "Abderrahman Azennoud",
+          "title": "Linguistics faculty (Ph.D.)",
+          "office": "Building 5, Office 104",
+          "building": "5",
+          "office_hours": "TBA",
+          "phone": "(+212) 535-862-158",
+          "email": "a.azennoud@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/abderrahman-azennoud"
+        },
+        {
+          "name": "Mélissa Dominique Devier",
+          "title": null,
+          "office": "Building 6, Office 110",
+          "building": "6",
+          "office_hours": "TBA",
+          "phone": "(+212) 535-862-561",
+          "email": "m.devier@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/m%C3%A9lissa-dominique-devier"
+        },
+        {
+          "name": "Aziz El Hassani",
+          "title": "EFL Lecturer",
+          "office": "Building 8B, Office 214",
+          "building": "8B",
+          "office_hours": "TBA",
+          "phone": "(+212) 535-863-290",
+          "email": "a.elhassani@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/aziz-el-hassani"
+        },
+        {
+          "name": "Souad Loukili",
+          "title": null,
+          "office": "Building 6, Office 2",
+          "building": "6",
+          "office_hours": "TBA",
+          "phone": "(+212) 535-862-966",
+          "email": "s.loukili@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/souad-loukili"
+        },
+        {
+          "name": "Yasmine Ouakrime",
+          "title": null,
+          "office": "Building 6, Office 109",
+          "building": "6",
+          "office_hours": "TBA",
+          "phone": "(+212) 535-862-458",
+          "email": null,
+          "profile_url": "https://aui.ma/teacher-bio/yasmine-ouakrime"
+        },
+        {
+          "name": "Melyssa Lynn Reynolds",
+          "title": "English Language Instructor",
+          "office": "Building 4, Office 111",
+          "building": "4",
+          "office_hours": "TBA",
+          "phone": "(+212) 535-863-144",
+          "email": "m.reynolds@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/melyssa-lynn-reynolds"
+        },
+        {
+          "name": "Aurore Marie-Thérèse Savoie",
+          "title": "Spanish/Hispanic studies instructor",
+          "office": "Building 6, Office 110",
+          "building": "6",
+          "office_hours": "TBA",
+          "phone": "(+212) 535-862-458",
+          "email": null,
+          "profile_url": "https://aui.ma/teacher-bio/aurore-marie-th%C3%A9r%C3%A8se-savoie"
+        },
+        {
+          "name": "Giovanna Storti",
+          "title": "English Lecturer",
+          "office": "Building 5, Office 104",
+          "building": "5",
+          "office_hours": "TBA",
+          "phone": "(+212) 535-862-158",
+          "email": "g.storti@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/giovanna-storti"
+        },
+        {
+          "name": "Jade Tahtah",
+          "title": "Linguistics faculty (doctorate)",
+          "office": "Building 6, Office 2",
+          "building": "6",
+          "office_hours": "TBA",
+          "phone": "(+212) 535-862-118",
+          "email": null,
+          "profile_url": "https://aui.ma/teacher-bio/jade-tahtah"
+        },
+        {
+          "name": "Hafid Tlemçani-Mekaoui",
+          "title": "Lecturer",
+          "office": "Building 8, Office 4",
+          "building": "8",
+          "office_hours": "TBA",
+          "phone": "(+212) 535-862-429",
+          "email": null,
+          "profile_url": "https://aui.ma/teacher-bio/hafid-tlem%C3%A7ani-mekaoui"
+        },
+        {
+          "name": "Jacob Adrianus Wildschut",
+          "title": "Language Center teacher (since 2014)",
+          "office": "Building 8, Office 113",
+          "building": "8",
+          "office_hours": "TBA",
+          "phone": "(+212) 535-862-455",
+          "email": "j.wildschut@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/jacob-adrianus-wildschut"
+        },
+        {
+          "name": "Moncef Lahlou",
+          "title": null,
+          "office": null,
+          "building": null,
+          "office_hours": null,
+          "phone": null,
+          "email": null,
+          "profile_url": "https://aui.ma/teacher-bio/moncef-lahlou"
+        },
+        {
+          "name": "Jemili Marwen",
+          "title": null,
+          "office": null,
+          "building": null,
+          "office_hours": null,
+          "phone": null,
+          "email": null,
+          "profile_url": "https://aui.ma/teacher-bio/jemili-marwen"
+        },
+        {
+          "name": "Islas Rodrigo",
+          "title": null,
+          "office": null,
+          "building": null,
+          "office_hours": null,
+          "phone": null,
+          "email": null,
+          "profile_url": "https://aui.ma/teacher-bio/islas-rodrigo"
+        },
+        {
+          "name": "Wildschut Arian",
+          "title": null,
+          "office": null,
+          "building": null,
+          "office_hours": null,
+          "phone": null,
+          "email": null,
+          "profile_url": "https://aui.ma/teacher-bio/wildschut-arian"
+        },
+        {
+          "name": "Sanaa Boussaaddan",
+          "title": null,
+          "office": "Building 4, Office 109",
+          "building": "4",
+          "office_hours": "TBA",
+          "phone": "(+212) 535-863-149",
+          "email": null,
+          "profile_url": "https://aui.ma/teacher-bio/sanaa-boussaaddan"
+        },
+        {
+          "name": "Holly Formolo",
+          "title": null,
+          "office": "Building 8, Office 8",
+          "building": "8",
+          "office_hours": "TBA",
+          "phone": "(+212) 535-862-450",
+          "email": "h.formolo@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/holly-formolo"
+        },
+        {
+          "name": "Mirela Najtellari",
+          "title": null,
+          "office": "Building 9, Office 101",
+          "building": "9",
+          "office_hours": "TBA",
+          "phone": "(+212) 535-862-358",
+          "email": "m.najtellari@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/mirela-najtellari"
+        },
+        {
+          "name": "Massimo Cortesi",
+          "title": null,
+          "office": "Building 8B, Office 03",
+          "building": "8B",
+          "office_hours": "TBA",
+          "phone": "(+212) 535-862-356",
+          "email": "m.cortesi@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/massimo-cortesi"
+        },
+        {
+          "name": "Stephanie Ftouh",
+          "title": null,
+          "office": "Building 4, Office 111",
+          "building": "4",
+          "office_hours": "TBA",
+          "phone": "(+212) 535-863-144",
+          "email": "s.ftouh@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/stephanie-ftouh"
+        },
+        {
+          "name": "Mohamed Kasmi",
+          "title": null,
+          "office": "Building 8B, Office 03",
+          "building": "8B",
+          "office_hours": "TBA",
+          "phone": "(+212) 535-862-357",
+          "email": "m.kasmi@aui.ma",
+          "profile_url": "https://aui.ma/teacher-bio/mohamed-kasmi"
+        }
+      ]
+    }
+  ],
+  "university_centers_and_services": [
+    {
+      "name": "Center for Learning Excellence (CLE)",
+      "services": "Mentor and tutor training; tutoring and academic support services."
+    },
+    {
+      "name": "Writing Center (part of CLE)",
+      "services": "Socratic-style writing tutoring for students of all levels and disciplines."
+    },
+    {
+      "name": "Center for Learning and Teaching (CLT)",
+      "services": "Technical support, consultation and production services for faculty; digital teaching."
+    },
+    {
+      "name": "Mohammed VI Library",
+      "services": "University library and research guides.",
+      "url": "https://libguides.aui.ma"
+    },
+    {
+      "name": "Employability & Entrepreneurship Office (Pathways)",
+      "services": "Career preparation, internships and entrepreneurship support.",
+      "url": "https://aui.ma/employability-and-entrepreneurship-office"
+    },
+    {
+      "name": "Azrou Center for Community Development",
+      "services": "Community engagement and development programs.",
+      "url": "https://aui.ma/azrou-center-for-community-developement"
+    },
+    {
+      "name": "Executive Education Center",
+      "services": "Executive and continuing education programs.",
+      "url": "https://aui.ma/executive-education"
+    }
+  ]
+}
