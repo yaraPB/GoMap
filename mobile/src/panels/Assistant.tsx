@@ -3,6 +3,7 @@ import { KeyboardAvoidingView, Linking, Platform, Pressable, ScrollView, StyleSh
 import Animated, { FadeIn, FadeInDown, LinearTransition } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
+import { openAR } from '../ar/open';
 import { api, ApiError } from '../api/client';
 import type { Answer, Lang } from '../api/types';
 import { fmtMinutes } from '../ar/geo';
@@ -57,7 +58,7 @@ export default function Assistant({ ask }: { ask?: string }) {
         // leaving the chat for directions: the conversation stays here for when they come back
         const a = answer.action as Extract<Answer['action'], { type: 'route' }>;
         const ready = await nav.preview({ placeId: target.id, name: target.name, coordinates: target.coordinates, category: target.category }, a.mode === 'step_free' ? 'step_free' : 'walk');
-        if (a.mode === 'ar' && ready) { nav.start(); replace({ name: 'go' }); router.push('/ar'); }
+        if (a.mode === 'ar' && ready) { nav.start(); replace({ name: 'go' }); openAR(); }
         else { say(answer.text, false); push({ name: 'route', said: question, reply: answer.text }); }
       } else {
         say(answer.alert?.tone === 'urgent' ? `${answer.alert.text} ${answer.text}` : answer.text, true);

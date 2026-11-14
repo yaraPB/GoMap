@@ -4,6 +4,7 @@ import Animated, { Easing, FadeIn, FadeInDown, FadeOut, useAnimatedStyle, useSha
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
+import { openAR } from '../ar/open';
 import { api } from '../api/client';
 import type { Answer, Lang } from '../api/types';
 import { t } from '../i18n/strings';
@@ -120,7 +121,7 @@ export default function Voice({ auto = false }: { auto?: boolean }) {
       const a = await api.ask(text, lang, loc.reason === 'off-campus' ? null : loc.coord, [], true);
       if (a.intent === 'place' && a.action?.type === 'route' && a.place) {
         const ready = await nav.preview({ placeId: a.place.id, name: a.place.name, coordinates: a.place.coordinates, category: a.place.category }, a.action.mode === 'step_free' ? 'step_free' : 'walk');
-        if (a.action.mode === 'ar' && ready) { nav.start(); replace({ name: 'go' }); router.push('/ar'); }
+        if (a.action.mode === 'ar' && ready) { nav.start(); replace({ name: 'go' }); openAR(); }
         else { if (a.text && chat.get().voice) speak(a.text, lang); chat.add({ role: 'user', text }); chat.add({ role: 'assistant', answer: a }); replace({ name: 'route', said: text, reply: a.text }); }
       } else toAssistant(text);
     } catch {

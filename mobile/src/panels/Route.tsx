@@ -3,6 +3,7 @@ import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown, FadeInUp, LinearTransition } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
+import { openAR } from '../ar/open';
 import type { RouteMode } from '../api/types';
 import { fmtDistance, fmtMinutes } from '../ar/geo';
 import { useApp, useLocation } from '../state/app';
@@ -22,7 +23,7 @@ export function RoutePreview({ said, reply }: { said?: string; reply?: string })
   const loc = useLocation();
   const r = nav.route;
   const close = () => { nav.stop(); pop(); };
-  const startAR = () => { nav.start(); router.push('/ar'); replace({ name: 'go' }); };
+  const startAR = () => { nav.start(); openAR(); replace({ name: 'go' }); };
   const modes: { id: RouteMode | 'indoor'; name: string; icon: IconName }[] = [
     { id: 'walk', name: 'Walk', icon: 'walk' }, { id: 'step_free', name: 'Step-free', icon: 'wheel' }, { id: 'indoor', name: 'Indoor', icon: 'building' },
   ];
@@ -157,7 +158,7 @@ export function TurnByTurn() {
       {rerouting && <Animated.View entering={FadeIn} style={[styles.reroute, { top: insets.top + 132 }]}><T weight="semibold" style={{ color: color.warnText, fontSize: 12.5 }}>Off the route · finding a new way</T></Animated.View>}
 
       <View style={[styles.side, { top: insets.top + (rerouting ? 176 : 140) }]}>
-        <Pressable accessibilityRole="button" onPress={() => router.push('/ar')} style={styles.camBtn}>
+        <Pressable accessibilityRole="button" onPress={() => openAR()} style={styles.camBtn}>
           <Icon name="camera" size={18} stroke={color.ink} /><T weight="semibold" style={{ fontSize: 13 }}>Use camera</T>
         </Pressable>
         <IconBtn icon={nav.muted ? 'ban' : 'bolt'} label={nav.muted ? 'Unmute voice guidance' : 'Mute voice guidance'} onPress={() => nav.setMuted(!nav.muted)} size={44} />

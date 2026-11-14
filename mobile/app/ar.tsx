@@ -7,48 +7,60 @@ import { DeviceMotion } from 'expo-sensors';
 import { router } from 'expo-router';
 import Svg, { Circle, Defs, LinearGradient, Polygon, Polyline, Stop } from 'react-native-svg';
 import type { Position } from '../src/api/types';
-import { angleDiff, bearing, enu, fmtDistance, fmtMinutes, pointAlong, snapToLine } from '../src/ar/geo';
-import { arReady, chevronsAhead, labelFor, steerHint, type Pose } from '../src/ar/projection';
+import { bearing, enu, fmtDistance, fmtMinutes, pointAlong, snapToLine } from '../src/ar/geo';
+import { chevronsAhead, labelFor, pathRibbon, steerHint, turnMarker, type Pose } from '../src/ar/projection';
+import { cameraPose, HeadingFusion } from '../src/ar/orientation';
 import { useApp, useLocation } from '../src/state/app';
 import { useNav } from '../src/state/navigation';
 import { ManeuverIcon } from '../src/ui/bits';
 import { Btn, Icon, IconBtn, T } from '../src/ui/kit';
 import { color } from '../src/ui/theme';
 
-const GPS_LIMIT_M = 15;
-const rad2deg = 180 / Math.PI;
+const GPS_LIMIT_M = 15;      // arrows are exact-ish below this
+const GPS_PAUSE_M = 40;      // above this they would point at the wrong path: pause
+const FLOW_MS = 1400;        // one chevron spacing per 1.4 s, about walking pace
 
-/** Phone tilt from the motion sensor, smoothed. pitchDown: 0 = camera at the horizon, 90 = straight down. */
-function usePose(enabled: boolean) {
-  const [tilt, setTilt] = useState({ pitchDown: 20, roll: 0, ok: false });
+/**
+ * Where the camera looks, from every sensor: attitude (gyro-fused rotation) for smooth, instant
+ * movement at any tilt; compass and walking course to keep it pointing at true north.
+ * pitchDown: 0 = camera at the horizon, 90 = straight down.
+ */
+function usePose(compass: { heading: number | null; accuracy: number | null; course: number | null }) {
+  const [pose, setPose] = useState({ heading: null as number | null, pitchDown: 20, roll: 0, yaw: 0, ok: false, t: 0 });
+  const fusion = useRef(new HeadingFusion());
+  const sensors = useRef(compass);
+  sensors.current = compass;
   const sm = useRef({ p: 20, r: 0 });
   useEffect(() => {
-    if (!enabled) return;
     let active = true;
-    let last = 0;
+    let last = 0, drawn = 0;
     let sub: { remove: () => void } | undefined;
     void (async () => {
       try {
         if (!(await DeviceMotion.isAvailableAsync())) return;
         const permission = await DeviceMotion.requestPermissionsAsync();
         if (!active || !permission.granted) return;
-        DeviceMotion.setUpdateInterval(50);
+        DeviceMotion.setUpdateInterval(33);
         sub = DeviceMotion.addListener(m => {
-          if (!m.rotation || !Number.isFinite(m.rotation.beta) || !Number.isFinite(m.rotation.gamma)) return;
-          last = Date.now();
-          const beta = m.rotation.beta * rad2deg;
-          const gamma = m.rotation.gamma * rad2deg;
-          const pitch = Math.max(-10, Math.min(80, 90 - beta));
-          const roll = Math.max(-35, Math.min(35, gamma));
-          sm.current = { p: sm.current.p * 0.75 + pitch * 0.25, r: sm.current.r * 0.8 + roll * 0.2 };
-          setTilt({ pitchDown: sm.current.p, roll: sm.current.r, ok: true });
+          const r = m.rotation;
+          if (!r || !Number.isFinite(r.alpha) || !Number.isFinite(r.beta) || !Number.isFinite(r.gamma)) return;
+          const now = Date.now();
+          last = now;
+          const cam = cameraPose(r.alpha, r.beta, r.gamma);
+          const s = sensors.current;
+          const heading = fusion.current.update({ yaw: cam.yaw, pitchDown: cam.pitchDown, compass: s.heading, compassAccuracy: s.accuracy, course: s.course, t: now, platform: Platform.OS });
+          // light smoothing on tilt only: the gyro is already clean, heading is fused above
+          sm.current = { p: sm.current.p * 0.6 + Math.max(-10, Math.min(85, cam.pitchDown)) * 0.4, r: sm.current.r * 0.6 + Math.max(-40, Math.min(40, cam.roll)) * 0.4 };
+          if (now - drawn < 33) return; // ~30 fps is plenty for SVG
+          drawn = now;
+          setPose({ heading, pitchDown: sm.current.p, roll: sm.current.r, yaw: cam.yaw, ok: true, t: now });
         });
       } catch { /* AR remains paused when motion data is unavailable. */ }
     })();
-    const timer = setInterval(() => { if (last && Date.now() - last > 3000) setTilt(t => t.ok ? { ...t, ok: false } : t); }, 1000);
+    const timer = setInterval(() => { if (last && Date.now() - last > 3000) setPose(p => (p.ok ? { ...p, ok: false } : p)); }, 1000);
     return () => { active = false; sub?.remove(); clearInterval(timer); };
-  }, [enabled]);
-  return tilt;
+  }, []);
+  return { ...pose, fusion: fusion.current };
 }
 
 export default function ARGuidance() {
@@ -59,32 +71,39 @@ export default function ARGuidance() {
   const loc = useLocation();
   const nav = useNav();
   const { reduceMotion } = useApp();
-  const tilt = usePose(true);
-  const [offset, setOffset] = useState(0);               // manual compass correction from "Align with the path"
+  const sensed = usePose({ heading: loc.rawHeading, accuracy: loc.headingAccuracy, course: loc.course });
+  const tilt = sensed;
   const [calibrating, setCalibrating] = useState(false);
-  const [aligned, setAligned] = useState(false);
   const [now, setNow] = useState(Date.now());
 
-  useEffect(() => { if (camera && !camera.granted && camera.canAskAgain && !requestedCamera.current) { requestedCamera.current = true; requestCamera(); } }, [camera]); // eslint-disable-line react-hooks/exhaustive-deps
+  // the camera opens at once: ask on arrival, no intermediate screen
+  useEffect(() => { if (!requestedCamera.current && camera && !camera.granted && camera.canAskAgain) { requestedCamera.current = true; requestCamera(); } }, [camera]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []);
 
   const route = nav.route;
   const line = route?.geometry.coordinates ?? [];
-  const user = loc.coord ?? line[0] ?? null;
-  const heading = loc.heading != null ? (loc.heading + offset + 360) % 360 : null;
-  const pose: Pose | null = heading != null ? { heading, pitchDown: tilt.pitchDown, roll: tilt.roll } : null;
+  // stand on the route when we are close to it: GPS error then shifts arrows along the path, not sideways off it
+  const onRoute = nav.progress.snapped && nav.progress.off < 15 ? nav.progress.snapped : null;
+  const user = onRoute ?? loc.coord ?? line[0] ?? null;
+  const heading = sensed.heading ?? loc.heading;
+  const pose: Pose | null = heading != null && tilt.ok ? { heading, pitchDown: tilt.pitchDown, roll: tilt.roll } : null;
   const view = { width: screen.width, height: screen.height };
+  const flow = reduceMotion ? 0 : (sensed.t % FLOW_MS) / FLOW_MS;
 
-  const chevrons = useMemo(() => (pose && user && line.length ? chevronsAhead(line, user, pose, view) : []), [pose?.heading, pose?.pitchDown, pose?.roll, user?.[0], user?.[1], line, screen.width, screen.height]); // eslint-disable-line react-hooks/exhaustive-deps
+  const step = route?.steps[nav.progress.stepIndex];
+  const ribbon = useMemo(() => (pose && user && line.length ? pathRibbon(line, user, pose, view) : []), [pose?.heading, pose?.pitchDown, pose?.roll, user?.[0], user?.[1], line, screen.width, screen.height]); // eslint-disable-line react-hooks/exhaustive-deps
+  const chevrons = pose && user && line.length ? chevronsAhead(line, user, pose, view, 6, flow) : [];
+  const turn = pose && user && step && step.turn !== 'straight' && step.turn !== 'arrive' ? turnMarker(line, user, step.at, pose, view) : null;
   const steer = pose && user && line.length ? steerHint(line, user, pose.heading, view) : null;
   const dest = line.at(-1);
   const label = pose && user && dest ? labelFor(dest, user, pose, view) : null;
 
-  // Expo reports a calibration level from 0 to 3 on both iOS and Android.
-  const headingWeak = loc.headingAccuracy == null || loc.headingAccuracy < 2;
-  const gpsBad = !loc.simulated && (loc.accuracy == null || loc.accuracy > GPS_LIMIT_M || loc.timestamp == null || now - loc.timestamp > 15000);
-  const needsCalibration = !arReady({ simulated: loc.simulated, accuracy: loc.accuracy, timestamp: loc.timestamp, now, heading, headingAccuracy: loc.headingAccuracy, aligned, motion: tilt.ok });
-  const step = route?.steps[nav.progress.stepIndex];
+  const stale = loc.timestamp == null || now - loc.timestamp > 20000;
+  const gpsBad = !loc.simulated && (loc.accuracy == null || loc.accuracy > GPS_LIMIT_M || stale);
+  const gpsLost = !loc.simulated && (loc.accuracy == null || loc.accuracy > GPS_PAUSE_M || stale);
+  // arrows show whenever we know where the camera looks; poor GPS dims them instead of hiding them
+  const needsCalibration = !pose || gpsLost;
+  const arrowAlpha = gpsBad ? 0.6 : 1;
   const onRoad = useMemo(() => {
     if (!user || !line.length) return null;
     const s = snapToLine(line, user);
@@ -93,11 +112,10 @@ export default function ARGuidance() {
 
   /** Point the phone along the path ahead and tap: the difference becomes the compass correction. */
   const alignWithPath = () => {
-    if (!user || !line.length || loc.heading == null) return;
+    if (!user || !line.length || !tilt.ok) return;
     const s = snapToLine(line, user);
     const ahead = bearing(pointAlong(line, s.along), pointAlong(line, s.along + 8));
-    setOffset(angleDiff(loc.heading, ahead));
-    setAligned(true);
+    sensed.fusion.align(sensed.yaw, ahead);
     setCalibrating(false);
   };
   const back = () => (router.canGoBack() ? router.back() : router.replace('/'));
@@ -115,7 +133,7 @@ export default function ARGuidance() {
 
   return (
     <View style={styles.root}>
-      {camera?.granted ? <CameraView style={StyleSheet.absoluteFill} facing="back" /> : (
+      {camera?.granted ? <CameraView style={StyleSheet.absoluteFill} facing="back" animateShutter={false} /> : !camera || camera.canAskAgain && !requestedCamera.current ? null : (
         <View style={[StyleSheet.absoluteFill, styles.center, { padding: 28, backgroundColor: '#0F1419' }]}>
           <Icon name="camera" size={36} stroke="#fff" />
           <T weight="bold" style={{ color: '#fff', fontSize: 18, marginTop: 12, textAlign: 'center' }}>Camera access is off</T>
@@ -130,13 +148,27 @@ export default function ARGuidance() {
 
       {/* arrows laid on the paving, 1.5 to 8 m ahead, fading past 8 m */}
       {!needsCalibration && camera?.granted && (
-        <Svg width={screen.width} height={screen.height} style={StyleSheet.absoluteFill} pointerEvents="none">
+        <Svg width={screen.width} height={screen.height} style={StyleSheet.absoluteFill} pointerEvents="none" opacity={arrowAlpha}>
           <Defs>
-            <LinearGradient id="chev" x1="0" y1="1" x2="0" y2="0"><Stop offset="0" stopColor="#22C55E" /><Stop offset="1" stopColor="#16A34A" /></LinearGradient>
+            <LinearGradient id="chev" x1="0" y1="1" x2="0" y2="0"><Stop offset="0" stopColor="#4ADE80" /><Stop offset="1" stopColor="#16A34A" /></LinearGradient>
+            <LinearGradient id="turn" x1="0" y1="1" x2="0" y2="0"><Stop offset="0" stopColor="#60A5FA" /><Stop offset="1" stopColor="#2563EB" /></LinearGradient>
           </Defs>
+          {/* the path on the floor */}
+          {ribbon.map((r, i) => <Polygon key={`r${i}`} points={r.points} fill="#22C55E" fillOpacity={0.22 * r.opacity} />)}
+          {/* far to near so nearer arrows cover farther ones */}
           {[...chevrons].reverse().map(c => (
-            <Polygon key={c.key} points={c.points} fill="url(#chev)" fillOpacity={c.opacity * pulse(c.key)} stroke="#FFFFFF" strokeOpacity={0.55 * c.opacity} strokeWidth={1.5} strokeLinejoin="round" />
+            <React.Fragment key={c.key}>
+              {c.shadow && <Polygon points={c.shadow} fill="#000" fillOpacity={0.28 * c.opacity} />}
+              {c.edge && <Polygon points={c.edge} fill="#0B6B3F" fillOpacity={0.9 * c.opacity} />}
+              <Polygon points={c.points} fill="url(#chev)" fillOpacity={c.opacity} stroke="#FFFFFF" strokeOpacity={0.7 * c.opacity} strokeWidth={1.5} strokeLinejoin="round" />
+            </React.Fragment>
           ))}
+          {turn && (
+            <>
+              {turn.shadow && <Polygon points={turn.shadow} fill="#000" fillOpacity={0.3} />}
+              <Polygon points={turn.points} fill="url(#turn)" fillOpacity={0.5 + 0.5 * pulse(0)} stroke="#fff" strokeWidth={2} strokeLinejoin="round" />
+            </>
+          )}
         </Svg>
       )}
 
@@ -176,12 +208,13 @@ export default function ARGuidance() {
           <T weight="semibold" style={styles.pillText}>{loc.simulated ? 'Demo position' : loc.accuracy != null ? `GPS ±${Math.round(loc.accuracy)} m` : 'Finding GPS'}</T>
         </View>
         {onRoad && <View style={styles.pill}><Icon name={onRoad.startsWith('Road') ? 'car' : 'walk'} size={13} stroke="#E6E7E4" /><T weight="semibold" style={styles.pillText}>{onRoad}</T></View>}
-        {offset !== 0 && <View style={styles.pill}><Icon name="calibrate" size={13} stroke="#E6E7E4" /><T weight="semibold" style={styles.pillText}>Aligned {offset > 0 ? '+' : ''}{Math.round(offset)}°</T></View>}
+        {sensed.fusion.aligned && <View style={styles.pill}><Icon name="calibrate" size={13} stroke="#E6E7E4" /><T weight="semibold" style={styles.pillText}>Aligned with the path</T></View>}
+        {gpsBad && !gpsLost && <View style={styles.pill}><T weight="semibold" style={styles.pillText}>Arrows approximate</T></View>}
         {!tilt.ok && Platform.OS !== 'web' && <View style={styles.pill}><T weight="semibold" style={styles.pillText}>Motion sensor unavailable</T></View>}
       </View>}
 
       {camera?.granted && needsCalibration && !calibrating && <Pressable accessibilityRole="button" onPress={() => setCalibrating(true)} style={[styles.warning, { top: insets.top + 132 }]}>
-        <T weight="semibold" style={{ color: '#fff' }}>Arrows paused · {gpsBad ? 'waiting for a better GPS fix' : !tilt.ok ? 'waiting for motion sensors' : 'align the compass'}</T>
+        <T weight="semibold" style={{ color: '#fff' }}>Arrows paused · {!tilt.ok ? 'waiting for motion sensors' : heading == null ? 'waiting for the compass' : 'waiting for a better GPS fix'}</T>
         <T style={{ color: '#D2DAE5', fontSize: 12, marginTop: 3 }}>Tap for options. The camera and 2D route remain available.</T>
       </Pressable>}
 
@@ -219,7 +252,7 @@ export default function ARGuidance() {
             )}
             <Btn title="Use the 2D map instead" onPress={back} style={{ marginTop: 18 }} />
             <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
-              <Btn title="Align with the path" kind="secondary" small style={{ flex: 1 }} onPress={alignWithPath} disabled={loc.heading == null} />
+              <Btn title="Align with the path" kind="secondary" small style={{ flex: 1 }} onPress={alignWithPath} disabled={!tilt.ok} />
               <Btn title="Back to camera" kind="ghost" small style={{ flex: 1 }} onPress={() => setCalibrating(false)} />
             </View>
           </View>

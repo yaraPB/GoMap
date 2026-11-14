@@ -6,6 +6,8 @@ import { setApiUser } from '../api/client';
 import type { Lang, MockUser, Position } from '../api/types';
 import { createHeadingFilter, distance } from '../ar/geo';
 import { CAMPUS_CENTER } from '../map/mapHtml';
+import { snapToNetwork, WalkFilter } from '../location/kalman';
+import { useWalkways } from '../api/hooks';
 
 /** Mock accounts until GoCampus SSO. TODO: replace with GoCampus SSO */
 export const USERS: MockUser[] = [
@@ -59,6 +61,13 @@ export type Fix = {
   /** true only when a simulated walk is active */
   simulated: boolean;
   reason: 'off-campus' | 'no-permission' | 'walk' | null;
+  /** the fix as the phone reported it, before smoothing and snapping */
+  rawCoord: Position | null;
+  rawAccuracy: number | null;
+  /** walking speed (m/s) and direction of travel from the filter; course is null when standing */
+  speed: number;
+  course: number | null;
+  onPath: boolean;
 };
 type LocCtx = Fix & { request: () => Promise<void>; setSimulated: (p: Position | null) => void };
 const Loc = createContext<LocCtx | null>(null);
@@ -67,7 +76,11 @@ const DEMO_POSITION: Position = [-5.10655, 33.53925]; // main plaza, by the libr
 const OFF_CAMPUS_M = 2000;
 
 export function LocationProvider({ children }: { children: React.ReactNode }) {
-  const [real, setReal] = useState<{ coord: Position; accuracy: number | null; timestamp: number } | null>(null);
+  const [real, setReal] = useState<{ coord: Position; accuracy: number | null; timestamp: number; raw: Position; rawAccuracy: number | null; speed: number; course: number | null; onPath: boolean } | null>(null);
+  const filterRef = useRef(new WalkFilter());
+  const walkways = useWalkways();
+  const lines = useRef<Position[][]>([]);
+  useEffect(() => { lines.current = (walkways.data?.features ?? []).filter(f => f.properties.modes !== 'drive').map(f => f.geometry.coordinates); }, [walkways.data]);
   const [permission, setPermission] = useState<Fix['permission']>('unknown');
   const [heading, setHeading] = useState<{ smooth: number; raw: number; acc: number | null } | null>(null);
   const [walk, setWalk] = useState<Position | null>(null);
@@ -78,8 +91,22 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
     subs.current.forEach(s => s.remove());
     subs.current = [];
     try {
-      const pos = await Location.watchPositionAsync({ accuracy: Location.Accuracy.BestForNavigation, distanceInterval: 1, timeInterval: 1000 },
-        u => setReal(previous => previous && u.timestamp < previous.timestamp ? previous : { coord: [u.coords.longitude, u.coords.latitude], accuracy: u.coords.accuracy ?? null, timestamp: u.timestamp }));
+      // Android: ask for high-accuracy mode (GPS + Wi-Fi), otherwise fixes can be 50–100 m off
+      if (Platform.OS === 'android') await Location.enableNetworkProviderAsync().catch(() => {});
+      // show something at once, then refine
+      const lastKnown = await Location.getLastKnownPositionAsync({ maxAge: 60_000, requiredAccuracy: 50 }).catch(() => null);
+      let lastT = 0;
+      const onFix = (u: Location.LocationObject) => {
+        if (u.timestamp <= lastT) return;
+        lastT = u.timestamp;
+        const raw: Position = [u.coords.longitude, u.coords.latitude];
+        const f = filterRef.current.update(raw, u.coords.accuracy ?? null, u.timestamp);
+        // on campus, people are on paths: pull the dot onto the nearest walkway when it is close
+        const snap = f.accuracy < 30 ? snapToNetwork(f.coord, lines.current, Math.min(8, Math.max(4, f.accuracy * 0.8))) : null;
+        setReal({ coord: snap?.coord ?? f.coord, accuracy: Math.round(Math.min(f.accuracy, u.coords.accuracy ?? f.accuracy) * 10) / 10, timestamp: u.timestamp, raw, rawAccuracy: u.coords.accuracy ?? null, speed: f.speed, course: f.course, onPath: !!snap });
+      };
+      if (lastKnown) onFix(lastKnown);
+      const pos = await Location.watchPositionAsync({ accuracy: Location.Accuracy.BestForNavigation, distanceInterval: 0, timeInterval: 1000, mayShowUserSettingsDialog: true }, onFix);
       subs.current.push(pos);
       if (Platform.OS !== 'web') {
         const head = await Location.watchHeadingAsync(h => {
@@ -118,6 +145,7 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
       coord, accuracy: simulated ? 4 : real?.accuracy ?? null, timestamp: simulated ? Date.now() : real?.timestamp ?? null,
       heading: heading?.smooth ?? null, rawHeading: heading?.raw ?? null, headingAccuracy: heading?.acc ?? null,
       permission, simulated, reason, request, setSimulated: setWalk,
+      rawCoord: real?.raw ?? null, rawAccuracy: real?.rawAccuracy ?? null, speed: simulated ? 1.25 : real?.speed ?? 0, course: simulated ? null : real?.course ?? null, onPath: simulated || !!real?.onPath,
     };
   }, [real, heading, permission, walk, request]);
   return <Loc.Provider value={value}>{children}</Loc.Provider>;

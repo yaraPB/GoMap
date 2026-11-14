@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { router } from 'expo-router';
+import { openAR } from '../ar/open';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { usePlace } from '../api/hooks';
@@ -31,7 +32,7 @@ export default function PlaceSheet({ id }: { id: string }) {
   const go = async (mode: 'walk' | 'ar') => {
     if (!place) return;
     await nav.preview({ placeId: place.id, name: place.name, coordinates: place.coordinates, category: place.category }, 'walk');
-    if (mode === 'ar') { nav.start(); replace({ name: 'go' }); router.push('/ar'); } else push({ name: 'route' });
+    if (mode === 'ar') { nav.start(); replace({ name: 'go' }); openAR(); } else push({ name: 'route' });
   };
 
   const header = (

@@ -31,6 +31,44 @@ export function arReady(input: { simulated: boolean; accuracy: number | null; ti
 export function focalPx(screen: Screen) { return (screen.height / 2) / Math.tan((VFOV_DEG / 2) * rad); }
 export function hfovDeg(screen: Screen) { return 2 * Math.atan((screen.width / 2) / focalPx(screen)) / rad; }
 
+type Cam = [number, number, number]; // right, up, forward (metres)
+const NEAR_Z = 0.3;
+
+/** World point (east, north, up from the user's feet) → camera space. */
+export function toCamera([e, n, u]: [number, number, number], pose: Pose): Cam {
+  const h = pose.heading * rad, th = pose.pitchDown * rad;
+  const p = [e, n, u - EYE_HEIGHT];
+  const F = [Math.sin(h) * Math.cos(th), Math.cos(h) * Math.cos(th), -Math.sin(th)];
+  const U = [Math.sin(h) * Math.sin(th), Math.cos(h) * Math.sin(th), Math.cos(th)];
+  const R = [Math.cos(h), -Math.sin(h), 0];
+  return [p[0] * R[0] + p[1] * R[1] + p[2] * R[2], p[0] * U[0] + p[1] * U[1] + p[2] * U[2], p[0] * F[0] + p[1] * F[1] + p[2] * F[2]];
+}
+
+function toScreen([x, y, z]: Cam, pose: Pose, screen: Screen): Projected {
+  const f = focalPx(screen);
+  let sx = f * x / z, sy = -f * y / z;
+  if (pose.roll) { const r = -pose.roll * rad, c = Math.cos(r), s = Math.sin(r); [sx, sy] = [sx * c - sy * s, sx * s + sy * c]; }
+  return { x: screen.width / 2 + sx, y: screen.height / 2 + sy, depth: z };
+}
+
+/**
+ * Project a flat shape, cutting it at the near plane instead of dropping it: arrows right at
+ * your feet stay visible (cut by the bottom of the screen) rather than vanishing.
+ */
+export function projectPolygon(points: [number, number, number][], pose: Pose, screen: Screen): Projected[] | null {
+  const cam = points.map(p => toCamera(p, pose));
+  const out: Cam[] = [];
+  for (let i = 0; i < cam.length; i++) {
+    const a = cam[i], b = cam[(i + 1) % cam.length];
+    const ain = a[2] >= NEAR_Z, bin = b[2] >= NEAR_Z;
+    if (ain) out.push(a);
+    if (ain !== bin) { const t = (NEAR_Z - a[2]) / (b[2] - a[2]); out.push([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, NEAR_Z]); }
+  }
+  if (out.length < 3) return null;
+  return out.map(c => toScreen(c, pose, screen));
+}
+const pts = (p: Projected[]) => p.map(q => `${q.x.toFixed(1)},${q.y.toFixed(1)}`).join(' ');
+
 /** Project a world point (east, north, up metres relative to the user's feet). */
 export function project([e, n, u]: [number, number, number], pose: Pose, screen: Screen): Projected | null {
   const h = pose.heading * rad, th = pose.pitchDown * rad;
@@ -63,31 +101,82 @@ export function chevronPolygon(centre: [number, number], dirDeg: number, pose: P
   return { points: pts as Projected[], depth: (pts as Projected[]).reduce((s, q) => s + q.depth, 0) / pts.length };
 }
 
-export type Chevron = { key: number; points: string; opacity: number; dist: number };
+export type Chevron = { key: number; points: string; shadow: string | null; edge: string | null; opacity: number; dist: number };
+
+/** Chevron outline on the ground (east/north metres), lifted by `up` metres. */
+function chevronShape(centre: [number, number], dirDeg: number, size: number, up: number): [number, number, number][] {
+  const d = [Math.sin(dirDeg * rad), Math.cos(dirDeg * rad)];
+  const p = [d[1], -d[0]];
+  const L = 0.6 * size, W = 0.45 * size, T = 0.22 * size;
+  const at = (fwd: number, side: number): [number, number, number] => [centre[0] + d[0] * fwd + p[0] * side, centre[1] + d[1] * fwd + p[1] * side, up];
+  return [at(L / 2, 0), at(-L / 2, W), at(-L / 2 + T, W), at(L / 2 - T * 1.15, 0), at(-L / 2 + T, -W), at(-L / 2, -W)];
+}
 
 /**
- * Chevrons along the route ahead of the user, from NEAR_M to FAR_M.
- * `line` is the route geometry; arrows follow its bends, so a turn shows up as arrows curving away.
+ * Chevrons along the route ahead, NEAR_M to FAR_M, lying on the paving. Each has a raised top,
+ * a darker front edge (thickness) and a soft shadow, so it reads as an object on the floor.
+ * `flow` (0–1) slides them forward along the path: the ar-flow animation.
  */
-export function chevronsAhead(line: Position[], user: Position, pose: Pose, screen: Screen, count = 5): Chevron[] {
+export function chevronsAhead(line: Position[], user: Position, pose: Pose, screen: Screen, count = 6, flow = 0): Chevron[] {
   if (line.length < 2 || count < 1) return [];
   const snap = snapToLine(line, user);
   const total = lineLength(line);
+  const spacing = (FAR_M - NEAR_M) / Math.max(1, count - 1);
   const out: Chevron[] = [];
   for (let k = 0; k < count; k++) {
-    const ahead = count === 1 ? NEAR_M : NEAR_M + (k * (FAR_M - NEAR_M)) / (count - 1);
+    const ahead = NEAR_M + (k + flow) * spacing;
     const along = snap.along + ahead;
-    if (along >= total) break;
+    if (along >= total - 0.3) break;
     const c = pointAlong(line, along);
-    const next = pointAlong(line, Math.min(total, along + 0.8));
-    const dir = bearing(c, next);
-    const local = enu(user, c);
-    const poly = chevronPolygon(local, dir, pose, screen, 1);
-    if (!poly) continue;
-    const fade = ahead > FAR_M - 2 ? Math.max(0, (FAR_M - ahead) / 2) * 0.8 + 0.2 : 1;
-    out.push({ key: k, points: poly.points.map(q => `${q.x.toFixed(1)},${q.y.toFixed(1)}`).join(' '), opacity: fade, dist: ahead });
+    const dir = bearing(c, pointAlong(line, Math.min(total, along + 0.8)));
+    const local = enu(user, c) as [number, number];
+    const top = projectPolygon(chevronShape(local, dir, 1, 0.06), pose, screen);
+    if (!top) continue;
+    const shadow = projectPolygon(chevronShape([local[0] + 0.06, local[1] - 0.06], dir, 1.05, 0), pose, screen);
+    const base = projectPolygon(chevronShape(local, dir, 1, 0), pose, screen);
+    // fade in at the near end (as it slides in) and out past FAR_M
+    const fadeIn = k === 0 ? Math.min(1, flow * 2 + 0.2) : 1;
+    const fadeOut = ahead > FAR_M - 2 ? Math.max(0, (FAR_M + spacing - ahead) / (2 + spacing)) : 1;
+    out.push({ key: k, points: pts(top), shadow: shadow ? pts(shadow) : null, edge: base ? pts(base) : null, opacity: Math.max(0, Math.min(1, fadeIn * fadeOut)), dist: ahead });
   }
   return out;
+}
+
+/** The route painted on the ground as a translucent band, so the way is clear between arrows. */
+export function pathRibbon(line: Position[], user: Position, pose: Pose, screen: Screen, from = 0.4, to = 30, width = 1.2): { points: string; opacity: number }[] {
+  if (line.length < 2) return [];
+  const snap = snapToLine(line, user);
+  const total = lineLength(line);
+  const out: { points: string; opacity: number }[] = [];
+  const step = 1.5;
+  let prev: [number, number, number][] | null = null;
+  for (let s = from; s <= to && snap.along + s < total; s += step) {
+    const c = pointAlong(line, snap.along + s);
+    const dir = bearing(c, pointAlong(line, Math.min(total, snap.along + s + 0.6))) * rad;
+    const [e, n] = enu(user, c);
+    const px = Math.cos(dir) * width / 2, py = -Math.sin(dir) * width / 2;
+    const edge: [number, number, number][] = [[e - px, n - py, 0.01], [e + px, n + py, 0.01]];
+    if (prev) {
+      const poly = projectPolygon([prev[0], prev[1], edge[1], edge[0]], pose, screen);
+      if (poly) out.push({ points: pts(poly), opacity: Math.max(0.05, 1 - s / to) });
+    }
+    prev = edge;
+  }
+  return out;
+}
+
+/** A big arrow on the ground at the next turn, pointing the new way, when it is close. */
+export function turnMarker(line: Position[], user: Position, turnAt: Position, pose: Pose, screen: Screen) {
+  const snap = snapToLine(line, user);
+  const t = snapToLine(line, turnAt);
+  const ahead = t.along - snap.along;
+  if (ahead < 2 || ahead > 25) return null;
+  const total = lineLength(line);
+  const dir = bearing(pointAlong(line, t.along), pointAlong(line, Math.min(total, t.along + 4)));
+  const local = enu(user, pointAlong(line, Math.min(total, t.along + 1.2))) as [number, number];
+  const top = projectPolygon(chevronShape(local, dir, 2.2, 0.08), pose, screen);
+  const shadow = projectPolygon(chevronShape([local[0] + 0.1, local[1] - 0.1], dir, 2.3, 0), pose, screen);
+  return top ? { points: pts(top), shadow: shadow ? pts(shadow) : null, dist: ahead } : null;
 }
 
 /** Where to point the user when the path ahead is off-screen. */

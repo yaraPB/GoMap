@@ -42,11 +42,11 @@ test('ground ahead projects below the horizon, nearer is lower; behind is hidden
 
 test('chevrons follow the route ahead and shrink with distance', () => {
   const line: [number, number][] = [user, offset(user, 0, 30)]; // 30 m due north
-  const chev = chevronsAhead(line, user, { heading: 0, pitchDown: 25, roll: 0 }, screen);
+  const chev = chevronsAhead(line, user, { heading: 0, pitchDown: 25, roll: 0 }, screen, 5);
   assert.equal(chev.length, 5);
   const width = (pts: string) => { const xs = pts.split(' ').map(p => Number(p.split(',')[0])); return Math.max(...xs) - Math.min(...xs); };
   assert.ok(width(chev[0].points) > width(chev[4].points));
-  assert.ok(chev[4].opacity < chev[0].opacity, 'fades past 8 m');
+  assert.ok(chev[4].opacity < chev[1].opacity, 'fades past 8 m (the nearest one fades in as it slides forward)');
 });
 
 test('steer hint points the way when the path is behind or to the side', () => {
