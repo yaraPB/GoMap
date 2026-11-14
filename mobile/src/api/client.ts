@@ -1,5 +1,5 @@
 import { Platform } from 'react-native';
-import type { Answer, Closure, CrowdingCollection, Lang, MockUser, OfficeList, Person, PlaceDetail, PlaceLite, Position, Procedure, ReportKind, Route, RouteMode, WalkwayCollection } from './types';
+import type { Answer, CampusInfo, Service, SttSession, Closure, CrowdingCollection, Lang, MockUser, OfficeList, Person, PlaceDetail, PlaceLite, Position, Procedure, ReportKind, Route, RouteMode, WalkwayCollection } from './types';
 
 const local = Platform.OS === 'android' ? 'http://10.0.2.2:4000' : 'http://localhost:4000';
 export const API_URL = (process.env.EXPO_PUBLIC_API_URL || local).replace(/\/$/, '');
@@ -35,7 +35,7 @@ export const api = {
   offices: (id: string) => request<OfficeList>(`/api/places/${encodeURIComponent(id)}/people`),
   people: (f: { q?: string; department?: string; open_now?: boolean; limit?: number } = {}) => request<Person[]>(`/api/people${qs(f)}`),
   person: (id: string) => request<Person>(`/api/people/${encodeURIComponent(id)}`),
-  setPresence: (id: string, body: { status: 'in' | 'busy' | 'out' | 'clear'; reason?: string | null; until?: string | null; note?: string }) =>
+  setPresence: (id: string, body: { status: 'in' | 'busy' | 'out' | 'clear' | 'keep'; reason?: string | null; until?: string | null; note?: string | null; note_kind?: string | null; lunch?: [string, string] | null }) =>
     request<Person>(`/api/people/${encodeURIComponent(id)}/presence`, { method: 'PUT', body: JSON.stringify(body) }),
   procedures: (q?: string) => request<Procedure[]>(`/api/procedures${qs({ q })}`),
   route: (from: Position, to: { placeId?: string; coord?: Position }, mode: RouteMode) =>
@@ -67,5 +67,10 @@ export const api = {
     return request<{ id: string; status: string; place: { id: string; name: string } | null; merged_with_existing: boolean }>('/api/reports', { method: 'POST', body: form });
   },
   myReports: () => request<{ id: string; kind: string; status: string; place_id: string | null; created_at: string; decided_at: string | null; reason: string | null }[]>('/api/reports/mine'),
-  mockUsers: () => request<MockUser[]>('/api/mock-users'),
+  mockUsers: () => request<MockUser[]>('/api/accounts'),
+  services: (q?: string) => request<Service[]>(`/api/services${qs({ q })}`),
+  service: (id: string) => request<Service>(`/api/services/${encodeURIComponent(id)}`),
+  campus: () => request<CampusInfo>('/api/campus'),
+  version: () => request<{ version: number }>('/api/version'),
+  sttSession: () => request<SttSession>('/api/assistant/stt-session', { method: 'POST' }),
 };

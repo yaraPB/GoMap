@@ -5,6 +5,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { join, extname } from 'node:path';
 import type { Position } from 'geojson';
 import { Assistant } from './assistant/assistant.js';
+import { sonioxTemporaryKey } from './assistant/soniox.js';
 import type { Lang } from './assistant/router.js';
 import { config, SERVER_DIR } from './config.js';
 import { CATEGORIES, Entrance, Place, Report, SCHOOLS } from './db/mongo.js';
@@ -279,6 +280,21 @@ export function createApp(ctx: AppContext) {
     const history = Array.isArray(req.body?.history) ? (req.body.history as unknown[]).slice(-6).filter((h): h is { role: 'user' | 'assistant'; text: string } =>
       !!h && typeof h === 'object' && ['user', 'assistant'].includes((h as { role: string }).role) && typeof (h as { text: unknown }).text === 'string').map(h => ({ role: h.role, text: h.text.slice(0, 500) })) : [];
     res.json(await assistant.ask({ text, lang, from: coord(req.body?.from), history, localOnly: req.body?.local_only === true }));
+  }));
+
+  /** Live speech: a 5-minute Soniox key for the phone's WebSocket. 404 when Soniox is not set up. */
+  let sttKeys = 0, sttWindow = Date.now();
+  app.post('/api/assistant/stt-session', wrap(async (_req, res) => {
+    if (!config.sonioxKey) throw new HttpError(404, 'Live transcription is not configured (SONIOX_API_KEY).');
+    if (Date.now() - sttWindow > 60000) { sttWindow = Date.now(); sttKeys = 0; }
+    if (++sttKeys > 30) throw new HttpError(429, 'Too many voice sessions, try again in a minute.');
+    try {
+      const k = await sonioxTemporaryKey(config.sonioxKey);
+      res.set('Cache-Control', 'no-store');
+      res.json({ provider: 'soniox', url: 'wss://stt-rt.soniox.com/transcribe-websocket', model: config.sonioxRtModel, api_key: k.api_key, expires_at: k.expires_at });
+    } catch {
+      throw new HttpError(503, 'Live transcription is unavailable right now.');
+    }
   }));
 
   app.post('/api/assistant/transcribe', upload.single('audio'), wrap(async (req, res) => {

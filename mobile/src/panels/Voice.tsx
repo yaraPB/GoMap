@@ -4,7 +4,6 @@ import Animated, { Easing, FadeIn, FadeInDown, FadeOut, useAnimatedStyle, useSha
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
-import * as Speech from 'expo-speech';
 import { api } from '../api/client';
 import type { Answer, Lang } from '../api/types';
 import { t } from '../i18n/strings';
@@ -14,6 +13,8 @@ import { usePanels } from '../state/panels';
 import { Btn, Icon, IconBtn, T } from '../ui/kit';
 import { color } from '../ui/theme';
 import { useSpeech } from '../voice/useSpeech';
+import { speak, speechLevel, stopSpeaking, useSpeaking } from '../voice/speak';
+import { chat } from '../state/chat';
 import Waveform from '../voice/Waveform';
 
 const LANG_LABEL: Record<Lang, string> = { en: 'English', fr: 'Français', ar: 'العربية' };
@@ -23,6 +24,7 @@ function understood(a: Answer | null) {
   if (a.intent === 'place' && a.place) return { title: `Directions → ${a.place.name}`, body: 'Release to confirm. Directions open on their own · you will not have to tap again.' };
   if (a.intent === 'person' && a.person) return { title: `Office → ${a.person.name}`, body: 'Release to see where they are and whether they are in.' };
   if (a.intent === 'procedure' && a.procedure) return { title: `How to → ${a.procedure.title}`, body: 'Release to see the steps, the office and its hours.' };
+  if (a.intent === 'service' && a.service) return { title: `Office → ${a.service.short_name}`, body: a.issue ? `For ${a.issue.issue.toLowerCase()}. Release for where it is, its hours and contact.` : 'Release for where it is, its hours and contact.' };
   if (a.intent === 'help') return { title: 'Help → a quick tour of GoMap', body: 'Release to start the walkthrough.' };
   return null;
 }
@@ -46,22 +48,41 @@ function MicRings({ on }: { on: boolean }) {
   );
 }
 
-export default function Voice() {
+export default function Voice({ auto = false }: { auto?: boolean }) {
   const insets = useSafeAreaInsets();
   const { lang, setLang, reduceMotion } = useApp();
   const loc = useLocation();
   const nav = useNav();
-  const { pop, replace } = usePanels();
+  const { pop, replace, stack } = usePanels();
+  const speaking = useSpeaking();
+  const [ttsLevel, setTtsLevel] = useState(0);
+  const heard = useRef(false);
+  const quietSince = useRef<number | null>(null);
+  const toggledRef = useRef(false);
   const [level, setLevel] = useState(0);
   const [partial, setPartial] = useState('');
   const [preview, setPreview] = useState<Answer | null>(null);
   const [sending, setSending] = useState(false);
-  const [toggled, setToggled] = useState(false);
+  const [toggled, setToggledState] = useState(false);
+  const setToggled = (v: boolean) => { toggledRef.current = v; setToggledState(v); };
   const pressedAt = useRef(0);
   const debounce = useRef<ReturnType<typeof setTimeout> | null>(null);
   const starting = useRef<Promise<boolean> | null>(null);
   const finishing = useRef(false);
-  const speech = useSpeech({ onLevel: setLevel, onPartial: setPartial });
+  const speech = useSpeech({
+    onLevel: l => {
+      setLevel(l);
+      // hands-free / tap mode: stop by itself after ~1.3 s of quiet once you have spoken
+      if (!toggledRef.current) return;
+      if (l > 0.32) { heard.current = true; quietSince.current = null; }
+      else if (heard.current && l < 0.16) {
+        quietSince.current ??= Date.now();
+        if (Date.now() - quietSince.current > 1300) { setToggled(false); finishRef.current(); }
+      }
+    },
+    onPartial: setPartial,
+    onEndpoint: () => { if (toggledRef.current) { setToggled(false); finishRef.current(); } },
+  });
   const listening = speech.state === 'listening';
   const thinking = speech.state === 'transcribing' || sending;
 
@@ -74,6 +95,8 @@ export default function Voice() {
 
   const begin = async () => {
     if (listening || thinking) return;
+    stopSpeaking();
+    heard.current = false; quietSince.current = null;
     setPreview(null); setPartial('');
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
     const pending = speech.start(lang);
@@ -98,12 +121,25 @@ export default function Voice() {
       if (a.intent === 'place' && a.action?.type === 'route' && a.place) {
         const ready = await nav.preview({ placeId: a.place.id, name: a.place.name, coordinates: a.place.coordinates, category: a.place.category }, a.action.mode === 'step_free' ? 'step_free' : 'walk');
         if (a.action.mode === 'ar' && ready) { nav.start(); replace({ name: 'go' }); router.push('/ar'); }
-        else { if (a.text) Speech.speak(a.text, { language: lang === 'fr' ? 'fr-FR' : lang === 'ar' ? 'ar' : 'en-US' }); replace({ name: 'route', said: text, reply: a.text }); }
-      } else replace({ name: 'assistant', ask: text });
+        else { if (a.text && chat.get().voice) speak(a.text, lang); chat.add({ role: 'user', text }); chat.add({ role: 'assistant', answer: a }); replace({ name: 'route', said: text, reply: a.text }); }
+      } else toAssistant(text);
     } catch {
-      replace({ name: 'assistant', ask: text });
+      toAssistant(text);
     } finally { setSending(false); finishing.current = false; }
   };
+  /** Back to the conversation it came from (or open one), carrying the question. */
+  const toAssistant = (text: string) => {
+    chat.ask(text);
+    if (stack.at(-2)?.name === 'assistant') pop(); else replace({ name: 'assistant' });
+  };
+  const finishRef = useRef(finish);
+  finishRef.current = finish;
+  useEffect(() => { if (auto) { setToggled(true); begin(); } }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!speaking) { setTtsLevel(0); return; }
+    const id = setInterval(() => setTtsLevel(speechLevel()), 60);
+    return () => clearInterval(id);
+  }, [speaking]);
   const onPressIn = () => { pressedAt.current = Date.now(); if (!toggled) begin(); };
   const onPressOut = () => {
     if (toggled) { setToggled(false); finish(); return; }
@@ -130,14 +166,14 @@ export default function Voice() {
 
       <View style={[styles.center, { top: insets.top + 140 }]}>
         <T weight="semibold" style={styles.state}>{thinking ? t(lang, 'thinking') : listening ? t(lang, 'listening') : speech.state === 'error' ? 'Microphone' : 'Ready'}</T>
-        <Waveform level={level} mode={thinking ? 'thinking' : listening ? 'listening' : 'idle'} reduceMotion={reduceMotion} />
+        <Waveform level={speaking && !listening ? ttsLevel : level} mode={thinking ? 'thinking' : listening ? 'listening' : speaking ? 'speaking' : 'idle'} reduceMotion={reduceMotion} />
         <View style={{ minHeight: 70, paddingHorizontal: 28 }}>
           {partial ? (
             <T weight="semibold" style={styles.transcript} accessibilityLiveRegion="polite">{confirmed}<T weight="semibold" style={[styles.transcript, { color: '#6B7280' }]}>{tail}{listening ? '…' : ''}</T></T>
           ) : (
-            <T style={[styles.transcript, { color: '#6B7280', fontSize: 20 }]}>{listening ? (speech.engine === 'native' ? 'Go ahead…' : 'Speak, then release') : 'Try “Take me to building eight”'}</T>
+            <T style={[styles.transcript, { color: '#6B7280', fontSize: 20 }]}>{listening ? (speech.engine === 'recorded' ? (toggled ? 'Speak, I stop when you pause' : 'Speak, then release') : 'Go ahead…') : 'Try “Where do I pay my fees?”'}</T>
           )}
-          <T style={styles.hint}>{speech.engine === 'native' ? `${LANG_LABEL[lang]} · on-device recognition` : `${LANG_LABEL[lang]} · words appear after you release (install the dev build for live words)`}</T>
+          <T style={styles.hint}>{speech.engine === 'soniox' ? `${LANG_LABEL[lang]} · live words by Soniox${toggled ? ' · stops when you pause' : ''}` : speech.engine === 'native' ? `${LANG_LABEL[lang]} · on-device recognition` : `${LANG_LABEL[lang]} · words appear after you release`}</T>
         </View>
       </View>
 

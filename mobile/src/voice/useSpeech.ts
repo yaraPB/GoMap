@@ -7,7 +7,9 @@
  *              then the server transcribes the clip on release.
  *
  * The engine is chosen at runtime, so the same code runs in Expo Go and in a dev build.
- * Swapping in another provider (e.g. Soniox for Arabic) means adding a third engine here.
+ *  - soniox:   live words from Soniox (best for Arabic/Darija/French), streamed straight from the
+ *              phone with a 5-minute key from our server. Tried first when the server has a
+ *              Soniox key and expo-audio can stream PCM; otherwise the engines above take over.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Platform } from 'react-native';
@@ -16,9 +18,10 @@ import { RecordingPresets, requestRecordingPermissionsAsync, setAudioModeAsync, 
 import type { Lang } from '../api/types';
 import { api } from '../api/client';
 import { speechLocale } from '../i18n/strings';
+import { SonioxSession, sonioxAvailable } from './soniox';
 
 export type SpeechState = 'idle' | 'listening' | 'transcribing' | 'error';
-export type SpeechEngine = 'native' | 'recorded';
+export type SpeechEngine = 'soniox' | 'native' | 'recorded';
 
 type NativeModule = {
   start: (o: Record<string, unknown>) => void; stop: () => void; abort: () => void;
@@ -39,13 +42,17 @@ function loadNative(): NativeModule | null {
   }
 }
 // Recorded mode uses the server's configured Soniox provider, including in a dev build.
-const native = process.env.EXPO_PUBLIC_SPEECH_ENGINE === 'recorded' ? null : loadNative();
+const forced = process.env.EXPO_PUBLIC_SPEECH_ENGINE;
+const native = forced === 'recorded' || forced === 'soniox' ? null : loadNative();
+const trySoniox = forced !== 'native' && forced !== 'recorded';
 export const SPEECH_ENGINE: SpeechEngine = native ? 'native' : 'recorded';
 
 const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
 
-export function useSpeech(handlers: { onLevel: (level: number) => void; onPartial: (text: string) => void }) {
+export function useSpeech(handlers: { onLevel: (level: number) => void; onPartial: (text: string) => void; onEndpoint?: () => void }) {
   const [state, setState] = useState<SpeechState>('idle');
+  const [engine, setEngine] = useState<SpeechEngine>(trySoniox && sonioxAvailable() ? 'soniox' : SPEECH_ENGINE);
+  const soniox = useRef<SonioxSession | null>(null);
   const [error, setError] = useState<string | null>(null);
   const recorder = useAudioRecorder({ ...RecordingPresets.HIGH_QUALITY, isMeteringEnabled: true });
   const final = useRef<{ resolve: (t: string) => void; reject: (e: Error) => void } | null>(null);
@@ -89,6 +96,27 @@ export function useSpeech(handlers: { onLevel: (level: number) => void; onPartia
     langRef.current = lang;
     h.current.onPartial('');
     try {
+    if (trySoniox && sonioxAvailable()) {
+      const perm = await requestRecordingPermissionsAsync();
+      if (attempt !== generation.current) return false;
+      if (!perm.granted) { setError('Microphone permission is off.'); setState('error'); return false; }
+      await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
+      const session = new SonioxSession({
+        onPartial: text => { transcript.current = text; h.current.onPartial(text); },
+        onLevel: l => h.current.onLevel(l),
+        onEndpoint: () => h.current.onEndpoint?.(),
+        onError: msg => setError(msg),
+      });
+      if (await session.start(lang)) {
+        if (attempt !== generation.current) { session.abort(); return false; }
+        soniox.current = session;
+        setEngine('soniox');
+        setState('listening');
+        return true;
+      }
+      setError(null);
+      setEngine(SPEECH_ENGINE); // fall back for this and later sessions
+    }
     if (native) {
       const perm = await native.requestPermissionsAsync();
       if (attempt !== generation.current) return false;
@@ -122,6 +150,14 @@ export function useSpeech(handlers: { onLevel: (level: number) => void; onPartia
 
   /** Stop listening and resolve the final transcript. */
   const stop = useCallback(async (): Promise<string> => {
+    if (soniox.current) {
+      const session = soniox.current;
+      soniox.current = null;
+      const text = await session.stop();
+      await setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true }).catch(() => {});
+      setState('idle');
+      return text;
+    }
     if (native) {
       if (!nativeRunning.current) { setState('idle'); return transcript.current; }
       return new Promise<string>((resolve, reject) => {
@@ -153,7 +189,8 @@ export function useSpeech(handlers: { onLevel: (level: number) => void; onPartia
 
   const cancel = useCallback(async () => {
     generation.current++;
-    if (native) { nativeRunning.current = false; native.abort(); }
+    if (soniox.current) { soniox.current.abort(); soniox.current = null; await setAudioModeAsync({ allowsRecording: false }).catch(() => {}); }
+    else if (native) { nativeRunning.current = false; native.abort(); }
     else {
       if (meter.current) clearInterval(meter.current);
       meter.current = null;
@@ -167,5 +204,5 @@ export function useSpeech(handlers: { onLevel: (level: number) => void; onPartia
 
   useEffect(() => () => { if (meter.current) clearInterval(meter.current); }, []);
 
-  return { state, error, engine: SPEECH_ENGINE, start, stop, cancel };
+  return { state, error, engine, start, stop, cancel };
 }

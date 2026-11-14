@@ -1,6 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import * as Haptics from 'expo-haptics';
-import * as Speech from 'expo-speech';
+import { speak, stopSpeaking } from '../voice/speak';
 import { Platform } from 'react-native';
 import { api, ApiError } from '../api/client';
 import type { Position, Route, RouteMode, Step } from '../api/types';
@@ -30,7 +30,8 @@ type Ctx = {
 };
 const Nav = createContext<Ctx | null>(null);
 
-const SPEED: Record<RouteMode, number> = { walk: 1.3, step_free: 1.05, drive: 6 };
+// simulated walk pace (the ETA itself comes from the server, which counts stairs and crossings)
+const SPEED: Record<RouteMode, number> = { walk: 1.25, step_free: 1.0, drive: 5.5 };
 const OFF_ROUTE_M = 25;
 const ARRIVE_M = 8;
 
@@ -107,11 +108,11 @@ export function NavigationProvider({ children }: { children: React.ReactNode }) 
     if (demoRef.current && !loc.simulated) loc.setSimulated(DEMO_POSITION);
     setStatus('active');
     Haptics.selectionAsync().catch(() => {});
-    if (!muted && current.steps[0]) Speech.speak(current.steps[1] ? `${current.steps[0].text}. Then ${current.steps[1].text.toLowerCase()}` : current.steps[0].text, { language: lang === 'fr' ? 'fr-FR' : lang === 'ar' ? 'ar' : 'en-US' });
+    if (!muted && current.steps[0]) speak(current.steps[1] ? `${current.steps[0].text}. Then ${current.steps[1].text.toLowerCase()}` : current.steps[0].text, lang);
   }, [muted, lang, loc]);
 
   const stop = useCallback(() => {
-    Speech.stop(); stopSim();
+    stopSpeaking(); stopSim();
     requestId.current++;
     routeRef.current = null;
     setStatus('idle'); setRoute(null); setDest(null); setError(null);
@@ -129,7 +130,7 @@ export function NavigationProvider({ children }: { children: React.ReactNode }) 
     let next = stepAlong.findIndex((a, i) => i > 0 && a > snap.along + 2);
     if (next < 0) next = route.steps.length - 1;
     const remaining = Math.max(0, total - snap.along);
-    return { stepIndex: next, toNext: Math.max(0, stepAlong[next] - snap.along), remaining, remainingS: remaining / SPEED[route.mode], off: snap.off, along: snap.along, snapped: snap.point };
+    return { stepIndex: next, toNext: Math.max(0, stepAlong[next] - snap.along), remaining, remainingS: total > 0 ? route.duration_s * (remaining / total) : 0, off: snap.off, along: snap.along, snapped: snap.point };
   }, [route, status, loc.coord, stepAlong]);
 
   // live guidance: speech, haptics, arrival, rerouting
@@ -137,21 +138,20 @@ export function NavigationProvider({ children }: { children: React.ReactNode }) 
     if (status !== 'active' || !route || !dest) return;
     const step = route.steps[progress.stepIndex];
     if (spoken.current.step !== progress.stepIndex) spoken.current = { step: progress.stepIndex, near: false, at: false };
-    const voice = lang === 'fr' ? 'fr-FR' : lang === 'ar' ? 'ar' : 'en-US';
     if (!spoken.current.near && progress.toNext < 40 && progress.toNext > 12) {
       spoken.current.near = true;
-      if (!muted) Speech.speak(speakable(step, progress.toNext), { language: voice });
+      if (!muted) speak(speakable(step, progress.toNext), lang);
     }
     if (!spoken.current.at && progress.toNext <= 8) {
       spoken.current.at = true;
       if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-      if (!muted && step?.turn !== 'arrive') Speech.speak(step.text, { language: voice });
+      if (!muted && step?.turn !== 'arrive') speak(step.text, lang);
     }
     const reliable = loc.simulated || (loc.timestamp != null && Date.now() - loc.timestamp < 15000 && (loc.accuracy ?? 99) < 25);
     const endpoint = route.geometry.coordinates.at(-1);
     if (reliable && endpoint && loc.coord && progress.remaining < ARRIVE_M && distance(loc.coord, endpoint) < ARRIVE_M) {
-      Speech.stop();
-      if (!muted) Speech.speak(route.steps.at(-1)?.text ?? 'You have arrived', { language: voice });
+      stopSpeaking();
+      if (!muted) speak(route.steps.at(-1)?.text ?? 'You have arrived', lang);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       stopSim();
       setStatus('arrived');
@@ -163,7 +163,7 @@ export function NavigationProvider({ children }: { children: React.ReactNode }) 
     }
     if (offCount.current >= 3 && !rerouting.current && loc.coord) {
       rerouting.current = true; offCount.current = 0;
-      if (!muted) Speech.speak('Rerouting', { language: voice });
+      if (!muted) speak('Rerouting', lang);
       fetchRoute(dest, route.mode, loc.coord, true).finally(() => { rerouting.current = false; });
     }
   }, [progress, status, route, dest, muted, lang, loc.accuracy, loc.coord, loc.timestamp, loc.simulated, fetchRoute, stopSim]);

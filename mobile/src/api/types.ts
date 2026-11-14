@@ -25,7 +25,7 @@ export type Person = {
   place: { id: string; name: string } | null; office_number: string | null; floor: number | null;
   hours: Hours | null; hours_text: string | null; hours_raw: string | null; hours_note: string | null; by_appointment: boolean;
   open: OpenState; availability: Availability;
-  note: string | null;
+  note: string | null; note_kind: NoteKind | null; note_at: string | null; lunch: [string, string]; lunch_custom: boolean;
   presence: { status: 'in' | 'busy' | 'out'; reason: string | null; until: string | null; set_at: string; set_by: string; clears_at: string } | null;
   shared_with: { id: string; name: string }[];
   conflict: { field: string; values: { value: string; place_id: string | null; source: string }[] } | null;
@@ -48,10 +48,20 @@ export type Procedure = {
   verified_at: string | null; unverified: boolean;
 };
 
+export type NoteKind = 'sick' | 'online' | 'appointment' | 'email' | 'back_soon' | 'custom';
+export type Service = {
+  id: string; name: string; short_name: string; category: string; handles: string[]; keywords: string[]; places: { id: string; name: string; known: boolean }[];
+  location_text: string | null; room: string | null; email: string | null; extension: string | null; phone: string | null;
+  hours: Hours | null; hours_text: string | null; hours_raw: string | null; notes: string | null; open: OpenState; verified_at: string | null; stale: boolean; source: string | null;
+};
+export type CampusInfo = { open: string; close: string; lunch: [string, string]; weekend_working: boolean; emergencies: string | null; exceptions: string[]; office_hours_text: string };
+export type SttSession = { provider: 'soniox'; url: string; model: string; api_key: string; expires_at: string };
+
 export type Lang = 'en' | 'fr' | 'ar';
 export type AnswerAction = { type: 'route'; place_id: string; mode: 'walk' | 'step_free' | 'ar' } | { type: 'person'; person_id: string } | { type: 'help'; topic: 'walkthrough' };
 export type Answer = {
-  id: string; intent: 'place' | 'person' | 'procedure' | 'help' | 'unknown'; lang: Lang; text: string;
+  id: string; intent: 'place' | 'person' | 'procedure' | 'service' | 'info' | 'help' | 'unknown'; lang: Lang; text: string;
+  service?: Service; issue?: { id: string; issue: string; go_to: string; notes: string | null }; alert?: { tone: 'urgent' | 'closed' | 'info'; text: string };
   place?: { id: string; name: string; category: Category; status: string; closed_reason: string | null; hours: string | null; open: string; coordinates: Position };
   route?: { distance_m: number; duration_s: number; mode: string } | null;
   person?: Person;
@@ -65,4 +75,4 @@ export type WalkwayCollection = { type: 'FeatureCollection'; attribution: string
 export type CrowdingCollection = { type: 'FeatureCollection'; weekday: number; hour: number; basis: string; features: { type: 'Feature'; geometry: { type: 'LineString'; coordinates: Position[] }; properties: { id: string; load: number; delay_s: number; level: 'low' | 'medium' | 'high' } }[] };
 export type Closure = { id: string; cluster_id: string; kind: string; coordinates: Position; place_id: string | null; reason: string; from: string; until: string | null; radius_m: number };
 export type ReportKind = 'closed' | 'broken' | 'info' | 'hazard' | 'light' | 'access';
-export type MockUser = { id: string; name: string; role: 'student' | 'faculty' | 'admin' | 'guest' };
+export type MockUser = { id: string; name: string; role: 'student' | 'faculty' | 'staff' | 'admin' | 'guest'; person_id?: string | null; description?: string | null };

@@ -28,8 +28,8 @@ const S = {
 export type StringKey = keyof typeof S;
 export const t = (lang: Lang, key: StringKey) => S[key][lang] || S[key].en;
 export const SUGGESTIONS: Record<Lang, string[]> = {
-  en: ['Take me to Building 11', 'How do I declare a minor?', 'Is Harit Satt in his office?', 'Where can I eat?', 'How do I use this map?'],
-  fr: ['Emmène-moi au bâtiment 11', 'Comment déclarer une mineure ?', 'Où est la bibliothèque ?'],
+  en: ['Take me to Building 11', 'Where do I pay my fees?', 'I lost my student card', 'How do I declare a minor?', 'Is Harit Satt in his office?', 'I feel sick'],
+  fr: ['Emmène-moi au bâtiment 11', 'Comment déclarer une mineure ?', 'Où payer mes frais ?', 'Où est la bibliothèque ?'],
   ar: ['خذني إلى المبنى 11', 'وين المكتبة؟', 'أين المسجد؟'],
 };
 export const speechLocale = (l: Lang) => (l === 'fr' ? 'fr-FR' : l === 'ar' ? 'ar-MA' : 'en-US');

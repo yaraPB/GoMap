@@ -10,7 +10,7 @@ export type Panel =
   | { name: 'person'; id: string }
   | { name: 'people' }
   | { name: 'assistant'; ask?: string }
-  | { name: 'voice' }
+  | { name: 'voice'; auto?: boolean }
   | { name: 'route'; said?: string; reply?: string }
   | { name: 'go' }
   | { name: 'arrived' }

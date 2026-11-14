@@ -9,9 +9,9 @@ import { CAMPUS_CENTER } from '../map/mapHtml';
 
 /** Mock accounts until GoCampus SSO. TODO: replace with GoCampus SSO */
 export const USERS: MockUser[] = [
-  { id: 'demo-student', name: 'Demo Student', role: 'student' },
-  { id: 'harit-satt', name: 'Harit Satt', role: 'faculty' },
-  { id: 'demo-admin', name: 'Campus Admin', role: 'admin' },
+  { id: 'demo-student', name: 'Student', role: 'student' },
+  { id: 'harit-satt', name: 'Harit Satt', role: 'faculty', person_id: 'harit-satt' },
+  { id: 'demo-staff', name: 'Staff', role: 'staff' },
   { id: 'guest', name: 'Visitor', role: 'guest' },
 ];
 

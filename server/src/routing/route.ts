@@ -15,7 +15,20 @@ export type RouteResult = {
   uses_roads: boolean;
 };
 
-const SPEED: Record<RouteMode, number> = { walk: 1.3, step_free: 1.05, drive: 6 };
+// Average adult walking pace is ~1.3–1.4 m/s on the flat. Ifrane sits at 1,650 m and the campus is
+// hilly, so we use 1.25 m/s, slower on stairs, plus a pause at each road crossing. Step-free (wheelchair,
+// stroller) ~1.0 m/s. Driving on campus roads: 20 km/h.
+const SPEED: Record<RouteMode, number> = { walk: 1.25, step_free: 1.0, drive: 5.5 };
+const STAIRS_SPEED = 0.55;     // m/s of horizontal distance on a flight of steps
+const CROSSING_S = 8;          // look both ways, wait for a car
+const ARRIVAL_S = 20;          // last metres to the door and inside
+
+/** Realistic time for the average person, not just distance ÷ speed. */
+export function walkSeconds(legs: { kind: string; length: number }[], crossings: number, mode: RouteMode) {
+  if (mode === 'drive') return legs.reduce((t, l) => t + l.length / SPEED.drive, 0) + 30; // + parking
+  const moving = legs.reduce((t, l) => t + l.length / (l.kind === 'stairs' && mode === 'walk' ? STAIRS_SPEED : SPEED[mode]), 0);
+  return moving + crossings * CROSSING_S + ARRIVAL_S;
+}
 const ROAD_COST: Record<string, number> = { service: 1.25, street: 1.3, residential: 1.3, track: 1.2, street_limited: 1.2,
   tertiary: 1.6, tertiary_link: 1.6, secondary: 2.2, primary: 2.8, primary_link: 2.8 };
 
@@ -246,7 +259,8 @@ export function buildRoute(graph: Graph, start: Snap, startCoord: Position, path
 
   const distance = real.reduce((s, l) => s + haversine(l.from, l.to), 0) + haversine(startCoord, start.point) + (end ? haversine(lastOnNetwork, end) : 0);
   return {
-    mode, distance_m: Math.round(distance), duration_s: Math.round(distance / SPEED[mode]),
+    mode, distance_m: Math.round(distance),
+    duration_s: Math.round(walkSeconds([...real.map(l => ({ kind: l.edge.kind, length: haversine(l.from, l.to) })), { kind: 'walkway', length: distance - real.reduce((s, l) => s + haversine(l.from, l.to), 0) }], crossings.length, mode)),
     geometry: { type: 'LineString', coordinates: coords }, steps: tidy, crossings,
     uses_roads: real.some(l => l.edge.kind === 'road'),
   };

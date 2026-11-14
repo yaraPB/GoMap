@@ -67,7 +67,7 @@ function Panels() {
     case 'person': return <PersonPanel key={top.id} id={top.id} />;
     case 'people': return <People />;
     case 'assistant': return <Assistant ask={top.ask} />;
-    case 'voice': return <Voice />;
+    case 'voice': return <Voice auto={top.auto} />;
     case 'route': return <RoutePreview said={top.said} reply={top.reply} />;
     case 'go': return <TurnByTurn />;
     case 'arrived': return <Arrived />;

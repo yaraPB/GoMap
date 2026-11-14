@@ -31,6 +31,7 @@ export const config = {
   get geminiModel() { return process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite'; },
   get sonioxKey() { return process.env.SONIOX_API_KEY || ''; },
   get sonioxModel() { return process.env.SONIOX_MODEL || 'stt-async-v6'; },
+  get sonioxRtModel() { return process.env.SONIOX_RT_MODEL || 'stt-rt-v6'; },
   // TODO: replace with GoCampus SSO
   get adminToken() { return process.env.ADMIN_TOKEN || 'dev-admin-token'; },
   get timezone() { return process.env.CAMPUS_TZ || 'Africa/Casablanca'; },
