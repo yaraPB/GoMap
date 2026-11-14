@@ -177,7 +177,8 @@ export class Assistant {
     return { found: true, id: r.id, title: r.title, summary: r.summary, owner_office: r.owner_office, steps: json.parse(r.steps, []), contact_email: r.contact_email ?? 'not published', status: r.status };
   }
 
-  async ask(input: { text: string; lang: Lang; from: Position | null; history?: { role: 'user' | 'assistant'; text: string }[] }): Promise<Answer> {
+  /** localOnly: live preview while someone is still speaking. No Gemini, no log. */
+  async ask(input: { text: string; lang: Lang; from: Position | null; history?: { role: 'user' | 'assistant'; text: string }[]; localOnly?: boolean }): Promise<Answer> {
     if (!this.router) await this.refresh();
     const { text, lang, from } = input;
     const review = lang !== 'en';
@@ -186,8 +187,9 @@ export class Assistant {
     const m = this.router!.match(text);
     if (m) {
       const a = this.fromMatch(m, lang, from);
-      if (a) { this.log(text, lang, a.intent, 'local'); return { ...a, translation_review: review }; }
+      if (a) { if (!input.localOnly) this.log(text, lang, a.intent, 'local'); return { ...a, translation_review: review }; }
     }
+    if (input.localOnly) return { id: randomUUID(), intent: 'unknown', lang, text: '', answered_by: 'none' };
 
     // cache (location-independent answers only)
     const key = `${lang}:${normalise(text)}`;

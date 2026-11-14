@@ -215,7 +215,7 @@ export function createApp(ctx: AppContext) {
     const lang = (LANGS.includes(req.body?.lang) ? req.body.lang : 'en') as Lang;
     const history = Array.isArray(req.body?.history) ? (req.body.history as unknown[]).slice(-6).filter((h): h is { role: 'user' | 'assistant'; text: string } =>
       !!h && typeof h === 'object' && ['user', 'assistant'].includes((h as { role: string }).role) && typeof (h as { text: unknown }).text === 'string').map(h => ({ role: h.role, text: h.text.slice(0, 500) })) : [];
-    res.json(await assistant.ask({ text, lang, from: coord(req.body?.from), history }));
+    res.json(await assistant.ask({ text, lang, from: coord(req.body?.from), history, localOnly: req.body?.local_only === true }));
   }));
 
   app.post('/api/assistant/transcribe', upload.single('audio'), wrap(async (req, res) => {

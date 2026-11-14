@@ -7,8 +7,44 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "plugins": [
-      ["expo-camera", { "cameraPermission": "Allow GoMap to show the camera guide and capture a photo.", "recordAudioAndroid": false }],
-      ["expo-location", { "locationWhenInUsePermission": "Allow GoMap to estimate the direction to a selected campus place." }],
+      "expo-router",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "GoMap uses the camera to lay walking arrows on the ground in AR guidance.",
+          "recordAudioAndroid": false
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "GoMap uses your location to route you on campus and to place AR arrows."
+        }
+      ],
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "GoMap listens while you hold the mic so you can ask a question by voice."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Attach a photo to a problem report.",
+          "cameraPermission": "Take a photo for a problem report."
+        }
+      ],
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "GoMap listens while you hold the mic.",
+          "speechRecognitionPermission": "GoMap turns your voice question into text on the device.",
+          "androidSpeechServicePackages": [
+            "com.google.android.googlequicksearchbox"
+          ]
+        }
+      ],
+      "expo-font",
       "expo-status-bar"
     ],
     "ios": {
@@ -26,6 +62,11 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "scheme": "gomap",
+    "backgroundColor": "#0E1015",
+    "experiments": {
+      "typedRoutes": false
     }
   }
 }
