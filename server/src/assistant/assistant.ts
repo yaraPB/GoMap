@@ -93,7 +93,10 @@ export class Assistant {
 
   private placeNames() { return new Map([...this.places.values()].map(p => [p._id, p.name])); }
 
-  private placeAnswer(id: string, lang: Lang, from: Position | null, mode: Match['mode']): Answer | null {
+  /** 'when does X close' asks for hours, not for directions. */
+  private static HOURS = /\b(open|opens|close|closes|closing|hours|what time|when)\b|horaires|ouvert|ferme|متى|مفتوح/i;
+
+  private placeAnswer(id: string, lang: Lang, from: Position | null, mode: Match['mode'], question = ''): Answer | null {
     const p = this.places.get(id);
     if (!p) return null;
     const open = openState(p.hours, config.timezone);
@@ -104,6 +107,13 @@ export class Assistant {
       verified_at: p.verified_at, unverified: p.position_estimated || !p.verified_at,
     };
     if (p.status === 'closed') { base.text = T.closed[lang](p.name, p.closed_reason ?? ''); return base; }
+    if (Assistant.HOURS.test(question)) {
+      const h = formatHours(p.hours);
+      const now = open.state === 'open' ? ` It is open now, until ${open.until}.` : open.state === 'closed' ? ' It is closed right now.' : '';
+      base.text = h ? `${p.name}: ${h}.${now}` : `${p.name} has no published opening hours yet, so I will not guess. Ask at the desk or call the AUI switchboard.`;
+      base.unverified = true;
+      return base; // no auto-directions: they asked when, not where
+    }
     let route: Answer['route'] = null;
     if (from) {
       const r = this.campus.route(from, { placeId: id }, mode === 'step_free' ? 'step_free' : 'walk');
@@ -147,8 +157,8 @@ export class Assistant {
     };
   }
 
-  private fromMatch(m: Match, lang: Lang, from: Position | null): Answer | null {
-    if (m.intent === 'place') return this.placeAnswer(m.id, lang, from, m.mode);
+  private fromMatch(m: Match, lang: Lang, from: Position | null, question = ''): Answer | null {
+    if (m.intent === 'place') return this.placeAnswer(m.id, lang, from, m.mode, question);
     if (m.intent === 'person') return this.personAnswer(m.id, lang);
     if (m.intent === 'procedure') return this.procedureAnswer(m.id, lang, from);
     return { id: randomUUID(), intent: 'help', lang, text: T.help[lang], answered_by: 'local', action: { type: 'help', topic: 'walkthrough' } };
@@ -186,7 +196,7 @@ export class Assistant {
     // 1–3: local router
     const m = this.router!.match(text);
     if (m) {
-      const a = this.fromMatch(m, lang, from);
+      const a = this.fromMatch(m, lang, from, text);
       if (a) { if (!input.localOnly) this.log(text, lang, a.intent, 'local'); return { ...a, translation_review: review }; }
     }
     if (input.localOnly) return { id: randomUUID(), intent: 'unknown', lang, text: '', answered_by: 'none' };
@@ -211,7 +221,7 @@ export class Assistant {
       if (hit) {
         const id = String((hit.result as { id: string }).id);
         const intent = hit.call.name === 'find_place' ? 'place' : hit.call.name === 'get_person_office' ? 'person' : 'procedure';
-        const structured = this.fromMatch({ intent, id, score: 0, mode: modeFrom(text) }, lang, from)!;
+        const structured = this.fromMatch({ intent, id, score: 0, mode: modeFrom(text) }, lang, from, text)!;
         answer = { ...structured, text: prose || structured.text, answered_by: 'gemini' };
       } else {
         answer = { id: randomUUID(), intent: 'unknown', lang, text: prose || T.unknown[lang], answered_by: 'gemini', suggestions: ['Where is the library?', 'How do I declare a minor?'] };

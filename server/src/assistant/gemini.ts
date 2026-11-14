@@ -30,8 +30,9 @@ Rules:
 - Reply in ${lang === 'fr' ? 'French' : lang === 'ar' ? 'Arabic' : 'English'}, in at most two short sentences. No markdown, no lists. The app shows steps, maps and contacts itself.
 - Questions not about the campus: say you can only help with places, people and procedures at AUI.`;
 
-type Part = { text?: string; functionCall?: { name: string; args?: Record<string, string> }; functionResponse?: unknown };
-type Content = { role: 'user' | 'model' | 'function'; parts: Part[] };
+type Part = { text?: string; functionCall?: { name: string; args?: Record<string, string>; id?: string }; functionResponse?: unknown; thoughtSignature?: string };
+// Tool results go back with role 'user': the API rejects the older 'function' role.
+type Content = { role: 'user' | 'model'; parts: Part[] };
 
 export class Gemini {
   constructor(private apiKey: string, private model: string, private fetchImpl: typeof fetch = fetch) {}
@@ -75,9 +76,9 @@ export class Gemini {
         const call: ToolCall = { name, args: p.functionCall!.args ?? {} };
         const result = await run(call);
         calls.push({ call, result });
-        responses.push({ functionResponse: { name, response: { result: result ?? { found: false } } } });
+        responses.push({ functionResponse: { name, ...(p.functionCall!.id ? { id: p.functionCall!.id } : {}), response: { result: result ?? { found: false } } } });
       }
-      contents.push({ role: 'function', parts: responses });
+      contents.push({ role: 'user', parts: responses });
     }
     return { text: '', calls };
   }

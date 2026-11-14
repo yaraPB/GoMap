@@ -70,7 +70,7 @@ export function procedureSeeds(retrievedOn: string): ProcedureSeed[] {
       id: 'it-account', title: 'Wi-Fi or campus account problems', owner_office: 'ITS', place_id: 'its', contact_email: null,
       summary: 'ITS handles campus accounts, passwords and Wi-Fi access.',
       steps: [{ title: 'Go to ITS', body: 'Bring your student or staff ID.' }],
-      match_phrases: ['wifi', 'wi-fi', 'password', 'reset my password', 'campus account', 'internet not working', 'email account'],
+      match_phrases: ['wifi', 'wi-fi', 'password', 'reset my password', 'campus account', 'internet not working', 'email account', 'واي فاي', 'الانترنت'],
       source: 'Map label "ITS"; process not confirmed', status: 'draft', verified_at: null,
     },
     {

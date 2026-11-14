@@ -152,3 +152,18 @@ test('crowding returns load per walkway segment', async () => {
   assert.ok(body.features.length > 50);
   assert.ok(body.features.some((f: { properties: { level: string } }) => f.properties.level === 'high'));
 });
+
+test('assistant: hours questions answer with hours and do not open directions', async () => {
+  const a = (await send('/api/assistant/ask', { text: 'What time does the cafeteria close tonight?', lang: 'en', from: PLAZA })).body;
+  assert.equal(a.intent, 'place');
+  assert.equal(a.action, undefined);
+  assert.match(a.text, /hours/);
+});
+
+test('assistant: account problems give the procedure, prayer finds the mosque', async () => {
+  const pw = (await send('/api/assistant/ask', { text: 'where do students go when their account password stops working', lang: 'en' })).body;
+  assert.equal(pw.intent, 'procedure');
+  assert.equal(pw.procedure.id, 'it-account');
+  const pray = (await send('/api/assistant/ask', { text: 'is there somewhere to pray near the library', lang: 'en', from: PLAZA })).body;
+  assert.equal(pray.place.id, 'masjid-al-akhawayn');
+});

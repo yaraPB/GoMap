@@ -45,11 +45,11 @@ const NAMED: Record<string, Rule> = {
   'book store': { name: 'Book Store', category: 'services', aliases: ['bookstore', 'books'] },
   'business office': { name: 'Business Office', category: 'admin', aliases: ['fees', 'payments', 'tuition'] },
   'enrollment services': { name: 'Enrollment Services', category: 'admin', aliases: ['admissions', 'enrollment'] },
-  'its': { name: 'ITS', category: 'services', aliases: ['it', 'it support', 'wifi', 'information technology services', 'password', 'واي فاي', 'الانترنت'] },
+  'its': { name: 'ITS', category: 'services', aliases: ['it', 'it support', 'information technology services', 'it desk'] },
   'security office': { name: 'Security Office', category: 'services', aliases: ['security', 'lost and found', 'campus police', 'الأمن', 'securite'] },
   'therapist office': { name: 'Therapist Office', category: 'services', aliases: ['counseling', 'counselling', 'therapist', 'wellbeing'] },
   'old game room': { name: 'Old Game Room', category: 'athletics', aliases: ['game room'] },
-  'masjid al akhawayn': { name: 'Masjid Al Akhawayn', category: 'services', aliases: ['mosque', 'masjid', 'prayer', 'المسجد', 'مسجد', 'mosquee'] },
+  'masjid al akhawayn': { name: 'Masjid Al Akhawayn', category: 'services', aliases: ['mosque', 'masjid', 'prayer', 'pray', 'prayer room', 'المسجد', 'مسجد', 'mosquee'] },
   'aui post office': { name: 'AUI Post Office', category: 'services', aliases: ['post office', 'mail'] },
 };
 const SKIP = /parc d'ifrane|hotel michliffen|^al akhawayn university/i;
