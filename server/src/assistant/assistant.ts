@@ -7,7 +7,8 @@ import type { Campus } from '../services/campus.js';
 import { Directory, isStale } from '../services/directory.js';
 import { config } from '../config.js';
 import { Gemini, GeminiUnavailable, type ToolCall } from './gemini.js';
-import { IntentRouter, modeFrom, normalise, type Lang, type Match } from './router.js';
+import { transcribeSoniox } from './soniox.js';
+import { IntentRouter, modeFrom, type Lang, type Match } from './router.js';
 
 export type AnswerAction =
   | { type: 'route'; place_id: string; mode: 'walk' | 'step_free' | 'ar' }
@@ -80,6 +81,7 @@ export class Assistant {
 
   /** Rebuild the local index. Called at boot and after admin edits. */
   async refresh() {
+    this.db.prepare('DELETE FROM assistant_cache').run();
     const places = await Place.find({}, { _id: 1, name: 1, category: 1, aliases: 1, number: 1, status: 1, closed_reason: 1, hours: 1, location: 1, verified_at: 1, source: 1, position_estimated: 1 }).lean() as unknown as PlaceLite[];
     this.places = new Map(places.map(p => [p._id, p]));
     const people = this.db.prepare('SELECT id, name FROM people').all() as { id: string; name: string }[];
@@ -172,7 +174,8 @@ export class Assistant {
   /** Tools Gemini may call, run against our own data. */
   private async runTool(call: ToolCall) {
     const q = String(call.args.query ?? call.args.name ?? '');
-    const m = this.router!.match(q);
+    const intent = call.name === 'find_place' ? 'place' : call.name === 'get_person_office' ? 'person' : 'procedure';
+    const m = this.router!.match(q, intent);
     if (call.name === 'find_place') {
       const p = m?.intent === 'place' ? this.places.get(m.id) : undefined;
       return p ? { found: true, id: p._id, name: p.name, category: p.category, status: p.status, closed_reason: p.closed_reason, hours: formatHours(p.hours) ?? 'not published', verified: !!p.verified_at } : { found: false };
@@ -201,37 +204,25 @@ export class Assistant {
     }
     if (input.localOnly) return { id: randomUUID(), intent: 'unknown', lang, text: '', answered_by: 'none' };
 
-    // cache (location-independent answers only)
-    const key = `${lang}:${normalise(text)}`;
-    const cached = this.db.prepare('SELECT answer, expires_at FROM assistant_cache WHERE key = ?').get(key) as { answer: string; expires_at: string } | undefined;
-    if (cached && cached.expires_at > new Date().toISOString()) {
-      this.log(text, lang, 'cached', 'cache');
-      return { ...json.parse<Answer>(cached.answer, null as unknown as Answer), id: randomUUID(), answered_by: 'cache' };
-    }
-
     // 4: Gemini with function calling
     if (!this.gemini.configured) {
       this.log(text, lang, 'unknown', 'none');
       return { id: randomUUID(), intent: 'unknown', lang, text: T.unknown[lang], answered_by: 'none', translation_review: review, suggestions: ['Where is the library?', 'How do I declare a minor?', 'Is Harit Satt in?'] };
     }
     try {
-      const { text: prose, calls } = await this.gemini.ask(text, lang, input.history ?? [], c => this.runTool(c));
+      const { calls } = await this.gemini.ask(text, lang, input.history ?? [], c => this.runTool(c));
       const hit = [...calls].reverse().find(c => (c.result as { found?: boolean })?.found);
       let answer: Answer;
       if (hit) {
         const id = String((hit.result as { id: string }).id);
         const intent = hit.call.name === 'find_place' ? 'place' : hit.call.name === 'get_person_office' ? 'person' : 'procedure';
         const structured = this.fromMatch({ intent, id, score: 0, mode: modeFrom(text) }, lang, from, text)!;
-        answer = { ...structured, text: prose || structured.text, answered_by: 'gemini' };
+        // The model resolves intent; factual content comes from the current campus record.
+        answer = { ...structured, answered_by: 'gemini' };
       } else {
-        answer = { id: randomUUID(), intent: 'unknown', lang, text: prose || T.unknown[lang], answered_by: 'gemini', suggestions: ['Where is the library?', 'How do I declare a minor?'] };
+        answer = { id: randomUUID(), intent: 'unknown', lang, text: T.unknown[lang], answered_by: 'gemini', suggestions: ['Where is the library?', 'How do I declare a minor?'] };
       }
       this.log(text, lang, answer.intent, 'gemini');
-      if (!from) {
-        const expires = new Date(Date.now() + 24 * 3600 * 1000).toISOString();
-        this.db.prepare('INSERT INTO assistant_cache (key, answer, expires_at) VALUES (?,?,?) ON CONFLICT(key) DO UPDATE SET answer=excluded.answer, expires_at=excluded.expires_at')
-          .run(key, JSON.stringify(answer), expires);
-      }
       return { ...answer, translation_review: review };
     } catch (error) {
       this.log(text, lang, 'error', 'none');
@@ -240,5 +231,7 @@ export class Assistant {
     }
   }
 
-  async transcribe(audio: Buffer, mime: string, lang: Lang) { return this.gemini.transcribe(audio, mime, lang); }
+  async transcribe(audio: Buffer, mime: string, lang: Lang) {
+    return config.sonioxKey ? transcribeSoniox(audio, mime, lang, config.sonioxKey, config.sonioxModel) : this.gemini.transcribe(audio, mime, lang);
+  }
 }

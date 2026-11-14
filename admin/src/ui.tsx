@@ -79,7 +79,7 @@ export function PinMap({ center, pins, background = [], onMove, zoom = 17.3, hei
   useEffect(() => {
     if (!el.current || !MAPBOX_TOKEN) return;
     mapboxgl.accessToken = MAPBOX_TOKEN;
-    map.current = new mapboxgl.Map({ container: el.current, style: 'mapbox://styles/mapbox/standard', center, zoom, pitch: 30, config: { basemap: { showPointOfInterestLabels: false } } });
+    map.current = new mapboxgl.Map({ container: el.current, style: 'mapbox://styles/mapbox/standard', center, zoom, pitch: 30, config: { basemap: { showPointOfInterestLabels: false, showAdminBoundaries: false } } });
     map.current.addControl(new mapboxgl.NavigationControl({ showCompass: false }));
     return () => { map.current?.remove(); map.current = null; };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps

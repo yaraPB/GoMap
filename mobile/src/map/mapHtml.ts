@@ -18,9 +18,10 @@ export function mapHtml(token: string, opts: { flyIn: boolean }) {
 <link href="https://api.mapbox.com/mapbox-gl-js/v3.33.0/mapbox-gl.css" rel="stylesheet"/>
 <script src="https://api.mapbox.com/mapbox-gl-js/v3.33.0/mapbox-gl.js"></script>
 <style>
-html,body,#map{width:100%;height:100%;margin:0;overflow:hidden;background:#3E4C44;-webkit-tap-highlight-color:transparent}
+html,body,#map{width:100%;height:100%;margin:0;overflow:hidden;background:#0E1827;-webkit-tap-highlight-color:transparent}
 .mapboxgl-ctrl-attrib{font:10px -apple-system,Roboto,sans-serif!important;opacity:.8}
 .mapboxgl-ctrl-logo{transform:scale(.8);transform-origin:left bottom}
+.arriving .mapboxgl-marker{visibility:hidden}
 .pin{width:34px;height:34px;border-radius:50%;border:3px solid #fff;box-sizing:border-box;display:flex;align-items:center;justify-content:center;
   box-shadow:0 2px 6px rgba(0,0,0,.45);cursor:pointer;padding:0;position:relative;transition:transform 160ms ease,opacity 180ms ease}
 .pin svg{width:16px;height:16px}
@@ -54,40 +55,56 @@ html,body,#map{width:100%;height:100%;margin:0;overflow:hidden;background:#3E4C4
 var CAT=${json(cat)}, ICON=${json(ICON)}, TOKEN=${json(token)}, CENTER=${json(CAMPUS_CENTER)}, BOUNDS=${json(CAMPUS_BOUNDS)}, FLY=${json(opts.flyIn)};
 function send(type,detail){var m=JSON.stringify({type:type,detail:detail===undefined?null:detail});if(window.ReactNativeWebView)window.ReactNativeWebView.postMessage(m);else if(window.parent!==window)window.parent.postMessage(m,'*');}
 function svg(d,stroke,w){return '<svg viewBox="0 0 24 24" fill="none" stroke="'+(stroke||'#fff')+'" stroke-width="'+(w||2.4)+'" stroke-linecap="round" stroke-linejoin="round"><path d="'+d+'"/></svg>';}
-if(!window.mapboxgl||!mapboxgl.supported()){send('error','Mapbox needs WebGL, which this device does not provide.');return;}
+if(!window.mapboxgl||!mapboxgl.supported()){send('error','This device couldn’t display the map. Try reopening GoMap or using another device.');return;}
 mapboxgl.accessToken=TOKEN;
 var state={places:[],filter:{category:'all',school:'all'},selected:null,route:null,routeMode:'walk',crossings:[],walkways:null,crowding:null,closures:[],
   layers:{threeD:true,labels:true,cars:false,crowding:false},style:'default',user:null,heading:null,follow:false,pick:false,dest:null,highlight:null,dim:false};
 var STYLES={default:'mapbox://styles/mapbox/standard',satellite:'mapbox://styles/mapbox/standard-satellite',contrast:'mapbox://styles/mapbox/standard'};
 var reduce=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+var arriving=FLY&&!reduce,arrivalTimer=null,arrivalDone=false;
+document.body.classList.toggle('arriving',arriving);
 var map,ready=false,markers={},clusterMarkers={},meMarker=null,destMarker=null,closureMarkers=[],pickMarker=null,dashTimer=null,firstPins=true;
 try{
   map=new mapboxgl.Map({container:'map',style:STYLES.default,
-    center:FLY?[-6.5,31.8]:CENTER,zoom:FLY?2.2:16.4,pitch:FLY?0:55,bearing:FLY?0:-23,
-    attributionControl:false,config:{basemap:{showPointOfInterestLabels:false,showTransitLabels:false,lightPreset:'day'}}});
+    projection:'globe',center:arriving?[-18,24]:CENTER,zoom:arriving?0.65:16.4,pitch:arriving?0:55,bearing:arriving?0:-23,
+    attributionControl:false,config:{basemap:{showPointOfInterestLabels:false,showTransitLabels:false,showAdminBoundaries:false,colorBuildings:'#C4C1BA',lightPreset:campusLight()}}});
   map.addControl(new mapboxgl.AttributionControl({compact:true,customAttribution:'© OpenStreetMap contributors'}),'bottom-left');
 }catch(e){send('error',String(e&&e.message||e));return;}
 
-function easeOutCubic(t){return 1-Math.pow(1-t,3);}
+function finishArrival(){
+  if(arrivalDone)return;
+  arrivalDone=true;arriving=false;
+  document.body.classList.toggle('arriving',false);
+  clearTimeout(arrivalTimer);arrivalTimer=null;
+  map.off('touchstart',finishArrival);map.off('mousedown',finishArrival);map.off('moveend',finishArrival);
+  map.stop();map.jumpTo({center:CENTER,zoom:16.4,pitch:55,bearing:-23,padding:{top:0,bottom:0,left:0,right:0}});
+  lock();send('flyInDone');
+}
 function flyIn(){
-  if(reduce){map.jumpTo({center:CENTER,zoom:16.4,pitch:55,bearing:-23});lock();send('flyInDone');return;}
-  map.flyTo({center:CENTER,zoom:16.4,pitch:55,bearing:-23,duration:2000,easing:easeOutCubic,essential:true});
-  var skip=function(){map.stop();map.jumpTo({center:CENTER,zoom:16.4,pitch:55,bearing:-23});};
-  map.once('touchstart',skip);map.once('mousedown',skip);
-  map.once('moveend',function(){map.off('touchstart',skip);map.off('mousedown',skip);lock();send('flyInDone');});
+  if(arrivalDone)return;
+  if(reduce){finishArrival();return;}
+  arriving=true;
+  map.on('touchstart',finishArrival);map.on('mousedown',finishArrival);
+  // Let the whole planet be seen before one continuous descent into campus.
+  arrivalTimer=setTimeout(function(){
+    if(arrivalDone)return;
+    map.once('moveend',finishArrival);
+    map.flyTo({center:CENTER,zoom:16.4,pitch:55,bearing:-23,duration:5200,curve:1.35,
+      easing:function(t){return t*t*(3-2*t);}});
+  },850);
 }
 function lock(){map.setMaxBounds(BOUNDS);map.setMinZoom(14.2);}
 
 function emptyFC(){return {type:'FeatureCollection',features:[]};}
+function campusLight(){var h=Number(new Intl.DateTimeFormat('en-GB',{hour:'2-digit',hourCycle:'h23',timeZone:'Africa/Casablanca'}).format(new Date()));return h>=18||h<6?'night':'day';}
+function config(key,value){try{map.setConfigProperty('basemap',key,value);}catch(e){}}
 function addLayers(){
   var light=state.style!=='satellite';
   var pathColor=light?'#5B6B60':'#FFFFFF';
-  if(map.getConfigProperty){try{
-    map.setConfigProperty('basemap','show3dObjects',state.layers.threeD);
-    map.setConfigProperty('basemap','showPlaceLabels',state.layers.labels);
-    map.setConfigProperty('basemap','showRoadLabels',state.layers.labels);
-    if(state.style==='contrast')map.setConfigProperty('basemap','theme','monochrome');
-  }catch(e){}}
+  config('show3dObjects',state.layers.threeD);config('showPlaceLabels',state.layers.labels);
+  config('showRoadLabels',state.layers.labels);config('showAdminBoundaries',false);config('lightPreset',campusLight());
+  if(light)config('colorBuildings','#C4C1BA');
+  if(state.style==='contrast')config('theme','monochrome');
   map.addSource('walkways',{type:'geojson',data:state.walkways||emptyFC()});
   map.addSource('crowding',{type:'geojson',data:state.crowding||emptyFC(),lineMetrics:true});
   map.addSource('route',{type:'geojson',data:routeFC(),lineMetrics:true});
@@ -142,7 +159,7 @@ function renderPins(){
     var pr=f.properties;
     if(pr.cluster){var cid='c'+pr.cluster_id;if(keepC[cid])return;keepC[cid]=1;
       if(!clusterMarkers[cid]){var el=document.createElement('button');el.className='cluster drop';el.textContent=pr.point_count;el.setAttribute('aria-label',pr.point_count+' places, tap to open');
-        var coords=f.geometry.coordinates;el.onclick=function(e){e.stopPropagation();map.getSource('places').getClusterExpansionZoom(pr.cluster_id,function(err,z){if(!err)map.easeTo({center:coords,zoom:z+0.3,duration:450});});};
+        var coords=f.geometry.coordinates;el.onclick=function(e){e.stopPropagation();map.getSource('places').getClusterExpansionZoom(pr.cluster_id).then(function(z){map.easeTo({center:coords,zoom:z+0.3,duration:450});}).catch(function(){});};
         clusterMarkers[cid]=new mapboxgl.Marker({element:el}).setLngLat(coords).addTo(map);}
       return;}
     var id=pr.id;if(keep[id])return;keep[id]=1;var p=byId[id];if(!p)return;
@@ -184,7 +201,7 @@ function vis(id,on){if(map.getLayer(id))map.setLayoutProperty(id,'visibility',on
 var handlers={
   places:function(d){state.places=d.places;byId={};d.places.forEach(function(p){byId[p.id]=p;});setPlacesData(true);},
   filter:function(d){state.filter={category:d.category,school:d.school};setPlacesData(true);
-    var v=visiblePlaces();if(d.fit&&v.length&&d.category!=='all')fit(v.map(function(p){return p.coordinates;}));},
+    var v=visiblePlaces();if(!arriving&&d.fit&&v.length&&d.category!=='all')fit(v.map(function(p){return p.coordinates;}),d.padding);},
   select:function(d){state.selected=d.id;state.dim=!!d.dim;renderPins();var p=byId[d.id];
     if(p&&d.fly!==false)map.flyTo({center:p.coordinates,zoom:Math.max(map.getZoom(),17.4),pitch:50,padding:{top:60,bottom:d.bottom||420,left:0,right:0},duration:reduce?0:650});},
   route:function(d){state.route=d.geometry;state.crossings=d.crossings||[];
@@ -192,7 +209,7 @@ var handlers={
     setDest(d.dest||null);if(d.geometry){animateDash();if(d.fit!==false)fit(d.geometry.coordinates,d.padding);}else stopDash();},
   clearRoute:function(){state.route=null;state.crossings=[];if(map.getSource('route')){map.getSource('route').setData(emptyFC());map.getSource('crossings').setData(emptyFC());}setDest(null);stopDash();},
   user:function(d){state.user=d.coord;state.heading=d.heading;setMe();},
-  follow:function(d){state.follow=!!d.on;if(!d.on)map.easeTo({pitch:50,padding:{top:0,bottom:0,left:0,right:0},duration:500});else setMe();},
+  follow:function(d){state.follow=!!d.on;if(arriving)return;if(!d.on)map.easeTo({pitch:50,padding:{top:0,bottom:0,left:0,right:0},duration:reduce?0:500});else setMe();},
   locate:function(){if(state.user)map.flyTo({center:state.user,zoom:17.6,duration:reduce?0:700});},
   reset:function(){map.flyTo({center:CENTER,zoom:16.4,pitch:55,bearing:-23,padding:{top:0,bottom:0,left:0,right:0},duration:reduce?0:700});},
   walkways:function(d){state.walkways=d.data;if(map.getSource('walkways'))map.getSource('walkways').setData(d.data);},
@@ -203,16 +220,21 @@ var handlers={
     vis('roads-band',state.layers.cars);vis('roads-centre',state.layers.cars);vis('crowding',state.layers.crowding);
     try{map.setConfigProperty('basemap','show3dObjects',state.layers.threeD);map.setConfigProperty('basemap','showPlaceLabels',state.layers.labels);map.setConfigProperty('basemap','showRoadLabels',state.layers.labels);}catch(e){}
     if(o.labels!==state.layers.labels)resetPins(false),renderPins();},
-  style:function(d){if(d.style===state.style)return;state.style=d.style;ready=false;resetPins(false);map.setStyle(STYLES[d.style],{config:{basemap:{showPointOfInterestLabels:false,theme:d.style==='contrast'?'monochrome':'default'}}});},
+  style:function(d){if(d.style===state.style||!STYLES[d.style])return;state.style=d.style;ready=false;resetPins(false);map.setStyle(STYLES[d.style]);},
   pick:function(d){state.pick=!!d.on;if(!d.on&&pickMarker){pickMarker.remove();pickMarker=null;}},
   flyIn:function(){flyIn();},
+  skipIntro:function(){finishArrival();},
   camera:function(d){map.easeTo(Object.assign({duration:reduce?0:600},d));}
 };
 function onMessage(ev){var m=ev.data;if(typeof m==='string'){try{m=JSON.parse(m);}catch(e){return;}}if(!m||!m.type||!handlers[m.type])return;
   try{handlers[m.type](m);}catch(e){send('log',String(e&&e.message||e));}}
 window.addEventListener('message',onMessage);document.addEventListener('message',onMessage);
 
-map.on('style.load',function(){addLayers();ready=true;setPlacesData(false);setClosures();setMe();send('ready');});
+map.on('style.load',function(){
+  map.setFog({color:'#DFE9EE','high-color':'#7399BF','space-color':'#0E1827','horizon-blend':0.08,'star-intensity':0.15});
+  addLayers();ready=true;setPlacesData(false);setClosures();setMe();send('ready');
+});
+setInterval(function(){if(ready)config('lightPreset',campusLight());},60000);
 map.on('render',function(){if(ready)renderPins();});
 map.on('zoomend',function(){if(state.layers.labels){resetPins(false);renderPins();}});
 map.on('click',function(e){
@@ -221,9 +243,9 @@ map.on('click',function(e){
     pickMarker=new mapboxgl.Marker({element:el,anchor:'bottom'}).setLngLat(c).addTo(map);}else pickMarker.setLngLat(c);send('picked',c);return;}
   send('tapMap',[e.lngLat.lng,e.lngLat.lat]);});
 map.on('dragstart',function(){if(state.follow){state.follow=false;send('followOff');}});
-map.on('error',function(e){if(!ready)send('error',e&&e.error&&e.error.message||'Mapbox tiles could not load. Check the token and the connection.');});
-map.once('load',function(){if(FLY)flyIn();else lock();});
-setTimeout(function(){if(!ready)send('error','The map did not load. Check the Mapbox token and your connection.');},20000);
+map.on('error',function(e){if(!ready)send('error','The map could not load. Check your connection and reopen GoMap.');});
+map.once('load',function(){if(FLY)flyIn();else finishArrival();});
+setTimeout(function(){if(!ready)send('error','The map is taking a little longer. Check your connection and reopen GoMap.');},20000);
 })();
 </script></body></html>`;
 }

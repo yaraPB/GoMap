@@ -6,7 +6,6 @@ import { USERS, useApp } from '../state/app';
 import { usePanels } from '../state/panels';
 import { Icon, IconBtn, Label, Sheet, T } from '../ui/kit';
 import { color, type IconName } from '../ui/theme';
-import { SPEECH_ENGINE } from '../voice/useSpeech';
 
 const STYLES: { id: MapStyle; name: string; swatch: string[] }[] = [
   { id: 'default', name: 'Default', swatch: ['#E9E5DA', '#CFE3C4'] },
@@ -20,7 +19,7 @@ export default function Layers() {
   const map = useMap();
   const { user, setUser, lang, setLang } = useApp();
   const toggles: { key: keyof typeof map.layers; label: string; sub: string; icon: IconName }[] = [
-    { key: 'threeD', label: '3D buildings', sub: 'Extruded buildings at walking zoom', icon: 'building' },
+    { key: 'threeD', label: '3D buildings', sub: 'See buildings rise from the map as you zoom in', icon: 'building' },
     { key: 'cars', label: 'Show where cars go', sub: 'Roads as a solid band, paths stay dotted', icon: 'car' },
     { key: 'labels', label: 'Building labels', sub: 'Numbers on the pins up close', icon: 'pin' },
   ];
@@ -80,7 +79,12 @@ export default function Layers() {
             </Pressable>
           )}
         </View>
-        <T style={{ fontSize: 11.5, color: color.muted }}>Voice: {SPEECH_ENGINE === 'native' ? 'on-device recognition' : 'recorded and transcribed by the server (Expo Go)'} · Map © Mapbox © OpenStreetMap</T>
+        <Pressable accessibilityRole="button" onPress={() => push({ name: 'help', step: 0 })} style={{ flexDirection: 'row', gap: 12, alignItems: 'center', padding: 16, borderRadius: 18, backgroundColor: '#E8F3EB' }}>
+          <Icon name="map" stroke="#226348" size={22} />
+          <View style={{ flex: 1 }}><T weight="semibold" style={{ color: '#226348' }}>Take a quick tour</T><T style={{ color: '#617368', fontSize: 12, marginTop: 3 }}>Try the map and meet your campus guide.</T></View>
+          <Icon name="chevron" stroke="#226348" size={18} />
+        </Pressable>
+        <T style={{ fontSize: 11.5, color: color.muted }}>Map © Mapbox © OpenStreetMap</T>
       </ScrollView>
     </Sheet>
   );

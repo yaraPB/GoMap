@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View, useWindowDimensions, type PressableProps, type StyleProp, type TextProps, type TextStyle, type ViewStyle } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View, useWindowDimensions, type PressableProps, type StyleProp, type TextProps, type TextStyle, type ViewStyle } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { Easing, FadeInDown, runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
@@ -10,7 +10,8 @@ const ARABIC = /[؀-ۿ]/;
 
 export function Icon({ name, size = 20, stroke = color.ink, width = 2, fill = 'none' }: { name: IconName; size?: number; stroke?: string; width?: number; fill?: string }) {
   return (
-    <Svg width={size} height={size} viewBox="0 0 24 24" fill={fill} stroke={stroke} strokeWidth={width} strokeLinecap="round" strokeLinejoin="round" accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill={fill} stroke={stroke} strokeWidth={width} strokeLinecap="round" strokeLinejoin="round"
+      {...(Platform.OS === 'web' ? { 'aria-hidden': true } : { accessibilityElementsHidden: true, importantForAccessibility: 'no-hide-descendants' as const })}>
       <Path d={icons[name]} />
     </Svg>
   );

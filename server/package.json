@@ -10,6 +10,7 @@
     "check": "tsc --noEmit -p tsconfig.json",
     "geo:import": "tsx src/scripts/import-geo.ts",
     "graph:check": "tsx src/scripts/graph-check.ts",
+    "gemini:check": "tsx src/scripts/check-gemini.ts",
     "seed": "tsx src/scripts/seed.ts"
   },
   "dependencies": {

@@ -21,7 +21,7 @@ import Report from '../src/panels/Report';
 import { Arrived, RoutePreview, TurnByTurn } from '../src/panels/Route';
 import Search from '../src/panels/Search';
 import Voice from '../src/panels/Voice';
-import { Btn, Notice, T } from '../src/ui/kit';
+import { Btn, Icon, Notice, T } from '../src/ui/kit';
 import { color, font } from '../src/ui/theme';
 
 /** Keeps the map in step with app state: places, walkways, closures, you, and the route. */
@@ -80,14 +80,19 @@ function Panels() {
 }
 
 /** Board 01: the wordmark over the opening fly-in, world → Morocco → AUI. */
-function Launch({ onDone }: { onDone: () => void }) {
-  useEffect(() => { const t = setTimeout(onDone, 900); return () => clearTimeout(t); }, [onDone]);
+function Launch() {
+  const insets = useSafeAreaInsets();
+  const map = useMap();
   return (
-    <Animated.View exiting={FadeOut.duration(500)} style={[StyleSheet.absoluteFill, styles.launch]} pointerEvents="none">
-      <Animated.View entering={FadeInDown.duration(500)} style={{ alignItems: 'center', gap: 8 }}>
-        <T style={{ fontFamily: font.display, fontSize: 44, color: '#fff', letterSpacing: -1 }}>GoMap</T>
-        <T style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)', letterSpacing: 0.6 }}>AL AKHAWAYN UNIVERSITY · IFRANE</T>
-      </Animated.View>
+    <Animated.View exiting={FadeOut.duration(320)} style={StyleSheet.absoluteFill} pointerEvents="box-none">
+      <View style={[styles.launchTitle, { top: insets.top + 38 }]} pointerEvents="none">
+        <T style={{ fontFamily: font.display, fontSize: 36, color: '#fff', letterSpacing: -1 }}>GoMap</T>
+        <T style={{ fontSize: 14, color: '#E1EBE5', marginTop: 4 }}>Your campus, a little closer.</T>
+      </View>
+      <View style={[styles.launchFooter, { bottom: insets.bottom + 44 }]}>
+        <T weight="medium" style={{ fontSize: 12, color: '#E1EBE5', marginBottom: 16 }}>Earth · Morocco · Al Akhawayn</T>
+        <Btn title={map.ready ? 'Take me to campus' : 'Finding your campus…'} icon="arrowUp" kind="secondary" disabled={!map.ready} onPress={() => map.send({ type: 'skipIntro' })} />
+      </View>
     </Animated.View>
   );
 }
@@ -98,38 +103,54 @@ export default function MapShell() {
   const map = useMap();
   const { reduceMotion, firstSession, finishOnboarding, user } = useApp();
   const [launching, setLaunching] = useState(true);
+  const [arrived, setArrived] = useState(false);
   const [offer, setOffer] = useState(false);
-  useMapEvent(e => { if (e.type === 'flyInDone' && firstSession && user.role !== 'guest') setTimeout(() => setOffer(true), 900); });
+  useMapEvent(e => { if (e.type === 'flyInDone') { setLaunching(false); setArrived(true); } });
+  useEffect(() => {
+    if (map.error) setLaunching(false);
+  }, [map.error]);
+  useEffect(() => {
+    if (!arrived || !firstSession || user.role === 'guest') { setOffer(false); return; }
+    const timer = setTimeout(() => setOffer(true), 900);
+    return () => clearTimeout(timer);
+  }, [arrived, firstSession, user.role]);
   const showHome = stack.length === 1 || ['place', 'layers', 'help'].includes(top.name);
 
   return (
     <View style={{ flex: 1, backgroundColor: color.map }}>
       <CampusMap flyIn={!reduceMotion} />
       <MapSync />
-      {showHome && top.name !== 'help' && <Home chipsDelay={launching ? 1600 : 0} />}
+      {showHome && !launching && top.name !== 'help' && <Home chipsDelay={0} />}
       <Panels />
       {map.error && (
         <View style={[styles.error, { top: insets.top + 70 }]}>
           <Notice tone="missing" icon="map" text={map.error} />
         </View>
       )}
-      {offer && top.name === 'home' && (
+      {offer && firstSession && !launching && top.name === 'home' && (
         <Animated.View entering={FadeInDown.duration(320)} exiting={FadeOut} style={[styles.offer, { bottom: insets.bottom + 92 }]}>
-          <T weight="bold" style={{ fontSize: 16 }}>New to GoMap?</T>
-          <T style={{ fontSize: 13.5, color: color.muted, marginTop: 2 }}>A four-step tour of the map, the offices and the assistant.</T>
+          <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
+            <View style={styles.offerIcon}><Icon name="map" size={23} stroke="#226348" /></View>
+            <View style={{ flex: 1 }}>
+              <T weight="bold" style={{ fontSize: 17, color: '#1E3026' }}>Make yourself at home</T>
+              <T style={{ fontSize: 13, lineHeight: 19, color: '#667168', marginTop: 3 }}>Find a spot. Try a tap. Meet your guide.</T>
+            </View>
+          </View>
           <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
-            <Btn title="Show me" small style={{ flex: 1 }} onPress={() => { setOffer(false); push({ name: 'help', step: 0 }); }} />
+            <Btn title="Show me around" kind="dark" small style={{ flex: 1 }} onPress={() => { setOffer(false); push({ name: 'help', step: 0 }); }} />
             <Pressable accessibilityRole="button" onPress={() => { setOffer(false); finishOnboarding(); }} style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><T weight="semibold" style={{ color: color.muted }}>Not now</T></Pressable>
           </View>
         </Animated.View>
       )}
-      {launching && <Launch onDone={() => setLaunching(false)} />}
+      {launching && !reduceMotion && <Launch />}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  launch: { backgroundColor: color.night, alignItems: 'center', justifyContent: 'center' },
+  launchTitle: { position: 'absolute', left: 24, right: 24, alignItems: 'center', backgroundColor: 'rgba(14,24,39,0.65)', padding: 18, borderRadius: 24 },
+  launchFooter: { position: 'absolute', alignSelf: 'center', alignItems: 'center', backgroundColor: 'rgba(14,24,39,0.72)', padding: 16, borderRadius: 24 },
   error: { position: 'absolute', left: 14, right: 14 },
-  offer: { position: 'absolute', left: 12, right: 12, padding: 16, borderRadius: 18, backgroundColor: '#fff', shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 16, elevation: 8 },
+  offer: { position: 'absolute', left: 12, right: 12, padding: 18, borderRadius: 24, backgroundColor: '#FEFFFC', shadowColor: '#15251C', shadowOpacity: 0.18, shadowRadius: 16, elevation: 8 },
+  offerIcon: { width: 48, height: 48, borderRadius: 17, backgroundColor: '#E8F3EB', alignItems: 'center', justifyContent: 'center' },
 });

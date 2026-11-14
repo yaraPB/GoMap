@@ -68,11 +68,15 @@ export class Gemini {
         const text = parts.map(p => p.text ?? '').join('').trim();
         return { text, calls };
       }
-      contents.push({ role: 'model', parts: fnCalls });
+      // Gemini 3 may attach a thought signature to any part; return every part unchanged.
+      contents.push({ role: 'model', parts });
       const responses: Part[] = [];
       for (const p of fnCalls) {
         const name = p.functionCall!.name as ToolCall['name'];
-        if (!['find_place', 'get_person_office', 'get_procedure'].includes(name)) continue;
+        if (!['find_place', 'get_person_office', 'get_procedure'].includes(name)) {
+          responses.push({ functionResponse: { name, ...(p.functionCall!.id ? { id: p.functionCall!.id } : {}), response: { error: 'Unknown function' } } });
+          continue;
+        }
         const call: ToolCall = { name, args: p.functionCall!.args ?? {} };
         const result = await run(call);
         calls.push({ call, result });

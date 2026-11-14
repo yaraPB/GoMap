@@ -25,6 +25,7 @@ export type Person = {
   place: { id: string; name: string } | null; office_number: string | null; floor: number | null;
   hours: Hours | null; hours_text: string | null; hours_raw: string | null; hours_note: string | null; by_appointment: boolean;
   open: OpenState; availability: Availability;
+  note: string | null;
   presence: { status: 'in' | 'busy' | 'out'; reason: string | null; until: string | null; set_at: string; set_by: string; clears_at: string } | null;
   shared_with: { id: string; name: string }[];
   conflict: { field: string; values: { value: string; place_id: string | null; source: string }[] } | null;

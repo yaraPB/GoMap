@@ -50,6 +50,12 @@ export function openSqlite(file: string): Sql {
       set_at     TEXT NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS office_notes (
+      person_id TEXT PRIMARY KEY REFERENCES people(id) ON DELETE CASCADE,
+      note TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS procedures (
       id             TEXT PRIMARY KEY,
       title          TEXT NOT NULL,

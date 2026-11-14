@@ -84,10 +84,10 @@ export class IntentRouter {
     return best;
   }
 
-  match(text: string): Match | null {
+  match(text: string, wanted?: Exclude<Intent, 'help'>): Match | null {
     const t = normalise(text);
     const mode = modeFrom(text);
-    if (CUES.help.test(t)) return { intent: 'help', id: 'walkthrough', score: 0, mode };
+    if (!wanted && CUES.help.test(t)) return { intent: 'help', id: 'walkthrough', score: 0, mode };
     const words = t.split(' ').filter(w => !FILLER.has(w));
     if (!words.length) return null;
     const windows = new Set<string>();
@@ -106,6 +106,10 @@ export class IntentRouter {
     if (place) cands.push({ intent: 'place', id: place.id, score: place.score - (CUES.place.test(t) ? 0.08 : 0), mode });
     if (person) cands.push({ intent: 'person', id: person.id, score: person.score - (CUES.person.test(t) ? 0.1 : 0), mode });
     if (proc) cands.push({ intent: 'procedure', id: proc.id, score: proc.score - (CUES.procedure.test(t) ? 0.15 : 0), mode });
+    if (wanted) {
+      const matching = cands.find(candidate => candidate.intent === wanted);
+      return matching && matching.score < 0.15 ? matching : null;
+    }
     cands.sort((a, b) => a.score - b.score);
     const top = cands[0];
     // exact hits score ~0; fuzzy ones must be strong, or we would rather ask Gemini than guess

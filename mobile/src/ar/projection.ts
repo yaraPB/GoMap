@@ -21,6 +21,13 @@ export type Pose = { heading: number; pitchDown: number; roll: number };
 export type Screen = { width: number; height: number };
 export type Projected = { x: number; y: number; depth: number };
 
+/** GPS/compass projection is approximate; never draw ground arrows using stale or missing sensors. */
+export function arReady(input: { simulated: boolean; accuracy: number | null; timestamp: number | null; now: number; heading: number | null; headingAccuracy: number | null; aligned: boolean; motion: boolean }) {
+  const gps = input.simulated || (input.accuracy != null && input.accuracy <= 15 && input.timestamp != null && input.now - input.timestamp <= 15000);
+  const compass = input.heading != null && (input.aligned || (input.headingAccuracy != null && input.headingAccuracy >= 2));
+  return gps && compass && input.motion;
+}
+
 export function focalPx(screen: Screen) { return (screen.height / 2) / Math.tan((VFOV_DEG / 2) * rad); }
 export function hfovDeg(screen: Screen) { return 2 * Math.atan((screen.width / 2) / focalPx(screen)) / rad; }
 
@@ -63,14 +70,14 @@ export type Chevron = { key: number; points: string; opacity: number; dist: numb
  * `line` is the route geometry; arrows follow its bends, so a turn shows up as arrows curving away.
  */
 export function chevronsAhead(line: Position[], user: Position, pose: Pose, screen: Screen, count = 5): Chevron[] {
-  if (line.length < 2) return [];
+  if (line.length < 2 || count < 1) return [];
   const snap = snapToLine(line, user);
   const total = lineLength(line);
   const out: Chevron[] = [];
   for (let k = 0; k < count; k++) {
-    const ahead = NEAR_M + (k * (FAR_M - NEAR_M)) / (count - 1);
+    const ahead = count === 1 ? NEAR_M : NEAR_M + (k * (FAR_M - NEAR_M)) / (count - 1);
     const along = snap.along + ahead;
-    if (along > total) break;
+    if (along >= total) break;
     const c = pointAlong(line, along);
     const next = pointAlong(line, Math.min(total, along + 0.8));
     const dir = bearing(c, next);
@@ -85,8 +92,10 @@ export function chevronsAhead(line: Position[], user: Position, pose: Pose, scre
 
 /** Where to point the user when the path ahead is off-screen. */
 export function steerHint(line: Position[], user: Position, heading: number, screen: Screen) {
+  if (line.length < 2) return null;
   const snap = snapToLine(line, user);
   const target = pointAlong(line, snap.along + 6);
+  if (distance(user, target) < 1) return null;
   const rel = angleDiff(heading, bearing(user, target));
   const half = hfovDeg(screen) / 2;
   if (Math.abs(rel) <= half) return null;

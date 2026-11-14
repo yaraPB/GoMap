@@ -15,7 +15,8 @@ export type PlaceSeed = {
 
 type Rule = { id?: string; number?: string; name: string; category: string; aliases?: string[]; description?: string; schools?: string[]; hours?: PlaceSeed['hours'] };
 
-const WEEKDAY_OFFICE: PlaceSeed['hours'] = Object.fromEntries(['mon', 'tue', 'wed', 'thu', 'fri'].map(d => [d, [['08:30', '17:30']]]).concat([['sat', []], ['sun', []]]));
+// Assumptions for the demo, pending confirmation by campus staff. Break is noon–2 PM.
+const WEEKDAY_OFFICE: PlaceSeed['hours'] = Object.fromEntries(['mon', 'tue', 'wed', 'thu', 'fri'].map(d => [d, [['09:00', '12:00'], ['14:00', '17:00']]]).concat([['sat', []], ['sun', []]]));
 
 /** What each AUI building number holds, from the faculty directory and the design brief. */
 const BUILDINGS: Record<string, Rule> = {
@@ -66,7 +67,7 @@ export function placesFromPois(pois: PoiFeature[], buildings: BuildingFeature[])
       _id: id, name: rule.name, number, category: rule.category, schools: rule.schools ?? [],
       aliases: [...new Set([...(rule.aliases ?? []), ...(number ? [`building ${number}`, `b${number}`, number] : [])])],
       description: rule.description ?? null, location: { type: 'Point', coordinates: c },
-      hours: rule.hours ?? null, position_estimated: false, source: 'mapbox',
+      hours: rule.hours ?? (['services', 'admin'].includes(rule.category) ? WEEKDAY_OFFICE : null), position_estimated: false, source: 'mapbox',
       footprint: fp?.geometry ?? null, height: fp?.properties.height ?? null,
     });
   };

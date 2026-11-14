@@ -49,9 +49,11 @@ npx expo start --clear --lan # scan with Expo Go (SDK 58)
 
 Use your computer's Wi-Fi IPv4 address (`ipconfig`), not `localhost`, for a physical phone. Android emulator: `http://10.0.2.2:4000`.
 
-**Away from campus?** If you are more than 2 km from AUI, routes start from the main plaza (a demo position), and turn-by-turn and AR get a **Simulate walk** button that walks the route for you.
+**Away from campus?** The blue dot remains at your real location. The graph covers campus only, so a route preview starts from the main plaza and is labeled as a demo. Once started, **Simulate walk** moves a demo position along that route. The camera overlay in demo mode is not aligned to your real surroundings.
 
-**Live voice (optional dev build).** In Expo Go, voice records your question and the server transcribes it after you release. With a dev build (`npx expo run:android` or EAS), on-device recognition switches on by itself: words appear as you speak, in English, French or Arabic. No code change is needed.
+**Assistant and voice.** Set `GEMINI_API_KEY` in `server/.env`; the key stays on the server. Known places, people and procedures are resolved locally. Gemini can resolve less direct questions using the campus records; factual answers and actions are built from those records. Run `npm run gemini:check` in `server/` to test the configured key and tool calls with a synthetic question. The assistant uses the device voice for spoken replies. In Expo Go, the app records a question and transcribes it after release using Soniox if `SONIOX_API_KEY` is configured, otherwise Gemini. A dev build can use on-device recognition with live partial words; set `EXPO_PUBLIC_SPEECH_ENGINE=recorded` to use server transcription instead. Restart Expo after changing environment variables.
+
+**AR guidance.** Open a route and tap AR, or ask for directions with “AR”. Allow camera, location and motion access and use precise location outdoors. The camera opens immediately; ground arrows wait for a recent GPS fix (within 15 m), motion data and a usable or manually aligned compass. Tap the warning or calibration button, point along the next path, and choose **Align with the path**. The 2D route is always available. This is a GPS/compass and motion-based overlay, not ARCore/ARKit world tracking: camera field of view, phone height and position are estimates, so arrows can shift or be misplaced. The actual paths and estimated entrances must be checked on campus before relying on them.
 
 ### 3. Admin
 
@@ -88,7 +90,7 @@ cd admin  && npm run build
 
 ## On-campus test checklist (needs a real phone, outdoors)
 
-1. Open the app on the plaza: the fly-in lands on AUI and your blue dot is on the right path.
+1. Reopen the app: see the whole globe, then a smooth trip down to AUI. **Take me to campus** skips the trip; reduced motion opens directly on campus. Check your blue dot outdoors on the plaza.
 2. Ask "take me to building 8B" by voice: directions open without a second tap.
 3. Start AR facing the route: green arrows lie on the paving, stay put when you tilt the phone, and fade past about 8 m.
 4. If arrows point off the path, tap the calibrate button, point along the path and tap **Align with the path**.
@@ -96,3 +98,9 @@ cd admin  && npm run build
 6. Next to a tall building, GPS worse than ±15 m should bring up the calibration screen with "Use the 2D map instead".
 7. As faculty (Layers → Demo account), set "Busy until 15:00": the card, the office list and the assistant all show it.
 8. Report a closed path, confirm it in the admin: the next walking route goes around it.
+
+### Try the new map tour
+
+Tap **Show me around** after arriving, or open map settings and choose **Take a quick tour**. Choose Food, Study, or Sports to change the actual map. Tap a colored pin (or the suggested place) to see its name, then open its details or continue to the guide. Try typing, speaking, or the library question. Back and Skip tour are always available. Leaving the tour shows all places again.
+
+The tour keeps the map usable, with a small card that scrolls on shorter screens. Buildings have a slightly deeper warm gray. These changes use [NN/g’s guidance on learning through interaction](https://www.nngroup.com/articles/onboarding-tutorials/) and [Apple’s plain-language guidance](https://developer.apple.com/design/human-interface-guidelines/writing). Check the appearance and touch feel on a phone as well as in the browser.

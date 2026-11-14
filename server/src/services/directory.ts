@@ -99,6 +99,7 @@ export class Directory {
       office_number: r.office_number, floor: r.floor,
       hours, hours_text: formatHours(hours), hours_raw: r.hours_raw, hours_note: parsed.note, by_appointment: parsed.byAppointment,
       open, availability: avail,
+      note: (this.db.prepare('SELECT note FROM office_notes WHERE person_id = ?').get(r.id) as { note: string } | undefined)?.note ?? null,
       presence: presence ? { status: presence.status, reason: presence.reason, until: presence.until, set_at: presence.set_at, set_by: presence.set_by, clears_at: PRESENCE_CLEARS_AT } : null,
       shared_with: shared,
       conflict: json.parse(r.conflict, null),

@@ -152,7 +152,7 @@ export function createApp(ctx: AppContext) {
     const user = userOf(req);
     const id = String(req.params.id);
     // A faculty member sets their own status; the admin can set anyone's.
-    if (!(user.role === 'admin' || (user.role === 'faculty' && user.id === id))) throw new HttpError(403, 'Only this faculty member can set their status.');
+    if (!(req.header('authorization') === `Bearer ${config.adminToken}` || (user.role === 'faculty' && user.id === id))) throw new HttpError(403, 'Only this faculty member or an authenticated admin can set their status.');
     if (!directory.row(id)) throw new HttpError(404, 'Person not found');
     const status = req.body?.status;
     if (!['in', 'busy', 'out', 'clear'].includes(status)) throw bad('status must be in, busy, out or clear');
@@ -160,7 +160,14 @@ export function createApp(ctx: AppContext) {
     if (reason !== null && !['meeting', 'teaching', 'campus', 'away', 'none'].includes(reason)) throw bad('unknown reason');
     const until = req.body?.until ?? null;
     if (until !== null && (typeof until !== 'string' || Number.isNaN(Date.parse(until)))) throw bad('until must be an ISO timestamp or null');
+    if (req.body?.note !== undefined && typeof req.body.note !== 'string') throw bad('note must be text');
     directory.setPresence(id, { status, reason, until }, user.name);
+    if (req.body?.note !== undefined) {
+      const note = str(req.body.note, 500);
+      if (note) db.prepare('INSERT INTO office_notes (person_id,note,updated_at) VALUES (?,?,?) ON CONFLICT(person_id) DO UPDATE SET note=excluded.note,updated_at=excluded.updated_at').run(id, note, now());
+      else db.prepare('DELETE FROM office_notes WHERE person_id = ?').run(id);
+    }
+    db.prepare('DELETE FROM assistant_cache').run();
     res.json(directory.view(directory.row(id)!, await placeNames()));
   }));
 
@@ -222,7 +229,11 @@ export function createApp(ctx: AppContext) {
     if (!req.file) throw bad('audio file is required');
     const lang = (LANGS.includes(req.body?.lang) ? req.body.lang : 'en') as Lang;
     const mime = req.file.mimetype && req.file.mimetype !== 'application/octet-stream' ? req.file.mimetype : 'audio/mp4';
-    res.json({ text: await assistant.transcribe(req.file.buffer, mime, lang) });
+    try {
+      res.json({ text: await assistant.transcribe(req.file.buffer, mime, lang) });
+    } catch {
+      throw new HttpError(503, 'Speech transcription is unavailable. Check the server transcription key and connection, or type your question.');
+    }
   }));
 
   // ── reports (anyone) ──────────────────────────────────────────────────────

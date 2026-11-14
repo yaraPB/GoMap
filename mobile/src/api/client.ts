@@ -35,7 +35,7 @@ export const api = {
   offices: (id: string) => request<OfficeList>(`/api/places/${encodeURIComponent(id)}/people`),
   people: (f: { q?: string; department?: string; open_now?: boolean; limit?: number } = {}) => request<Person[]>(`/api/people${qs(f)}`),
   person: (id: string) => request<Person>(`/api/people/${encodeURIComponent(id)}`),
-  setPresence: (id: string, body: { status: 'in' | 'busy' | 'out' | 'clear'; reason?: string | null; until?: string | null }) =>
+  setPresence: (id: string, body: { status: 'in' | 'busy' | 'out' | 'clear'; reason?: string | null; until?: string | null; note?: string }) =>
     request<Person>(`/api/people/${encodeURIComponent(id)}/presence`, { method: 'PUT', body: JSON.stringify(body) }),
   procedures: (q?: string) => request<Procedure[]>(`/api/procedures${qs({ q })}`),
   route: (from: Position, to: { placeId?: string; coord?: Position }, mode: RouteMode) =>

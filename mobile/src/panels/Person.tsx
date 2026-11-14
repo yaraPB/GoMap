@@ -62,6 +62,8 @@ export default function PersonPanel({ id }: { id: string }) {
             </View>
           )}
 
+          {!!p.note && <View style={{ backgroundColor: '#FFF4C7', borderRadius: 12, padding: 14 }}><T weight="bold" style={{ marginBottom: 5 }}>A note from {first}</T><T style={{ lineHeight: 20 }}>{p.note}</T></View>}
+
           {nothing ? (
             <>
               <Notice tone="missing" text={`The directory has a profile for ${first} but no room or office hours, so GoMap will not guess one. Email first.`} />

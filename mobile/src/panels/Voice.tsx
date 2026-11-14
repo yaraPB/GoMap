@@ -4,6 +4,7 @@ import Animated, { Easing, FadeIn, FadeInDown, FadeOut, useAnimatedStyle, useSha
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
+import * as Speech from 'expo-speech';
 import { api } from '../api/client';
 import type { Answer, Lang } from '../api/types';
 import { t } from '../i18n/strings';
@@ -58,6 +59,8 @@ export default function Voice() {
   const [toggled, setToggled] = useState(false);
   const pressedAt = useRef(0);
   const debounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const starting = useRef<Promise<boolean> | null>(null);
+  const finishing = useRef(false);
   const speech = useSpeech({ onLevel: setLevel, onPartial: setPartial });
   const listening = speech.state === 'listening';
   const thinking = speech.state === 'transcribing' || sending;
@@ -73,24 +76,33 @@ export default function Voice() {
     if (listening || thinking) return;
     setPreview(null); setPartial('');
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-    await speech.start(lang);
+    const pending = speech.start(lang);
+    starting.current = pending;
+    const ok = await pending;
+    if (!ok) setToggled(false);
+    return ok;
   };
   const finish = async () => {
-    if (!listening) return;
+    if (finishing.current) return;
+    finishing.current = true;
+    const started = starting.current ? await starting.current : listening;
+    starting.current = null;
+    if (!started) { finishing.current = false; return; }
     Haptics.selectionAsync().catch(() => {});
-    const text = (await speech.stop()).trim();
-    if (!text) return;
+    let text = '';
+    try { text = (await speech.stop()).trim(); } catch { finishing.current = false; return; }
+    if (!text) { finishing.current = false; return; }
     setSending(true);
     try {
-      const a = await api.ask(text, lang, loc.coord, [], true);
+      const a = await api.ask(text, lang, loc.reason === 'off-campus' ? null : loc.coord, [], true);
       if (a.intent === 'place' && a.action?.type === 'route' && a.place) {
-        await nav.preview({ placeId: a.place.id, name: a.place.name, coordinates: a.place.coordinates, category: a.place.category }, a.action.mode === 'step_free' ? 'step_free' : 'walk');
-        if (a.action.mode === 'ar') { nav.start(); router.push('/ar'); }
-        replace({ name: 'route', said: text, reply: a.text });
+        const ready = await nav.preview({ placeId: a.place.id, name: a.place.name, coordinates: a.place.coordinates, category: a.place.category }, a.action.mode === 'step_free' ? 'step_free' : 'walk');
+        if (a.action.mode === 'ar' && ready) { nav.start(); replace({ name: 'go' }); router.push('/ar'); }
+        else { if (a.text) Speech.speak(a.text, { language: lang === 'fr' ? 'fr-FR' : lang === 'ar' ? 'ar' : 'en-US' }); replace({ name: 'route', said: text, reply: a.text }); }
       } else replace({ name: 'assistant', ask: text });
     } catch {
       replace({ name: 'assistant', ask: text });
-    } finally { setSending(false); }
+    } finally { setSending(false); finishing.current = false; }
   };
   const onPressIn = () => { pressedAt.current = Date.now(); if (!toggled) begin(); };
   const onPressOut = () => {
@@ -139,7 +151,7 @@ export default function Voice() {
       {speech.error && (
         <Animated.View entering={FadeInDown} style={[styles.card, { bottom: insets.bottom + 150 }]}>
           <T weight="semibold" style={{ color: '#fff', fontSize: 14 }}>{speech.error.includes('permission') ? 'Microphone permission is off' : 'Voice did not work this time'}</T>
-          <T style={{ color: '#A7ACB4', fontSize: 12.5, lineHeight: 18, marginTop: 4 }}>{speech.engine === 'recorded' ? t(lang, 'voiceOffline') : speech.error}</T>
+          <T style={{ color: '#A7ACB4', fontSize: 12.5, lineHeight: 18, marginTop: 4 }}>{speech.error}</T>
           <Btn title="Type instead" kind="secondary" small onPress={() => replace({ name: 'assistant' })} style={{ marginTop: 10, alignSelf: 'flex-start' }} />
         </Animated.View>
       )}

@@ -38,7 +38,8 @@ function loadNative(): NativeModule | null {
     return null;
   }
 }
-const native = loadNative();
+// Recorded mode uses the server's configured Soniox provider, including in a dev build.
+const native = process.env.EXPO_PUBLIC_SPEECH_ENGINE === 'recorded' ? null : loadNative();
 export const SPEECH_ENGINE: SpeechEngine = native ? 'native' : 'recorded';
 
 const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
@@ -53,6 +54,8 @@ export function useSpeech(handlers: { onLevel: (level: number) => void; onPartia
   const h = useRef(handlers);
   h.current = handlers;
   const langRef = useRef<Lang>('en');
+  const nativeRunning = useRef(false);
+  const generation = useRef(0);
 
   // native engine events
   useEffect(() => {
@@ -71,31 +74,37 @@ export function useSpeech(handlers: { onLevel: (level: number) => void; onPartia
         final.current?.reject(new Error(e.message || e.error)); final.current = null;
       }),
       native.addListener('end', () => {
+        nativeRunning.current = false;
         h.current.onLevel(0);
         if (final.current) { final.current.resolve(transcript.current); final.current = null; }
-        setState(s => (s === 'listening' ? 'idle' : s));
       }),
     ];
     return () => subs.forEach(s => s.remove());
   }, []);
 
   const start = useCallback(async (lang: Lang) => {
+    const attempt = ++generation.current;
     setError(null);
     transcript.current = '';
     langRef.current = lang;
     h.current.onPartial('');
+    try {
     if (native) {
       const perm = await native.requestPermissionsAsync();
+      if (attempt !== generation.current) return false;
       if (!perm.granted) { setError('Microphone permission is off.'); setState('error'); return false; }
       native.start({ lang: speechLocale(lang), interimResults: true, continuous: false, maxAlternatives: 1, addsPunctuation: true,
         volumeChangeEventOptions: { enabled: true, intervalMillis: 60 }, contextualStrings: ['GoMap', 'AUI', 'Al Akhawayn', 'building', 'registrar', 'NAB'] });
+      nativeRunning.current = true;
       setState('listening');
       return true;
     }
     const perm = await requestRecordingPermissionsAsync();
+    if (attempt !== generation.current) return false;
     if (!perm.granted) { setError('Microphone permission is off.'); setState('error'); return false; }
     await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
     await recorder.prepareToRecordAsync();
+    if (attempt !== generation.current) { await setAudioModeAsync({ allowsRecording: false }).catch(() => {}); return false; }
     recorder.record();
     setState('listening');
     // dBFS: silence ≈ -60, speech ≈ -35…-10
@@ -104,11 +113,17 @@ export function useSpeech(handlers: { onLevel: (level: number) => void; onPartia
       if (typeof db === 'number') h.current.onLevel(clamp01((db + 55) / 45));
     }, 60);
     return true;
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not start the microphone.');
+      setState('error');
+      return false;
+    }
   }, [recorder]);
 
   /** Stop listening and resolve the final transcript. */
   const stop = useCallback(async (): Promise<string> => {
     if (native) {
+      if (!nativeRunning.current) { setState('idle'); return transcript.current; }
       return new Promise<string>((resolve, reject) => {
         final.current = { resolve, reject };
         native.stop();
@@ -119,12 +134,12 @@ export function useSpeech(handlers: { onLevel: (level: number) => void; onPartia
     if (meter.current) clearInterval(meter.current);
     meter.current = null;
     h.current.onLevel(0);
-    await recorder.stop();
-    await setAudioModeAsync({ allowsRecording: false }).catch(() => {});
-    const uri = recorder.uri;
-    if (!uri) { setState('idle'); return ''; }
-    setState('transcribing');
     try {
+      await recorder.stop();
+      await setAudioModeAsync({ allowsRecording: false }).catch(() => {});
+      const uri = recorder.uri;
+      if (!uri) { setState('idle'); return ''; }
+      setState('transcribing');
       const { text } = await api.transcribe(uri, langRef.current);
       h.current.onPartial(text);
       setState('idle');
@@ -137,11 +152,13 @@ export function useSpeech(handlers: { onLevel: (level: number) => void; onPartia
   }, [recorder]);
 
   const cancel = useCallback(async () => {
-    if (native) native.abort();
+    generation.current++;
+    if (native) { nativeRunning.current = false; native.abort(); }
     else {
       if (meter.current) clearInterval(meter.current);
       meter.current = null;
       if (recorder.isRecording) await recorder.stop().catch(() => {});
+      await setAudioModeAsync({ allowsRecording: false }).catch(() => {});
     }
     final.current = null;
     h.current.onLevel(0);

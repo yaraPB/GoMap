@@ -8,6 +8,7 @@
     "userInterfaceStyle": "light",
     "plugins": [
       "expo-router",
+      ["expo-sensors", { "motionPermission": "GoMap uses motion sensors to align AR guidance with your camera." }],
       [
         "expo-camera",
         {

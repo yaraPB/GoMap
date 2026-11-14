@@ -27,7 +27,7 @@ before(async () => {
     geminiCalls++;
     assert.match(String(url), /generativelanguage/);
     assert.equal((init?.headers as Record<string, string>)['x-goog-api-key'], 'test-key');
-    return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: "I don't have that in the campus records." }] } }] }), { status: 200 });
+    return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: 'Invented office: Building 999.' }] } }] }), { status: 200 });
   }) as typeof fetch;
   ctx = await boot({ mongoUri: '', sqliteFile: ':memory:', geminiKey: 'test-key', fetchImpl: mockGemini, quiet: true });
   server = createApp({ ...ctx, uploadsDir: mkdtempSync(join(tmpdir(), 'gomap-')) }).listen(0, '127.0.0.1');
@@ -123,9 +123,9 @@ test('assistant falls back to Gemini for open questions and does not invent a pl
   assert.equal(geminiCalls, calls + 1);
   assert.equal(body.intent, 'unknown');
   assert.equal(body.action, undefined);
-  const again = (await send('/api/assistant/ask', { text: 'What is the meaning of life on campus tonight', lang: 'en' })).body;
-  assert.equal(again.answered_by, 'cache');
-  assert.equal(geminiCalls, calls + 1);
+  assert.doesNotMatch(body.text, /999/);
+  await send('/api/assistant/ask', { text: 'What is the meaning of life on campus tonight', lang: 'en', history: [{ role: 'user', text: 'Earlier question' }] });
+  assert.equal(geminiCalls, calls + 2, 'history-dependent answers are not reused');
 });
 
 test('faculty presence: only the person can set it, and it shows on their card', async () => {

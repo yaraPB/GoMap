@@ -15,7 +15,7 @@ export default function CampusMap({ flyIn }: { flyIn: boolean }) {
   const html = useMemo(() => (MAPBOX_TOKEN.startsWith('pk.') ? mapHtml(MAPBOX_TOKEN, { flyIn }) : ''), []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (!MAPBOX_TOKEN.startsWith('pk.')) map._emit({ type: 'error', detail: 'Set EXPO_PUBLIC_MAPBOX_TOKEN to a Mapbox public token in mobile/.env.local.' });
+    if (!MAPBOX_TOKEN.startsWith('pk.')) map._emit({ type: 'error', detail: 'The map isn’t connected yet. Please ask the person setting up GoMap to finish connecting it.' });
     map._attach(msg => web.current?.injectJavaScript(`window.dispatchEvent(new MessageEvent('message',{data:${JSON.stringify(msg)}}));true;`));
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 

@@ -3,6 +3,7 @@ import { KeyboardAvoidingView, Linking, Platform, Pressable, ScrollView, StyleSh
 import Animated, { FadeIn, FadeInDown, LinearTransition } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
+import * as Speech from 'expo-speech';
 import { api, ApiError } from '../api/client';
 import type { Answer, Lang } from '../api/types';
 import { fmtMinutes } from '../ar/geo';
@@ -25,6 +26,7 @@ export default function Assistant({ ask }: { ask?: string }) {
   const [turns, setTurns] = useState<Turn[]>([]);
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
+  const [voiceReplies, setVoiceReplies] = useState(true);
   const scroll = useRef<React.ComponentRef<typeof ScrollView>>(null);
   const rtl = lang === 'ar';
 
@@ -37,14 +39,15 @@ export default function Assistant({ ask }: { ask?: string }) {
     try {
       type H = { role: 'user' | 'assistant'; text: string };
       const history = turns.flatMap((tu): H[] => (tu.role === 'user' ? [{ role: 'user', text: tu.text }] : tu.role === 'assistant' ? [{ role: 'assistant', text: tu.answer.text }] : []));
-      const answer = await api.ask(question, lang, loc.coord, history);
+      const answer = await api.ask(question, lang, loc.reason === 'off-campus' ? null : loc.coord, history);
       setTurns(ts => [...ts, { role: 'assistant', answer }]);
+      if (voiceReplies && answer.text && !(answer.intent === 'place' && answer.action?.type === 'route')) { Speech.stop(); Speech.speak(answer.text, { language: lang === 'fr' ? 'fr-FR' : lang === 'ar' ? 'ar' : 'en-US' }); }
       // a place: the directions are already open, no second tap
       if (answer.intent === 'place' && answer.action?.type === 'route' && answer.place) {
         const a = answer.action;
-        await nav.preview({ placeId: answer.place.id, name: answer.place.name, coordinates: answer.place.coordinates, category: answer.place.category }, a.mode === 'step_free' ? 'step_free' : 'walk');
-        if (a.mode === 'ar') { nav.start(); router.push('/ar'); }
-        replace({ name: 'route', said: question, reply: answer.text });
+        const ready = await nav.preview({ placeId: answer.place.id, name: answer.place.name, coordinates: answer.place.coordinates, category: answer.place.category }, a.mode === 'step_free' ? 'step_free' : 'walk');
+        if (a.mode === 'ar' && ready) { nav.start(); replace({ name: 'go' }); router.push('/ar'); }
+        else { if (voiceReplies && answer.text) Speech.speak(answer.text, { language: lang === 'fr' ? 'fr-FR' : lang === 'ar' ? 'ar' : 'en-US' }); replace({ name: 'route', said: question, reply: answer.text }); }
       }
       if (answer.intent === 'help') push({ name: 'help', step: 0 });
     } catch (e) {
@@ -60,6 +63,7 @@ export default function Assistant({ ask }: { ask?: string }) {
     <View style={[styles.head, rtl && { flexDirection: 'row-reverse' }]}>
       <Icon name="sparkle" size={20} stroke={color.blue} />
       <T weight="bold" style={{ flex: 1, fontSize: 17, textAlign: rtl ? 'right' : 'left' }}>{t(lang, 'assistantTitle')}</T>
+      <IconBtn icon={voiceReplies ? 'bolt' : 'ban'} label={voiceReplies ? 'Mute assistant voice' : 'Enable assistant voice'} onPress={() => { if (voiceReplies) Speech.stop(); setVoiceReplies(!voiceReplies); }} float={false} bg={color.surface} size={34} />
       <View style={styles.langs} accessibilityRole="radiogroup" accessibilityLabel="Language">
         {(['en', 'fr', 'ar'] as Lang[]).map(l => (
           <Pressable key={l} accessibilityRole="radio" accessibilityState={{ selected: lang === l }} onPress={() => setLang(l)} style={[styles.lang, lang === l && { backgroundColor: color.ink }]}>
@@ -72,7 +76,7 @@ export default function Assistant({ ask }: { ask?: string }) {
   );
 
   return (
-    <Sheet snaps={[0.62, 0.94]} initial={turns.length || ask ? 1 : 0} onClose={pop} header={header}>
+    <Sheet snaps={[0.94]} onClose={pop} header={header}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, direction: rtl ? 'rtl' : 'ltr' }} keyboardVerticalOffset={60}>
         {lang !== 'en' && <View style={styles.review}><T weight="semibold" style={{ fontSize: 11.5, color: color.warnText }}>{t(lang, 'review')}</T></View>}
         <ScrollView ref={scroll} contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: 20 }} keyboardShouldPersistTaps="handled">

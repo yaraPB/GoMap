@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import Animated, { FadeIn, LinearTransition } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -45,11 +45,12 @@ export default function FacultyStatus() {
   const [reason, setReason] = useState<string>('meeting');
   const untils = useMemo(untilOptions, []);
   const [until, setUntil] = useState('today');
+  const [note, setNote] = useState<string | null>(null);
   const today = todayKey();
   const todayHours = me?.hours?.[today];
   const inPostedHours = me?.open.state === 'open';
   const save = useMutation({
-    mutationFn: (s: Status | 'clear') => api.setPresence(user.id, s === 'clear' ? { status: 'clear' } : { status: s, reason: s === 'in' ? null : reason, until: untils.find(u => u.id === until)?.iso ?? null }),
+    mutationFn: (s: Status | 'clear') => api.setPresence(user.id, s === 'clear' ? { status: 'clear', note: note ?? me?.note ?? '' } : { status: s, reason: s === 'in' ? null : reason, until: untils.find(u => u.id === until)?.iso ?? null, note: note ?? me?.note ?? '' }),
     onSuccess: p => { qc.setQueryData(['person', user.id], p); qc.invalidateQueries({ queryKey: ['offices'] }); qc.invalidateQueries({ queryKey: ['people'] }); },
   });
 
@@ -108,6 +109,13 @@ export default function FacultyStatus() {
           </Animated.View>
         )}
         {status === 'in' && !inPostedHours && <Notice tone="info" icon="info" text="This is outside your posted hours. Students will see that you are in anyway, and your posted hours stay as they are." />}
+
+        <View style={{ backgroundColor: '#FFF4C7', padding: 15, borderRadius: 12, gap: 8 }}>
+          <T weight="bold">A note for students</T>
+          <T style={{ fontSize: 12, color: color.muted }}>This stays on your public card until you edit or remove it.</T>
+          <View style={styles.wrap}>{['In a meeting, back soon', 'Online meetings today', 'Please email me', 'Please make an appointment', 'Out sick today'].map(text => <Choice key={text} label={text} on={note === text} onPress={() => setNote(text)} />)}</View>
+          <TextInput accessibilityLabel="Note for students" multiline maxLength={500} value={note ?? me.note ?? ''} onChangeText={setNote} placeholder="Write your own note…" style={{ minHeight: 70, padding: 10, backgroundColor: '#fff', borderRadius: 8, textAlignVertical: 'top' }} />
+        </View>
 
         <View>
           <Label style={{ marginBottom: 8 }}>What students see right now</Label>

@@ -6,7 +6,7 @@ export type MapLayers = { threeD: boolean; labels: boolean; cars: boolean; crowd
 
 export type MapCommand =
   | { type: 'places'; places: PlaceLite[] }
-  | { type: 'filter'; category: string; school: string; fit?: boolean }
+  | { type: 'filter'; category: string; school: string; fit?: boolean; padding?: { top: number; bottom: number; left: number; right: number } }
   | { type: 'select'; id: string | null; bottom?: number; fly?: boolean; dim?: boolean }
   | { type: 'route'; geometry: { type: 'LineString'; coordinates: Position[] } | null; crossings?: Position[]; dest?: Position | null; fit?: boolean; padding?: { top: number; bottom: number; left: number; right: number } }
   | { type: 'clearRoute' }
@@ -21,7 +21,8 @@ export type MapCommand =
   | { type: 'style'; style: MapStyle }
   | { type: 'pick'; on: boolean }
   | { type: 'flyIn' }
-  | { type: 'camera'; center?: Position; zoom?: number; pitch?: number; bearing?: number };
+  | { type: 'skipIntro' }
+  | { type: 'camera'; center?: Position; zoom?: number; pitch?: number; bearing?: number; duration?: number; padding?: { top: number; bottom: number; left: number; right: number } };
 
 export type MapEvent =
   | { type: 'ready' } | { type: 'error'; detail: string } | { type: 'select'; detail: string }

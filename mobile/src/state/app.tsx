@@ -51,11 +51,12 @@ export function useApp() {
 export type Fix = {
   coord: Position | null;
   accuracy: number | null;      // metres
+  timestamp: number | null;     // time of the actual location fix
   heading: number | null;       // smoothed, true north
   rawHeading: number | null;
   headingAccuracy: number | null;
   permission: 'unknown' | 'granted' | 'denied';
-  /** true when we are using the demo position on the plaza (away from campus, or simulated walk) */
+  /** true only when a simulated walk is active */
   simulated: boolean;
   reason: 'off-campus' | 'no-permission' | 'walk' | null;
 };
@@ -66,7 +67,7 @@ const DEMO_POSITION: Position = [-5.10655, 33.53925]; // main plaza, by the libr
 const OFF_CAMPUS_M = 2000;
 
 export function LocationProvider({ children }: { children: React.ReactNode }) {
-  const [real, setReal] = useState<{ coord: Position; accuracy: number | null } | null>(null);
+  const [real, setReal] = useState<{ coord: Position; accuracy: number | null; timestamp: number } | null>(null);
   const [permission, setPermission] = useState<Fix['permission']>('unknown');
   const [heading, setHeading] = useState<{ smooth: number; raw: number; acc: number | null } | null>(null);
   const [walk, setWalk] = useState<Position | null>(null);
@@ -78,11 +79,12 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
     subs.current = [];
     try {
       const pos = await Location.watchPositionAsync({ accuracy: Location.Accuracy.BestForNavigation, distanceInterval: 1, timeInterval: 1000 },
-        u => setReal({ coord: [u.coords.longitude, u.coords.latitude], accuracy: u.coords.accuracy ?? null }));
+        u => setReal(previous => previous && u.timestamp < previous.timestamp ? previous : { coord: [u.coords.longitude, u.coords.latitude], accuracy: u.coords.accuracy ?? null, timestamp: u.timestamp }));
       subs.current.push(pos);
       if (Platform.OS !== 'web') {
         const head = await Location.watchHeadingAsync(h => {
           const raw = h.trueHeading >= 0 ? h.trueHeading : h.magHeading;
+          if (!Number.isFinite(raw) || raw < 0) return;
           setHeading({ smooth: filter.current(raw), raw, acc: h.accuracy ?? null });
         });
         subs.current.push(head);
@@ -110,10 +112,10 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
     let simulated = false;
     let reason: Fix['reason'] = null;
     if (walk) { coord = walk; simulated = true; reason = 'walk'; }
-    else if (offCampus) { coord = DEMO_POSITION; simulated = true; reason = 'off-campus'; }
+    else if (offCampus) { reason = 'off-campus'; }
     else if (permission === 'denied') { coord = null; reason = 'no-permission'; }
     return {
-      coord, accuracy: simulated ? 4 : real?.accuracy ?? null,
+      coord, accuracy: simulated ? 4 : real?.accuracy ?? null, timestamp: simulated ? Date.now() : real?.timestamp ?? null,
       heading: heading?.smooth ?? null, rawHeading: heading?.raw ?? null, headingAccuracy: heading?.acc ?? null,
       permission, simulated, reason, request, setSimulated: setWalk,
     };

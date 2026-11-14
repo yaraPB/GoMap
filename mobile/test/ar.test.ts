@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { angleDiff, bearing, createHeadingFilter, distance, offset, pointAlong, snapToLine } from '../src/ar/geo';
-import { chevronsAhead, EYE_HEIGHT, focalPx, project, steerHint } from '../src/ar/projection';
+import { arReady, chevronsAhead, EYE_HEIGHT, focalPx, project, steerHint } from '../src/ar/projection';
 
 const screen = { width: 390, height: 844 };
 const user: [number, number] = [-5.1066, 33.5393];
@@ -63,4 +63,23 @@ test('route snapping and walking along it', () => {
   assert.ok(Math.abs(s.off - 3) < 0.2);
   assert.ok(Math.abs(distance(pointAlong(line, 25), user) - 25) < 0.2);
   assert.ok(Math.abs(bearing(user, offset(user, 10, 0)) - 90) < 0.5);
+});
+
+test('AR arrows require a fresh accurate fix, a usable compass and motion', () => {
+  const good = { simulated: false, accuracy: 8, timestamp: 100_000, now: 105_000, heading: 90, headingAccuracy: 2, aligned: false, motion: true };
+  assert.equal(arReady(good), true);
+  assert.equal(arReady({ ...good, now: 116_000 }), false);
+  assert.equal(arReady({ ...good, accuracy: 20 }), false);
+  assert.equal(arReady({ ...good, headingAccuracy: 1 }), false);
+  assert.equal(arReady({ ...good, headingAccuracy: 1, aligned: true }), true);
+  assert.equal(arReady({ ...good, motion: false }), false);
+  assert.equal(arReady({ ...good, simulated: true, accuracy: null, timestamp: null }), true);
+});
+
+test('AR projection handles a single arrow and does not steer at the destination', () => {
+  const line: [number, number][] = [user, offset(user, 0, 20)];
+  const arrows = chevronsAhead(line, user, { heading: 0, pitchDown: 25, roll: 0 }, screen, 1);
+  assert.equal(arrows.length, 1);
+  assert.doesNotMatch(arrows[0].points, /NaN/);
+  assert.equal(steerHint(line, line[1], 180, screen), null);
 });

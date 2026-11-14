@@ -22,7 +22,7 @@ export type Progress = {
 type Ctx = {
   dest: Destination | null; mode: RouteMode; route: Route | null; status: NavStatus; error: string | null;
   progress: Progress; muted: boolean; simulating: boolean; startedFromDemo: boolean;
-  preview: (d: Destination, mode?: RouteMode) => Promise<void>;
+  preview: (d: Destination, mode?: RouteMode) => Promise<boolean>;
   setMode: (m: RouteMode) => void;
   start: () => void; stop: () => void; setMuted: (m: boolean) => void; toggleSimulate: () => void;
   /** cumulative distance along the route of each step's start */
@@ -52,50 +52,68 @@ export function NavigationProvider({ children }: { children: React.ReactNode }) 
   const [simulating, setSimulating] = useState(false);
   const [startedFromDemo, setStartedFromDemo] = useState(false);
   const offCount = useRef(0);
+  const lastOffFix = useRef<number | null>(null);
   const rerouting = useRef(false);
   const spoken = useRef<{ step: number; near: boolean; at: boolean }>({ step: -1, near: false, at: false });
   const simTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const routeRef = useRef<Route | null>(null);
+  const demoRef = useRef(false);
+  const requestId = useRef(0);
 
-  const from = loc.coord ?? DEMO_POSITION;
+  // Campus-only graph: keep the real blue dot, but clearly label a demo route from the plaza.
+  const from = !loc.coord || loc.reason === 'off-campus' ? DEMO_POSITION : loc.coord;
 
-  const fetchRoute = useCallback(async (d: Destination, m: RouteMode, origin: Position) => {
+  const fetchRoute = useCallback(async (d: Destination, m: RouteMode, origin: Position, keepOnFailure = false) => {
+    const id = ++requestId.current;
     setError(null);
     try {
       const r = await api.route(origin, { placeId: d.placeId }, m);
+      if (id !== requestId.current) return undefined;
+      routeRef.current = r;
       setRoute(r);
       return r;
     } catch (e) {
+      if (id !== requestId.current) return undefined;
       setError(e instanceof ApiError && e.status === 0 ? 'You are offline. Directions need a connection.' : e instanceof Error ? e.message : 'No route found');
-      setRoute(null);
+      if (!keepOnFailure) { setRoute(null); routeRef.current = null; }
       return null;
     }
   }, []);
 
   const preview = useCallback(async (d: Destination, m: RouteMode = 'walk') => {
     setDest(d); setModeState(m); setStatus('loading');
-    setStartedFromDemo(!loc.coord || loc.simulated);
+    routeRef.current = null;
+    setRoute(null);
+    demoRef.current = !loc.coord || loc.simulated || loc.reason === 'off-campus';
+    setStartedFromDemo(demoRef.current);
     const r = await fetchRoute(d, m, from);
-    setStatus(r ? 'preview' : 'error');
-  }, [fetchRoute, from, loc.coord, loc.simulated]);
+    if (r !== undefined) setStatus(r ? 'preview' : 'error');
+    return !!r;
+  }, [fetchRoute, from, loc.coord, loc.simulated, loc.reason]);
 
   const setMode = useCallback((m: RouteMode) => {
     setModeState(m);
-    if (dest) { setStatus(s => (s === 'active' ? s : 'loading')); fetchRoute(dest, m, from).then(r => setStatus(s => (r ? (s === 'active' ? 'active' : 'preview') : 'error'))); }
+    if (dest) { setStatus(s => (s === 'active' ? s : 'loading')); fetchRoute(dest, m, from).then(r => { if (r !== undefined) setStatus(s => (r ? (s === 'active' ? 'active' : 'preview') : 'error')); }); }
   }, [dest, fetchRoute, from]);
 
   const stopSim = useCallback(() => { if (simTimer.current) clearInterval(simTimer.current); simTimer.current = null; setSimulating(false); loc.setSimulated(null); }, [loc]);
 
   const start = useCallback(() => {
-    if (!route) return;
+    const current = routeRef.current;
+    if (!current) return;
     spoken.current = { step: -1, near: false, at: false };
     offCount.current = 0;
+    lastOffFix.current = null;
+    if (demoRef.current && !loc.simulated) loc.setSimulated(DEMO_POSITION);
     setStatus('active');
     Haptics.selectionAsync().catch(() => {});
-    if (!muted) Speech.speak(route.steps[1] ? `${route.steps[0].text}. Then ${route.steps[1].text.toLowerCase()}` : route.steps[0].text, { language: lang === 'fr' ? 'fr-FR' : lang === 'ar' ? 'ar' : 'en-US' });
-  }, [route, muted, lang]);
+    if (!muted && current.steps[0]) Speech.speak(current.steps[1] ? `${current.steps[0].text}. Then ${current.steps[1].text.toLowerCase()}` : current.steps[0].text, { language: lang === 'fr' ? 'fr-FR' : lang === 'ar' ? 'ar' : 'en-US' });
+  }, [muted, lang, loc]);
 
   const stop = useCallback(() => {
     Speech.stop(); stopSim();
+    requestId.current++;
+    routeRef.current = null;
     setStatus('idle'); setRoute(null); setDest(null); setError(null);
   }, [stopSim]);
 
@@ -129,7 +147,9 @@ export function NavigationProvider({ children }: { children: React.ReactNode }) 
       if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       if (!muted && step?.turn !== 'arrive') Speech.speak(step.text, { language: voice });
     }
-    if (progress.remaining < ARRIVE_M) {
+    const reliable = loc.simulated || (loc.timestamp != null && Date.now() - loc.timestamp < 15000 && (loc.accuracy ?? 99) < 25);
+    const endpoint = route.geometry.coordinates.at(-1);
+    if (reliable && endpoint && loc.coord && progress.remaining < ARRIVE_M && distance(loc.coord, endpoint) < ARRIVE_M) {
       Speech.stop();
       if (!muted) Speech.speak(route.steps.at(-1)?.text ?? 'You have arrived', { language: voice });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
@@ -137,14 +157,16 @@ export function NavigationProvider({ children }: { children: React.ReactNode }) 
       setStatus('arrived');
       return;
     }
-    const reliable = (loc.accuracy ?? 99) < 25;
-    if (reliable && progress.off > OFF_ROUTE_M) offCount.current++; else offCount.current = 0;
+    if (lastOffFix.current !== loc.timestamp) {
+      lastOffFix.current = loc.timestamp;
+      if (reliable && progress.off > OFF_ROUTE_M) offCount.current++; else offCount.current = 0;
+    }
     if (offCount.current >= 3 && !rerouting.current && loc.coord) {
       rerouting.current = true; offCount.current = 0;
       if (!muted) Speech.speak('Rerouting', { language: voice });
-      fetchRoute(dest, route.mode, loc.coord).finally(() => { rerouting.current = false; });
+      fetchRoute(dest, route.mode, loc.coord, true).finally(() => { rerouting.current = false; });
     }
-  }, [progress, status, route, dest, muted, lang, loc.accuracy, loc.coord, fetchRoute, stopSim]);
+  }, [progress, status, route, dest, muted, lang, loc.accuracy, loc.coord, loc.timestamp, loc.simulated, fetchRoute, stopSim]);
 
   // walk the demo position along the route (for testing away from campus)
   const toggleSimulate = useCallback(() => {

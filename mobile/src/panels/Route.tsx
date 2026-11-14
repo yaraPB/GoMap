@@ -46,7 +46,7 @@ export function RoutePreview({ said, reply }: { said?: string; reply?: string })
               {([['walk', 'Walk', 'walk'], ['ar', 'AR route', 'ar'], ['step_free', 'Step-free', 'wheel']] as const).map(([id, name, icon]) => {
                 const on = id === 'ar' ? false : nav.mode === id;
                 return (
-                  <Pressable key={id} accessibilityRole="button" accessibilityState={{ selected: on }} onPress={() => (id === 'ar' ? startAR() : nav.setMode(id))}
+                  <Pressable key={id} accessibilityRole="button" accessibilityState={{ selected: on, disabled: id === 'ar' && !r }} disabled={id === 'ar' && !r} onPress={() => (id === 'ar' ? startAR() : nav.setMode(id))}
                     style={[styles.modeBtn, on ? { backgroundColor: color.ink, borderColor: color.ink } : null]}>
                     <Icon name={icon} size={16} stroke={on ? '#fff' : color.ink2} />
                     <T weight="semibold" style={{ fontSize: 12.5, color: on ? '#fff' : color.ink2 }}>{name}</T>
