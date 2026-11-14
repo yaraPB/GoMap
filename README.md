@@ -1,177 +1,98 @@
 # GoMap
 
-GoMap is a campus discovery prototype for Al Akhawayn University. The mobile app helps someone find a place or the office likely to handle a request, view a sample pin, and report information that needs correction. It also includes an AI assistant and a camera-based direction guide.
+The campus map feature for **GoCampus**, Al Akhawayn University. It answers three questions: *where is this place*, *is this person in their office*, and *where do I go to get this done*.
 
-**Project status:** local prototype. The seeded destinations, coordinates, service matches, hours, and entrances have not been approved as official campus information. The camera guide is not a verified walking route.#
+Design: [design/README.md](design/README.md) (31 screens in `design/*.html`). Build plan: [design/IMPLEMENTATION.md](design/IMPLEMENTATION.md).
 
-## Running the application
+**Status:** working prototype on branch `yara-redesign`. Building numbers, positions, footpaths and roads come from the real map data. Categories, entrances, opening hours and procedures are **unverified** until the campus office confirms them, and the app says so on every screen.
 
-Server
-
-```bash
-cd ~/Desktop/GoMap/server
-npm run dev
-```
-
-Mobile
-
-```bash
-cd ~/Desktop/GoMap/mobile
-npm start
-```
-
-## Features
-
-| Area | What the app does |
-| --- | --- |
-| Home | Shows shortcuts to the map, search, service finder, and AI assistant, plus a few example destinations. |
-| Campus map | Displays category-colored pins on Mapbox, lets users select a pin, filter by category, recenter the map, and change the map tilt. A public Mapbox token and internet access are required. |
-| Search | Searches places by name, description, and service terms through the API; includes an empty state. |
-| Find help | Shows sample needs such as scholarship, registration, Wi-Fi, and library help, then opens the suggested destination. |
-| Place details | Shows a description, category, and any available hours or entrance information. Missing details are labeled as awaiting verification. |
-| Correction reports | Accepts an issue type and details for a place. The API stores the report in SQLite without changing the published place record. |
-| AI assistant | Sends a question and recent chat history to the server. The server gives Gemini the sample place and service records, requests a JSON answer, and links only place IDs found in the database. The assistant can still be wrong. |
-| Camera guide | Opens the phone camera for a selected place, estimates straight-line distance and turn direction from GPS and compass readings, and captures a photo preview in the app cache. It does not upload photos or provide spatial AR routing. |
-| Error handling | Shows loading, connection, map failure, permission, and retry states where applicable. |
-
-## Tech stack
-
-- **Mobile:** React Native, TypeScript, Expo SDK 58, Expo Camera, Expo Location, and a WebView for Mapbox GL JS.
-- **API:** Node.js, TypeScript, Express, and Node's built-in SQLite module.
-- **AI:** Gemini Generate Content API, called from the server so the Gemini key is not bundled into the mobile app.
-- **Data:** seeded sample places and service matches in SQLite; correction reports persist in the local database file.
+## What's in the repo
 
 ```text
-GoMap/
-├── mobile/
-│   ├── App.tsx                 screens and navigation
-│   ├── src/api.ts              API client and types
-│   ├── src/CampusMap.tsx        Mapbox map and pin bridge
-│   ├── src/ARPreview.tsx        camera, location, compass, capture
-│   └── test/                   map tests
-├── server/
-│   ├── src/server.ts           Express routes
-│   ├── src/db.ts               SQLite schema and seeding
-│   ├── src/seed.ts             sample campus records
-│   ├── src/assistant.ts        Gemini request and response checks
-│   └── test/                   API tests
-├── README.md
-└── TODO.md                     planned improvements
+server/   Express API · MongoDB (map data) · SQLite (everything else) · routing · assistant
+mobile/   Expo app (runs in Expo Go) · one persistent Mapbox map · assistant + voice · AR guidance
+admin/    Vite + React dashboard for the one person who keeps the data true
+data/     faculty directory, imported campus geometry, hand-drawn mock paths
 ```
 
-## Run locally on an Android phone
+| Store | Holds | Why |
+|---|---|---|
+| **MongoDB** | places, entrances, walkways, report pins | GeoJSON with `2dsphere` indexes: "nearest place to this pin" and "reports within 20 m" are one query each |
+| **SQLite** | people, today's presence, procedures, crowding, assistant cache and log | built into Node, Postgres-safe types for a later move |
+| Postgres | users, later | not ours until GoCampus SSO |
 
-### 1. Requirements
+## Run it
 
-- Node.js 22.13+ and npm. Node 24 is recommended for the built-in SQLite module.
-- [Expo Go for Android SDK 58](https://expo.dev/go?device=true&platform=android&sdkVersion=58).
-- A [Mapbox public access token](https://account.mapbox.com/access-tokens/) beginning with `pk.`.
-- Optional: a [Gemini API key](https://aistudio.google.com/app/apikey) to enable the assistant.
-- Phone and computer on the same Wi-Fi network for local API access.
+Requirements: Node 22.13+ (24 recommended), a [Mapbox public token](https://account.mapbox.com/access-tokens/) (`pk.…`), and optionally a [Gemini key](https://aistudio.google.com/app/apikey).
 
-### 2. Install dependencies
-
-From Git Bash:
+### 1. API
 
 ```bash
-cd ~/Desktop/GoMap/server
+cd server
 npm ci
-cd ../mobile
+cp .env.example .env      # add GEMINI_API_KEY; leave MONGODB_URI empty for an in-memory database
+npm start                 # http://localhost:4000/api/health → {"ok":true}
+```
+
+With no `MONGODB_URI`, the server starts an in-memory MongoDB and seeds it on every start. The first run downloads a MongoDB binary, which takes a minute. To keep data between restarts, point `MONGODB_URI` at Atlas (free tier) or a local `mongod`.
+
+Without a Gemini key, the assistant still answers places, people and procedures, because those are handled locally. Open questions, and voice in Expo Go, need the key.
+
+### 2. Mobile
+
+```bash
+cd mobile
 npm ci
+cp .env.example .env.local   # EXPO_PUBLIC_API_URL=http://YOUR_WIFI_IP:4000 and EXPO_PUBLIC_MAPBOX_TOKEN=pk.…
+npx expo start --clear --lan # scan with Expo Go (SDK 58)
 ```
 
-### 3. Configure the API and Mapbox
+Use your computer's Wi-Fi IPv4 address (`ipconfig`), not `localhost`, for a physical phone. Android emulator: `http://10.0.2.2:4000`.
 
-Find your computer's Wi-Fi **IPv4 address** with `ipconfig`. Do not use `localhost` or the example IP for a physical phone. In `mobile/`:
+**Away from campus?** If you are more than 2 km from AUI, routes start from the main plaza (a demo position), and turn-by-turn and AR get a **Simulate walk** button that walks the route for you.
+
+**Live voice (optional dev build).** In Expo Go, voice records your question and the server transcribes it after you release. With a dev build (`npx expo run:android` or EAS), on-device recognition switches on by itself: words appear as you speak, in English, French or Arabic. No code change is needed.
+
+### 3. Admin
 
 ```bash
-cp .env.example .env.local
-notepad .env.local
+cd admin
+npm ci
+npm run dev                  # http://localhost:5173, token: ADMIN_TOKEN from server/.env (dev default: dev-admin-token)
 ```
 
-Set these values in `mobile/.env.local` (without quotes):
+The admin reuses the Mapbox token from `mobile/.env.local`. Set `VITE_MAPBOX_TOKEN` / `VITE_API_URL` in `admin/.env.local` to override.
 
-```text
-EXPO_PUBLIC_API_URL=http://YOUR_COMPUTER_WIFI_IP:4000
-EXPO_PUBLIC_MAPBOX_TOKEN=pk.YOUR_PUBLIC_MAPBOX_TOKEN
-```
+## Campus geometry
 
-An Android emulator uses `http://10.0.2.2:4000` for the API URL. The Mapbox token is still required. `EXPO_PUBLIC_` values are bundled into the app, so put only the **public** Mapbox token there.
-
-To enable the AI assistant, create `server/.env` from `server/.env.example` and set your Gemini key:
+Footpaths, roads, stairs, building labels and footprints are imported from **Mapbox Streets vector tiles**. Mapbox tags footpaths (`class=path`, `type=footway/steps/crossing`) separately from roads (`street`, `service`, `tertiary`…), so nothing needs hand-tracing:
 
 ```bash
-cd ~/Desktop/GoMap/server
-cp .env.example .env
-notepad .env
+cd server
+npm run geo:import           # Mapbox (uses MAPBOX_TOKEN or the mobile token) → data/campus/*.geojson
+npm run geo:import -- --osm  # same output straight from OpenStreetMap (open licence)
+npm run graph:check          # nodes, connected pieces, dead ends: run after every import
 ```
 
-```text
-GEMINI_API_KEY=YOUR_GEMINI_KEY
-GEMINI_MODEL=gemini-3.5-flash-lite
-PORT=4000
-```
+The imported files are committed, so nobody else needs a token to run the server. **Before a public release, switch to `--osm`:** Mapbox's terms limit storing tile data, while OpenStreetMap's licence (ODbL) allows it with attribution. The data is the same underneath. If neither import exists, the server falls back to the hand-drawn `data/walking_paths.geojson` and `data/driving_roads.geojson`. A line drawn in both is treated as a shared road.
 
-The Gemini key belongs on the server only. The rest of the app runs without it; the assistant will show a configuration error. Both local environment files are ignored by Git.
-
-### 4. Start both processes
-
-Terminal 1:
-
-```bash
-cd ~/Desktop/GoMap/server
-npm start
-```
-
-Check `http://localhost:4000/api/health` in your computer browser. It should return `{"ok":true}`.
-
-Terminal 2:
-
-```bash
-cd ~/Desktop/GoMap/mobile
-npx expo start --clear --lan
-```
-
-Scan the QR code with Expo Go. Keep both terminals running. Restart Expo after changing `mobile/.env.local`, and restart the server after changing `server/.env`.
-
-If the phone cannot load campus data, open `http://YOUR_COMPUTER_WIFI_IP:4000/api/health` in the **phone's browser**. If that page does not load, check that both devices are on the same Wi-Fi and that Windows Firewall allows Node.js on the private network. `npx expo start --tunnel` can help the phone reach Expo, but it does not tunnel the local API.
-
-## API
-
-The API listens on port 4000 by default.
-
-| Method and path | Purpose |
-| --- | --- |
-| `GET /api/health` | Health check |
-| `GET /api/places?q=&category=` | List, search, or filter places |
-| `GET /api/places/:id` | Get one place |
-| `GET /api/services` | List sample need-to-office suggestions |
-| `POST /api/reports` | Store a correction report |
-| `POST /api/assistant` | Ask the Gemini assistant about the sample records |
-
-The SQLite file is created at `server/data/gomap.sqlite`. Set `GOMAP_DB` to choose a different file.
+Known gaps in the map data: Building 16 (NAB) has no label, so its pin is estimated and flagged; Buildings 12–14, 20 and 28 are missing; two labels both read "29". Entrances are estimated as the point where the path network meets each building, until someone confirms the real doors in the admin.
 
 ## Checks
 
 ```bash
-cd ~/Desktop/GoMap/server
-npm run check
-npm test
-npm run build
-
-cd ../mobile
-npx expo install --check
-npx tsc --noEmit
-npm test
-npx expo export --platform android
+cd server && npm run check && npm test && npm run graph:check
+cd mobile && npx tsc --noEmit && npm test && npx expo export --platform android
+cd admin  && npm run build
 ```
 
-## Current limits
+## On-campus test checklist (needs a real phone, outdoors)
 
-- Pins and service suggestions are sample data. AUI staff must verify locations, entrances, hours, contacts, and processes before public use.
-- The camera arrow uses approximate GPS and compass readings; it does not account for buildings, paths, closures, or accessible entrances.
-- The assistant is limited to the seeded records but can still produce an inaccurate answer. It needs evaluation against approved information.
-- The API has no authentication or report review interface and is intended for local development. Do not expose it directly to the public internet.
-- Mapbox and Gemini require their own accounts and may have usage limits or charges.
-
-See [TODO.md](TODO.md) for the deployment plan and the next improvements.
+1. Open the app on the plaza: the fly-in lands on AUI and your blue dot is on the right path.
+2. Ask "take me to building 8B" by voice: directions open without a second tap.
+3. Start AR facing the route: green arrows lie on the paving, stay put when you tilt the phone, and fade past about 8 m.
+4. If arrows point off the path, tap the calibrate button, point along the path and tap **Align with the path**.
+5. Walk off-route by about 30 m: it says "Rerouting" and draws a new route.
+6. Next to a tall building, GPS worse than ±15 m should bring up the calibration screen with "Use the 2D map instead".
+7. As faculty (Layers → Demo account), set "Busy until 15:00": the card, the office list and the assistant all show it.
+8. Report a closed path, confirm it in the admin: the next walking route goes around it.
