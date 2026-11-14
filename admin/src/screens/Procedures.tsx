@@ -13,6 +13,7 @@ export default function Procedures({ selected, select }: { selected?: string; se
         <div><h1>Services the assistant answers from</h1><p className="sub">Only <b>live</b> entries answer without an “unverified” banner. Draft and review entries are flagged in the app.</p></div>
         <button className="btn dark" onClick={() => select('new')}>New procedure</button>
       </div>
+      {!selected && <ProcedureTable list={list.data ?? []} select={select} />}
       <div className="split">
         <div className="card" style={{ padding: 10 }}>
           <div className="list">
@@ -27,6 +28,32 @@ export default function Procedures({ selected, select }: { selected?: string; se
         {selected ? <Editor key={selected} initial={selected === 'new' ? EMPTY : list.data?.find(p => p.id === selected) ?? null} onSaved={id => { list.reload(); select(id); }} /> : <div className="card empty">Choose a procedure.</div>}
       </div>
     </>
+  );
+}
+
+/** Declarations at a glance: minor, graduation, internships… who owns them, where, how to reach them. */
+function ProcedureTable({ list, select }: { list: Procedure[]; select: (id: string) => void }) {
+  const places = useLoad(api.places);
+  const name = (id: string | null) => (id ? places.data?.find(p => p.id === id)?.name ?? id : '—');
+  return (
+    <div className="card tablewrap" style={{ padding: 6, marginBottom: 16 }}>
+      <table>
+        <thead><tr><th>Procedure</th><th>Office</th><th>Where</th><th>Contact</th><th>Steps</th><th>Status</th><th>Verified</th></tr></thead>
+        <tbody>
+          {list.map(p => (
+            <tr key={p.id} style={{ cursor: 'pointer' }} onClick={() => select(p.id)}>
+              <td><b>{p.title}</b></td>
+              <td>{p.owner_office}</td>
+              <td>{name(p.place_id)}</td>
+              <td>{p.contact_email ?? <span className="pill miss">not published</span>}</td>
+              <td>{p.steps.length}</td>
+              <td><span className={`pill ${p.status === 'live' ? 'ok' : p.status === 'review' ? 'busy' : 'miss'}`}>{p.status}</span></td>
+              <td>{fmtDate(p.verified_at)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 

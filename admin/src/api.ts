@@ -22,6 +22,7 @@ async function req<T>(path: string, init: RequestInit = {}): Promise<T> {
 }
 const put = <T,>(p: string, b: unknown) => req<T>(p, { method: 'PUT', body: JSON.stringify(b) });
 const post = <T,>(p: string, b: unknown = {}) => req<T>(p, { method: 'POST', body: JSON.stringify(b) });
+const del = <T,>(p: string) => req<T>(p, { method: 'DELETE' });
 
 export type Hours = Partial<Record<'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun', [string, string][]>>;
 export type Place = {
@@ -35,7 +36,20 @@ export type Person = {
   place: { id: string; name: string } | null; office_number: string | null; floor: number | null; hours: Hours | null; hours_raw: string | null;
   conflict: { field: string; values: { value: string; place_id: string | null; source: string }[] } | null; verified_at: string | null; stale: boolean; missing: string[];
   availability: { state: string; label: string; detail: string | null };
+  note: string | null; note_kind: NoteKind | null; note_at: string | null; lunch: [string, string]; lunch_custom: boolean;
+  presence: { status: string; reason: string | null; until: string | null; set_by: string } | null;
 };
+export type NoteKind = 'sick' | 'online' | 'appointment' | 'email' | 'back_soon' | 'custom';
+export type OpenState = { state: 'open'; until: string } | { state: 'closed'; next: { day: string; time: string } | null } | { state: 'not_published' };
+export type Service = {
+  id: string; name: string; short_name: string; category: string; handles: string[]; keywords: string[]; places: { id: string; name: string; known: boolean }[];
+  location_text: string | null; room: string | null; email: string | null; extension: string | null; phone: string | null; hours: Hours | null; hours_text: string | null;
+  hours_raw: string | null; notes: string | null; open: OpenState; verified_at: string | null; stale: boolean; source: string | null; admin_edited: boolean; updated_at: string;
+};
+export type Issue = { id: string; issue: string; go_to: string; service_id: string | null; location_text: string | null; place: { id: string; name: string; known: boolean } | null; notes: string | null; keywords: string[]; sort: number; admin_edited: boolean };
+export type CampusHours = { open: string; close: string; lunch: [string, string]; weekend_working: boolean; emergencies: string | null; exceptions: string[] };
+export type OfficeTimeRow = { id: string; name: string; department: string | null; place: { id: string; name: string } | null; office_number: string | null; hours: Hours | null; hours_text: string | null;
+  published_min: number; in_min: number; busy_min: number; sessions: number; by_day: Record<string, number>; ratio: number | null; availability: Person['availability']; note: string | null; note_kind: NoteKind | null; lunch: [string, string] };
 export type Procedure = { id: string; title: string; summary: string; owner_office: string; place_id: string | null; contact_email: string | null;
   steps: { title: string; body: string }[]; match_phrases: string[]; source: string | null; status: 'draft' | 'review' | 'live'; verified_at: string | null; unverified: boolean };
 export type ReportCluster = {
@@ -70,10 +84,25 @@ export const api = {
   confirm: (cluster: string, b: { from: string; until: string | null; reason: string; radius_m: number; close_place: boolean }) => post<{ notified: string[]; closed_edges: number }>(`/api/admin/reports/${cluster}/confirm`, b),
   dismiss: (cluster: string) => post(`/api/admin/reports/${cluster}/dismiss`),
   resolve: (cluster: string) => post(`/api/admin/reports/${cluster}/resolve`),
+  services: () => req<Service[]>('/api/admin/services'),
+  saveService: (id: string, b: Record<string, unknown>) => put<Service>(`/api/admin/services/${id}`, b),
+  createService: (b: Record<string, unknown>) => post<Service>('/api/admin/services', b),
+  deleteService: (id: string) => del(`/api/admin/services/${id}`),
+  issues: () => req<Issue[]>('/api/admin/issues'),
+  saveIssue: (id: string, b: Record<string, unknown>) => put<Issue>(`/api/admin/issues/${id}`, b),
+  createIssue: (b: Record<string, unknown>) => post<Issue>('/api/admin/issues', b),
+  deleteIssue: (id: string) => del(`/api/admin/issues/${id}`),
+  campus: () => req<CampusHours>('/api/campus'),
+  saveCampus: (b: Partial<CampusHours>) => put<CampusHours>('/api/admin/campus-hours', b),
+  officeTime: (days: number, department?: string) => req<{ days: number; people: OfficeTimeRow[] }>(`/api/admin/office-time?days=${days}${department ? `&department=${department}` : ''}`),
+  ask: (question: string) => post<{ intent: string; text: string; service?: Service; issue?: { go_to: string }; alert?: { text: string }; answered_by: string }>('/api/admin/procedures/preview', { question }),
   log: () => req<{ id: string; question: string; lang: string; intent: string; answered_by: string; created_at: string }[]>('/api/admin/assistant-log'),
   changes: () => req<{ id: string; entity: string; entity_id: string; action: string; detail: unknown; actor: string; created_at: string }[]>('/api/admin/changes'),
 };
 
+export const SERVICE_CATEGORIES: [string, string][] = [['academic', 'Academic'], ['money', 'Money'], ['wellbeing', 'Health & wellbeing'], ['campus_life', 'Campus life'], ['it', 'IT'], ['admin', 'Administration'], ['service', 'Other']];
+export const NOTE_KINDS: [NoteKind, string, string][] = [['sick', '🤒', 'Out sick today'], ['online', '💻', 'Online meeting'], ['appointment', '📅', 'Take an appointment'], ['email', '✉️', 'Email me'], ['back_soon', '⏳', 'Back soon'], ['custom', '📝', 'Note']];
+export const fmtMin = (m: number) => (m < 60 ? `${m} min` : `${Math.floor(m / 60)} h${m % 60 ? ` ${m % 60}` : ''}`);
 export const CATEGORIES = ['academic', 'residential', 'dining', 'athletics', 'admin', 'services', 'facilities'];
 export const CAT_COLOR: Record<string, string> = { academic: '#2563EB', residential: '#E0841F', dining: '#D1473F', athletics: '#11864F', admin: '#6D5BD0', services: '#0E7490', facilities: '#6B7280' };
 export const SCHOOLS = [['sba', 'Business Administration'], ['sse', 'Science & Engineering'], ['shss', 'Humanities & Social Sciences'], ['lc', 'Language Center']] as const;

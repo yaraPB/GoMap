@@ -54,4 +54,23 @@ textarea.i { height: auto; min-height: 70px; padding: 9px 11px; resize: vertical
 .step { display: grid; grid-template-columns: 1fr 2fr auto; gap: 8px; margin-bottom: 8px; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; } .chip { display: inline-flex; align-items: center; gap: 4px; padding: 4px 9px; border-radius: 999px; background: var(--surface); font-size: 12.5px; }
 .chip button { border: 0; background: none; cursor: pointer; color: var(--muted); padding: 0; }
+.cal-wrap { user-select: none; }
+.cal { display: grid; border: 1px solid var(--hair); border-radius: 12px; overflow: hidden; background: #fff; }
+.cal-day { border: 0; border-bottom: 1px solid var(--line); background: #fff; padding: 6px 2px; font-weight: 700; font-size: 12.5px; cursor: pointer; display: flex; flex-direction: column; align-items: center; }
+.cal-day small { font-weight: 500; color: var(--muted); font-size: 10.5px; }
+.cal-day.unpub small { color: var(--miss); } .cal-day.closed small { color: var(--ink2); }
+.cal-time { font-size: 10.5px; color: var(--muted); text-align: right; padding: 0 6px; transform: translateY(-6px); height: 14px; }
+.cal-cell { height: 14px; border-left: 1px solid var(--hair); cursor: crosshair; }
+.cal-cell.hr { border-top: 1px solid var(--hair); }
+.cal-cell.lunch { background: repeating-linear-gradient(135deg, #FFF7E8 0 4px, #fff 4px 8px); }
+.cal-cell.unpub { background-color: #FBFBFA; }
+.cal-cell.on { background: #2563EB; border-left-color: #1D4ED8; }
+.cal-cell.on.lunch { background: #E0841F; }
+.sticky { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 8px; background: #FFF4B8; box-shadow: 0 2px 0 #E9D873; font-size: 12.5px; transform: rotate(-1deg); }
+.bar { height: 8px; border-radius: 99px; background: var(--surface); overflow: hidden; min-width: 110px; }
+.bar > i { display: block; height: 100%; background: var(--green); border-radius: 99px; }
+.bar.low > i { background: #E0841F; }
+td input.i, td select.i { height: 32px; font-size: 13px; width: 100%; }
+td textarea.i { min-height: 34px; font-size: 13px; width: 100%; }
+.tablewrap { overflow-x: auto; }
 @media (max-width: 980px) { .shell { grid-template-columns: 1fr; } .side { position: static; height: auto; flex-direction: row; flex-wrap: wrap; } .cols, .split { grid-template-columns: 1fr; } }

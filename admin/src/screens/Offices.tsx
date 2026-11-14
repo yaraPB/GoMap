@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { api, fmtDate, type Hours, type Person } from '../api';
-import { HoursEditor, Notice, useLoad } from '../ui';
+import { api, fmtDate, NOTE_KINDS, type Hours, type NoteKind, type Person } from '../api';
+import { HoursField, Notice, useLoad } from '../ui';
 
 /** Board 26: offices and hours. Resolve conflicts between sources, fill gaps, edit hours day by day. */
 export default function Offices({ selected, select }: { selected?: string; select: (id: string) => void }) {
@@ -45,7 +45,8 @@ function PersonEditor({ id, onSaved }: { id: string; onSaved: () => void }) {
   const save = async (extra: Record<string, unknown> = {}) => {
     setMsg(null);
     try {
-      await api.savePerson(id, { title: f.title ?? '', email: f.email ?? '', phone: f.phone ?? '', place_id: f.place?.id ?? null, office_number: f.office_number ?? '', floor: f.floor, office_hours: f.hours, ...extra });
+      await api.savePerson(id, { title: f.title ?? '', email: f.email ?? '', phone: f.phone ?? '', place_id: f.place?.id ?? null, office_number: f.office_number ?? '', floor: f.floor, office_hours: f.hours,
+        lunch: f.lunch_custom ? f.lunch : null, note: f.note ?? '', note_kind: f.note_kind, ...extra });
       setMsg({ tone: 'ok', text: 'Saved. The office list, the professor card and the assistant use it now.' });
       reload(); onSaved();
     } catch (e) { setMsg({ tone: 'miss', text: (e as Error).message }); }
@@ -87,7 +88,34 @@ function PersonEditor({ id, onSaved }: { id: string; onSaved: () => void }) {
       <div className="card stack">
         <p className="label">Office hours</p>
         {f.hours_raw && <p className="sub" style={{ margin: 0 }}>Posted on aui.ma as: “{f.hours_raw}”</p>}
-        <HoursEditor value={f.hours} onChange={(hours: Hours | null) => setF({ ...f, hours })} />
+        <HoursField value={f.hours} lunch={f.lunch} onChange={(hours: Hours | null) => setF({ ...f, hours })} />
+      </div>
+      <div className="cols">
+        <div className="card stack">
+          <p className="label" style={{ margin: 0 }}>Door note (shown as a sticky note in the app)</p>
+          <div className="chips">
+            {NOTE_KINDS.map(([k, emoji, label]) => (
+              <button key={k} type="button" className={`btn sm ${f.note_kind === k ? 'dark' : ''}`} onClick={() => setF({ ...f, note_kind: f.note_kind === k ? null : k as NoteKind, note: f.note || (k === 'custom' ? '' : label) })}>{emoji} {label}</button>
+            ))}
+          </div>
+          <input className="i" value={f.note ?? ''} placeholder="e.g. Office hours moved to Teams today" onChange={e => setF({ ...f, note: e.target.value })} />
+          {(f.note || f.note_kind) && <span className="sticky" style={{ alignSelf: 'flex-start' }}>{NOTE_KINDS.find(k => k[0] === f.note_kind)?.[1] ?? '📝'} {f.note || NOTE_KINDS.find(k => k[0] === f.note_kind)?.[2]}</span>}
+          {f.note_at && <small className="sub">Last changed {fmtDate(f.note_at)}</small>}
+        </div>
+        <div className="card stack">
+          <p className="label" style={{ margin: 0 }}>Today and lunch</p>
+          <div className="toolbar">
+            <span className={`pill ${['in', 'open'].includes(f.availability.state) ? 'ok' : f.availability.state === 'busy' ? 'busy' : ''}`}>{f.availability.label}{f.availability.detail ? ` · ${f.availability.detail}` : ''}</span>
+          </div>
+          <div className="toolbar">
+            {(['in', 'busy', 'out', 'clear'] as const).map(st => <button key={st} type="button" className="btn sm" onClick={() => save({ presence: st })}>{st === 'in' ? 'In office' : st === 'busy' ? 'Busy' : st === 'out' ? 'Not in today' : 'Clear status'}</button>)}
+          </div>
+          <label className="f" style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}><input type="checkbox" checked={f.lunch_custom} onChange={e => setF({ ...f, lunch_custom: e.target.checked })} /> Own lunch break (otherwise the campus one)</label>
+          <div className="grid2">
+            <label className="f">Lunch from<input className="i" type="time" disabled={!f.lunch_custom} value={f.lunch[0]} onChange={e => setF({ ...f, lunch: [e.target.value, f.lunch[1]] })} /></label>
+            <label className="f">to<input className="i" type="time" disabled={!f.lunch_custom} value={f.lunch[1]} onChange={e => setF({ ...f, lunch: [f.lunch[0], e.target.value] })} /></label>
+          </div>
+        </div>
       </div>
     </div>
   );

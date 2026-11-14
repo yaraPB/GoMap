@@ -7,7 +7,8 @@
  */
 export class GeminiUnavailable extends Error {}
 
-export type ToolCall = { name: 'find_place' | 'get_person_office' | 'get_procedure'; args: Record<string, string> };
+export const TOOL_NAMES = ['find_place', 'get_person_office', 'get_procedure', 'find_service', 'campus_info'] as const;
+export type ToolCall = { name: typeof TOOL_NAMES[number]; args: Record<string, string> };
 export type ToolRunner = (call: ToolCall) => Promise<unknown>;
 
 const TOOLS = [{
@@ -18,6 +19,10 @@ const TOOLS = [{
       parameters: { type: 'object', properties: { name: { type: 'string' } }, required: ['name'] } },
     { name: 'get_procedure', description: 'How to do a university procedure (declare a minor, internship agreement, advising, account problems…): steps, owning office, where it is, contact.',
       parameters: { type: 'object', properties: { query: { type: 'string' } }, required: ['query'] } },
+    { name: 'find_service', description: 'Which AUI office handles a student need or problem (fees, scholarships, transcripts, housing, feeling sick, stress, harassment, lost items, Wi-Fi, tutoring, internships, clubs…): office name, building, room, hours, email, phone extension.',
+      parameters: { type: 'object', properties: { query: { type: 'string', description: 'The need in a few words, e.g. "pay tuition" or "lost my wallet"' } }, required: ['query'] } },
+    { name: 'campus_info', description: 'General campus facts: standard office hours, lunch break, weekend opening, emergency numbers, and the list of offices.',
+      parameters: { type: 'object', properties: {} } },
   ],
 }];
 
@@ -28,7 +33,9 @@ Rules:
 - If the functions return nothing useful, say plainly you don't know and suggest asking the office or the AUI switchboard (+212 535-862-000).
 - Records marked unverified or draft: say they still need confirming.
 - Reply in ${lang === 'fr' ? 'French' : lang === 'ar' ? 'Arabic' : 'English'}, in at most two short sentences. No markdown, no lists. The app shows steps, maps and contacts itself.
-- Questions not about the campus: say you can only help with places, people and procedures at AUI.`;
+- A student describing a problem ("I lost my card", "I feel sick", "I can't pay"): call find_service.
+- Emergencies: always give Security's 24/7 number (ext. 2222 / 0535-86-2222) first.
+- Questions not about the campus: say you can only help with places, people, offices and procedures at AUI.`;
 
 type Part = { text?: string; functionCall?: { name: string; args?: Record<string, string>; id?: string }; functionResponse?: unknown; thoughtSignature?: string };
 // Tool results go back with role 'user': the API rejects the older 'function' role.
@@ -73,7 +80,7 @@ export class Gemini {
       const responses: Part[] = [];
       for (const p of fnCalls) {
         const name = p.functionCall!.name as ToolCall['name'];
-        if (!['find_place', 'get_person_office', 'get_procedure'].includes(name)) {
+        if (!TOOL_NAMES.includes(name)) {
           responses.push({ functionResponse: { name, ...(p.functionCall!.id ? { id: p.functionCall!.id } : {}), response: { error: 'Unknown function' } } });
           continue;
         }

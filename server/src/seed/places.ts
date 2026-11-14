@@ -15,23 +15,28 @@ export type PlaceSeed = {
 
 type Rule = { id?: string; number?: string; name: string; category: string; aliases?: string[]; description?: string; schools?: string[]; hours?: PlaceSeed['hours'] };
 
-// Assumptions for the demo, pending confirmation by campus staff. Break is noon–2 PM.
-const WEEKDAY_OFFICE: PlaceSeed['hours'] = Object.fromEntries(['mon', 'tue', 'wed', 'thu', 'fri'].map(d => [d, [['09:00', '12:00'], ['14:00', '17:00']]]).concat([['sat', []], ['sun', []]]));
+// AUI standard office hours (working_hours in the faculty JSON): 09:00–17:30, closed 13:00–14:00 for lunch.
+export const WEEKDAY_OFFICE: PlaceSeed['hours'] = Object.fromEntries(['mon', 'tue', 'wed', 'thu', 'fri'].map(d => [d, [['09:00', '13:00'], ['14:00', '17:30']]]).concat([['sat', []], ['sun', []]]));
+const OPEN_ALWAYS: PlaceSeed['hours'] = Object.fromEntries(['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].map(d => [d, [['00:00', '23:59']]]));
 
 /** What each AUI building number holds, from the faculty directory and the design brief. */
 const BUILDINGS: Record<string, Rule> = {
-  '1': { name: 'Building 1', category: 'admin', description: 'Administration.' },
-  '2': { name: 'Building 2', category: 'admin', aliases: ["registrar", "registrar's office"], description: "Registrar's Office (from the design brief, not verified).", hours: WEEKDAY_OFFICE },
-  '3': { name: 'Building 3', category: 'services', aliases: ['student services'] },
-  '4': { name: 'Building 4', category: 'academic', schools: ['shss', 'lc'] },
+  '1': { name: 'Building 1', category: 'admin', aliases: ['administration'], description: 'Administration: Registrar, Business Office, Financial Aid and the VPAA.', hours: WEEKDAY_OFFICE },
+  '2': { name: 'Building 2', category: 'services', description: 'Student Affairs (DSA), Student Activities (SAO), Campus Store and dining.', hours: WEEKDAY_OFFICE },
+  '3': { name: 'Building 3', category: 'dining', aliases: ['student services'], description: 'Dining.' },
+  '4': { name: 'Building 4', category: 'academic', schools: ['shss', 'lc'], description: 'Classrooms and Pathways (Employability & Entrepreneurship Office).' },
   '5': { name: 'Building 5', category: 'academic', schools: ['sse', 'lc'], aliases: ['sse', 'school of science and engineering', 'science and engineering dean'], description: "School of Science and Engineering: Dean's office and student affairs." },
   '6': { name: 'Building 6', category: 'academic', schools: ['sse', 'shss', 'lc', 'sba'], description: 'Classrooms, faculty offices, biology and chemistry lab.' },
-  '7': { name: 'Building 7', category: 'academic', schools: ['sse', 'shss'], description: 'Faculty offices, physics and engineering lab.' },
+  '7': { name: 'Building 7', category: 'academic', schools: ['sse', 'shss'], description: 'Faculty offices, physics and engineering lab, the Center for Learning Excellence, the Writing Center and CCSO.' },
   '8': { name: 'Building 8', category: 'academic', schools: ['shss', 'lc'], aliases: ['ssah', 'shss', 'language center', 'humanities'], description: "School of Social Sciences, Arts and Humanities (Dean's office, Office 1) and the Language Center." },
   '8b': { name: 'Building 8B', category: 'academic', schools: ['sba', 'sse', 'shss', 'lc'] },
-  '9': { name: 'Building 9', category: 'academic', schools: ['sse', 'lc'], description: 'Faculty offices and the food control lab.' },
-  '10': { name: 'Building 10', category: 'academic', schools: ['sba', 'shss'] },
+  '9': { name: 'Building 9', category: 'academic', schools: ['sse', 'lc'], description: 'Faculty offices, the food control lab, Security and Safety, and ITS.' },
+  '10': { name: 'Building 10', category: 'academic', schools: ['sba', 'shss'], description: 'Classrooms and the Office of International Programs (OIP).' },
   '11': { name: 'Building 11', category: 'academic', schools: ['sba'], aliases: ['sba', 'school of business', 'business school', 'school of business administration'], description: 'School of Business Administration: school office, faculty offices.' },
+  '14': { name: 'Building 14', category: 'services', description: 'Admissions, Athletics and a dining outlet.', hours: WEEKDAY_OFFICE },
+  '26': { name: 'Building 26 · Health Center', category: 'services', aliases: ['health center'], description: 'Health Center. Doctor and nurse on call 24/7 for emergencies.', hours: OPEN_ALWAYS },
+  '38': { name: 'Building 38', category: 'residential', aliases: ['residence', 'dorm'], description: 'Residence hall and Housing & Residential Life.' },
+  '39': { name: 'Building 39', category: 'residential', aliases: ['residence', 'dorm'], description: 'Residence hall and Housing & Residential Life.' },
   '15': { name: 'Mohammed VI Library', category: 'services', aliases: ['library', 'building 15', 'bibliotheque', 'm6 library', 'المكتبة', 'مكتبة', 'la bibliotheque'], description: 'University library and research guides.' },
   '17': { name: 'Main Auditorium', category: 'services', aliases: ['building 17', 'auditorium', 'amphitheatre'] },
 };
@@ -121,6 +126,16 @@ export function placesFromPois(pois: PoiFeature[], buildings: BuildingFeature[])
       schools: ['sba', 'sse', 'shss'], aliases: ['nab', 'new academic building', 'building 16', 'b16', '16'],
       description: 'New Academic Building. Position estimated: not labelled in the map data.',
       location: { type: 'Point', coordinates: [-5.10905, 33.53795] }, hours: null, position_estimated: true, source: 'mock',
+      footprint: null, height: null,
+    });
+  }
+  // Building 14 (Admissions, Athletics) has no map label either: start it on the Enrollment Services pin.
+  if (!places.has('building-14')) {
+    const enrollment = places.get('enrollment-services');
+    places.set('building-14', {
+      _id: 'building-14', name: 'Building 14', number: '14', category: 'services', schools: [], aliases: [...(BUILDINGS['14'].aliases ?? []), 'building 14', 'b14', '14'],
+      description: `${BUILDINGS['14'].description} Position estimated: not labelled in the map data.`,
+      location: { type: 'Point', coordinates: enrollment?.location.coordinates ?? [-5.1062, 33.5401] }, hours: WEEKDAY_OFFICE, position_estimated: true, source: 'mock',
       footprint: null, height: null,
     });
   }

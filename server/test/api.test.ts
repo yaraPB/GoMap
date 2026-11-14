@@ -58,7 +58,9 @@ test('building 11 lists offices by floor, with the shared office and the conflic
   const chetioui = people.find((p: { id: string }) => p.id === 'youssef-chetioui');
   assert.equal(chetioui.conflict.field, 'office_number');
   const { body: goel } = await get('/api/people/lakshmi-goel');
-  assert.deepEqual(goel.missing.sort(), ['email', 'hours', 'office']);
+  assert.deepEqual(goel.missing, ['hours'], 'the dean has an office now but still no published hours');
+  const { body: lahlou } = await get('/api/people/moncef-lahlou');
+  assert.deepEqual(lahlou.missing.sort(), ['email', 'hours', 'office']);
   assert.equal(goel.availability.state, 'not_published');
 });
 
@@ -109,7 +111,7 @@ test('assistant answers procedures and people with source and verification', asy
   const minor = (await send('/api/assistant/ask', { text: 'How do I declare a minor?', lang: 'en' })).body;
   assert.equal(minor.intent, 'procedure');
   assert.equal(minor.unverified, true, 'draft procedure is flagged');
-  assert.equal(minor.action.place_id, 'building-2');
+  assert.equal(minor.action.place_id, 'building-1', 'the Registrar is in Building 1');
   assert.ok(minor.procedure.steps.length >= 2);
   assert.ok(minor.source);
   const person = (await send('/api/assistant/ask', { text: 'Is professor Harit Satt in?', lang: 'en' })).body;
@@ -142,7 +144,8 @@ test('admin endpoints need the token; overview lists what is wrong', async () =>
   assert.equal((await fetch(`${base}/api/admin/overview`)).status, 401);
   const overview = await (await fetch(`${base}/api/admin/overview`, { headers: admin })).json() as any;
   assert.ok(overview.conflicts.some((c: { id: string }) => c.id === 'youssef-chetioui'));
-  assert.ok(overview.missing.some((m: { id: string }) => m.id === 'lakshmi-goel'));
+  assert.ok(overview.missing_total > 0 && overview.missing.every((m: { missing: string[] }) => m.missing.length > 0));
+  assert.ok(overview.counts.services >= 25);
   assert.ok(overview.unanswered.length >= 1);
 });
 
@@ -162,8 +165,73 @@ test('assistant: hours questions answer with hours and do not open directions', 
 
 test('assistant: account problems give the procedure, prayer finds the mosque', async () => {
   const pw = (await send('/api/assistant/ask', { text: 'where do students go when their account password stops working', lang: 'en' })).body;
-  assert.equal(pw.intent, 'procedure');
-  assert.equal(pw.procedure.id, 'it-account');
+  assert.ok(pw.intent === 'service' ? pw.service.id === 'its' : pw.procedure.id === 'it-account', 'ITS answers account problems');
+  assert.equal(pw.place.id, 'building-9');
   const pray = (await send('/api/assistant/ask', { text: 'is there somewhere to pray near the library', lang: 'en', from: PLAZA })).body;
   assert.equal(pray.place.id, 'masjid-al-akhawayn');
+});
+
+test('offices and services come from the JSON, with lunch cut out of the hours', async () => {
+  const { body } = await get('/api/services');
+  assert.ok(body.length >= 25);
+  const registrar = body.find((s: { id: string }) => s.id === 'registrar');
+  assert.equal(registrar.places[0].id, 'building-1');
+  assert.equal(registrar.extension, '2175');
+  assert.deepEqual(registrar.hours.mon, [['09:00', '13:00'], ['14:00', '17:30']]);
+  assert.deepEqual(registrar.hours.sat, []);
+  const housing = body.find((s: { id: string }) => s.id === 'housing');
+  assert.deepEqual(housing.places.map((p: { id: string }) => p.id), ['building-38', 'building-39']);
+  const campus = (await get('/api/campus')).body;
+  assert.deepEqual(campus.lunch, ['13:00', '14:00']);
+  const issues = (await get('/api/issues')).body;
+  assert.ok(issues.length >= 30);
+  assert.equal(issues.find((i: { issue: string }) => /textbooks/i.test(i.issue)).service_id, 'bookstore');
+});
+
+test('assistant routes student problems to the right office, with emergencies flagged', async () => {
+  const ask = async (text: string) => (await send('/api/assistant/ask', { text, lang: 'en', from: PLAZA })).body;
+  const fees = await ask('Where do I pay my fees?');
+  assert.equal(fees.intent, 'service');
+  assert.equal(fees.service.id, 'business-office');
+  assert.equal(fees.action.place_id, 'building-1');
+  assert.equal((await ask('I feel sick')).service.id, 'health-center');
+  assert.equal((await ask('where is the registrar')).service.id, 'registrar');
+  assert.equal((await ask('I need help with my essay')).service.id, 'writing-center');
+  const lost = await ask('I lost my wallet');
+  assert.equal(lost.service.id, 'security');
+  const fire = await ask('emergency, there is a fire');
+  assert.equal(fire.alert.tone, 'urgent');
+  const grad = await ask('how do I apply to graduate');
+  assert.equal(grad.intent, 'procedure');
+  assert.equal(grad.procedure.id, 'graduation-application');
+  const lib = await ask('take me to the library');
+  assert.equal(lib.intent, 'place', 'a service that is the building itself answers as the place');
+});
+
+test('admin edits a service and the assistant answers with it at once; version moves', async () => {
+  const v1 = (await get('/api/version')).body.version;
+  const r = await send('/api/admin/services/its', { extension: '9999', keywords: ['printer', 'printing'] }, admin, 'PUT');
+  assert.equal(r.status, 200);
+  assert.ok((await get('/api/version')).body.version > v1);
+  const a = (await send('/api/assistant/ask', { text: 'the printer is broken', lang: 'en' })).body;
+  assert.equal(a.service.id, 'its');
+  assert.equal(a.service.extension, '9999');
+  assert.equal((await send('/api/admin/services/its', { place_ids: ['nowhere'] }, admin, 'PUT')).status, 400);
+  const hours = await send('/api/admin/campus-hours', { lunch: ['12:30', '13:30'] }, admin, 'PUT');
+  assert.deepEqual(hours.body.lunch, ['12:30', '13:30']);
+  await send('/api/admin/campus-hours', { lunch: ['13:00', '14:00'] }, admin, 'PUT');
+});
+
+test('office time: presence changes are logged and the admin sees totals; notes carry a character', async () => {
+  const h = { 'content-type': 'application/json', 'x-gomap-user': 'harit-satt' };
+  const r = await send('/api/people/harit-satt/presence', { status: 'in', note: 'Online today', note_kind: 'online' }, h, 'PUT');
+  assert.equal(r.status, 200);
+  assert.equal(r.body.note_kind, 'online');
+  assert.equal((await send('/api/people/harit-satt/presence', { status: 'keep', note_kind: 'nope' }, h, 'PUT')).status, 400);
+  const report = (await (await fetch(`${base}/api/admin/office-time?days=7`, { headers: admin })).json()) as any;
+  const satt = report.people.find((p: { id: string }) => p.id === 'harit-satt');
+  assert.ok(satt.sessions >= 1);
+  assert.ok(satt.published_min > 0, 'published office hours are counted');
+  const accounts = (await get('/api/accounts')).body;
+  assert.deepEqual(accounts.map((a: { role: string }) => a.role), ['student', 'faculty', 'staff', 'guest']);
 });

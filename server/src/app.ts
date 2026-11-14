@@ -12,17 +12,23 @@ import { json, type Sql } from './db/sqlite.js';
 import { formatHours, openState, parseHours, type Hours } from './lib/hours.js';
 import type { RouteMode } from './routing/route.js';
 import type { Campus } from './services/campus.js';
-import { DEPARTMENTS, Directory, isStale, type PersonRow } from './services/directory.js';
+import { DEPARTMENTS, Directory, isStale, NOTE_KINDS, type PersonRow } from './services/directory.js';
+import { Offices, SERVICE_CATEGORIES, weeklyMinutes, type IssueRow, type ServiceRow } from './services/offices.js';
+import { meta } from './db/sqlite.js';
+import type { CampusHours } from './seed/services.js';
 
 export type AppContext = { db: Sql; campus: Campus; assistant: Assistant; uploadsDir?: string };
 
-/** Mock accounts until GoCampus SSO. TODO: replace with GoCampus SSO */
+/** Fallback when the accounts table is empty. Real list: SQLite `accounts`. TODO: replace with GoCampus SSO */
 export const MOCK_USERS = [
-  { id: 'demo-student', name: 'Demo Student', role: 'student' },
+  { id: 'demo-student', name: 'Student', role: 'student' },
   { id: 'harit-satt', name: 'Harit Satt', role: 'faculty' },
-  { id: 'demo-admin', name: 'Campus Admin', role: 'admin' },
+  { id: 'demo-staff', name: 'Staff', role: 'staff' },
   { id: 'guest', name: 'Visitor', role: 'guest' },
 ] as const;
+type Account = { id: string; name: string; role: string; person_id?: string | null; description?: string | null };
+
+const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 class HttpError extends Error { constructor(public status: number, message: string) { super(message); } }
 const bad = (msg: string) => new HttpError(400, msg);
@@ -50,6 +56,11 @@ function hoursInput(v: unknown): Hours | null {
   return out;
 }
 
+const strList = (v: unknown, max = 120) => {
+  if (!Array.isArray(v)) throw new HttpError(400, 'expected a list of strings');
+  return v.map(x => str(x, max)).filter((x): x is string => !!x);
+};
+
 const wrap = (fn: (req: Request, res: Response) => Promise<unknown> | unknown) => (req: Request, res: Response, next: NextFunction) => {
   Promise.resolve(fn(req, res)).catch(next);
 };
@@ -57,6 +68,10 @@ const wrap = (fn: (req: Request, res: Response) => Promise<unknown> | unknown) =
 export function createApp(ctx: AppContext) {
   const { db, campus, assistant } = ctx;
   const directory = new Directory(db);
+  const offices = new Offices(db);
+  // Bumped on every edit; the app polls /api/version and refetches when it moves.
+  let version = Date.now();
+  const bump = () => { version = Math.max(Date.now(), version + 1); };
   const uploadsDir = ctx.uploadsDir ?? join(SERVER_DIR, 'data', 'uploads');
   const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 8 * 1024 * 1024 } });
   const app = express();
@@ -69,16 +84,49 @@ export function createApp(ctx: AppContext) {
   app.use(express.json({ limit: '64kb' }));
   app.use('/api/uploads', express.static(uploadsDir, { maxAge: '1h' }));
 
-  const userOf = (req: Request) => MOCK_USERS.find(u => u.id === req.header('x-gomap-user')) ?? MOCK_USERS[0];
-  const changeLog = (entity: string, id: string, action: string, detail: unknown, actor: string) =>
+  const accounts = (): Account[] => {
+    const rows = db.prepare('SELECT id, name, role, person_id, description FROM accounts ORDER BY sort, name').all() as Account[];
+    return rows.length ? rows : [...MOCK_USERS];
+  };
+  const userOf = (req: Request) => { const list = accounts(); return list.find(u => u.id === req.header('x-gomap-user')) ?? list[0]; };
+  const changeLog = (entity: string, id: string, action: string, detail: unknown, actor: string) => {
     db.prepare('INSERT INTO change_log (id, entity, entity_id, action, detail, actor, created_at) VALUES (?,?,?,?,?,?,?)')
       .run(randomUUID(), entity, id, action, detail == null ? null : JSON.stringify(detail), actor, now());
+    bump();
+  };
   const placeNames = async () => new Map((await Place.find({}, { name: 1 }).lean()).map(p => [String(p._id), p.name]));
 
   // ── public ────────────────────────────────────────────────────────────────
 
   app.get('/api/health', (_req, res) => { res.json({ ok: true }); });
-  app.get('/api/mock-users', (_req, res) => { res.json(MOCK_USERS); });
+  app.get('/api/mock-users', (_req, res) => { res.json(accounts()); });
+  app.get('/api/accounts', (_req, res) => { res.json(accounts()); });
+  app.get('/api/version', (_req, res) => { res.set('Cache-Control', 'no-store'); res.json({ version }); });
+
+  app.get('/api/campus', (_req, res) => {
+    const c = offices.campus();
+    res.json({ ...c, timezone: config.timezone, office_hours_text: `Mon–Fri ${c.open}–${c.close} · lunch ${c.lunch[0]}–${c.lunch[1]}` });
+  });
+
+  app.get('/api/services', wrap(async (req, res) => {
+    const names = await placeNames();
+    const q = str(req.query.q)?.toLowerCase();
+    const category = str(req.query.category);
+    const views = offices.list().map(r => offices.view(r, names))
+      .filter(v => (!category || category === 'all' || v.category === category)
+        && (!q || `${v.name} ${v.short_name} ${v.handles.join(' ')} ${v.keywords.join(' ')}`.toLowerCase().includes(q)));
+    res.json(views);
+  }));
+  app.get('/api/services/:id', wrap(async (req, res) => {
+    const r = offices.row(String(req.params.id));
+    if (!r) throw new HttpError(404, 'Service not found');
+    const names = await placeNames();
+    res.json({ ...offices.view(r, names), issues: offices.issues().filter(i => i.service_id === r.id).map(i => offices.issueView(i, names)) });
+  }));
+  app.get('/api/issues', wrap(async (_req, res) => {
+    const names = await placeNames();
+    res.json(offices.issues().map(i => offices.issueView(i, names)));
+  }));
 
   const placeLite = (p: Record<string, unknown> & { _id: unknown; location: { coordinates: Position } | null }, counts: Map<string, number>) => {
     const hours = p.hours as Hours | null;
@@ -155,21 +203,29 @@ export function createApp(ctx: AppContext) {
     if (!(req.header('authorization') === `Bearer ${config.adminToken}` || (user.role === 'faculty' && user.id === id))) throw new HttpError(403, 'Only this faculty member or an authenticated admin can set their status.');
     if (!directory.row(id)) throw new HttpError(404, 'Person not found');
     const status = req.body?.status;
-    if (!['in', 'busy', 'out', 'clear'].includes(status)) throw bad('status must be in, busy, out or clear');
+    if (!['in', 'busy', 'out', 'clear', 'keep'].includes(status)) throw bad('status must be in, busy, out, clear or keep');
     const reason = req.body?.reason ?? null;
     if (reason !== null && !['meeting', 'teaching', 'campus', 'away', 'none'].includes(reason)) throw bad('unknown reason');
     const until = req.body?.until ?? null;
     if (until !== null && (typeof until !== 'string' || Number.isNaN(Date.parse(until)))) throw bad('until must be an ISO timestamp or null');
-    if (req.body?.note !== undefined && typeof req.body.note !== 'string') throw bad('note must be text');
-    directory.setPresence(id, { status, reason, until }, user.name);
-    if (req.body?.note !== undefined) {
-      const note = str(req.body.note, 500);
-      if (note) db.prepare('INSERT INTO office_notes (person_id,note,updated_at) VALUES (?,?,?) ON CONFLICT(person_id) DO UPDATE SET note=excluded.note,updated_at=excluded.updated_at').run(id, note, now());
-      else db.prepare('DELETE FROM office_notes WHERE person_id = ?').run(id);
-    }
+    if (req.body?.note !== undefined && req.body.note !== null && typeof req.body.note !== 'string') throw bad('note must be text');
+    const noteKind = req.body?.note_kind ?? null;
+    if (noteKind !== null && !NOTE_KINDS.includes(noteKind)) throw bad(`note_kind must be one of ${NOTE_KINDS.join(', ')}`);
+    const lunch = req.body?.lunch;
+    if (lunch !== undefined && lunch !== null && (!Array.isArray(lunch) || lunch.length !== 2 || !lunch.every((t: unknown) => typeof t === 'string' && TIME.test(t)) || lunch[0] >= lunch[1])) throw bad('lunch must be ["HH:MM","HH:MM"] or null');
+    if (status !== 'keep') directory.setPresence(id, { status, reason, until }, user.name);
+    if (req.body?.note !== undefined) saveNote(id, req.body.note, noteKind);
+    if (lunch !== undefined) db.prepare('UPDATE people SET lunch = ? WHERE id = ?').run(lunch ? JSON.stringify(lunch) : null, id);
     db.prepare('DELETE FROM assistant_cache').run();
+    bump();
     res.json(directory.view(directory.row(id)!, await placeNames()));
   }));
+
+  function saveNote(id: string, raw: unknown, kind: string | null) {
+    const note = str(raw, 500);
+    if (note || kind) db.prepare('INSERT INTO office_notes (person_id,note,kind,updated_at) VALUES (?,?,?,?) ON CONFLICT(person_id) DO UPDATE SET note=excluded.note,kind=excluded.kind,updated_at=excluded.updated_at').run(id, note ?? '', kind, now());
+    else db.prepare('DELETE FROM office_notes WHERE person_id = ?').run(id);
+  }
 
   app.get('/api/procedures', (req, res) => {
     const q = str(req.query.q)?.toLowerCase();
@@ -292,7 +348,7 @@ export function createApp(ctx: AppContext) {
     const reportsNew = await Report.aggregate([{ $match: { status: 'new' } }, { $group: { _id: '$cluster_id' } }, { $count: 'n' }]);
     const procs = db.prepare('SELECT id, title, status, verified_at FROM procedures').all() as { status: string }[];
     res.json({
-      counts: { places: places.length, people: people.length, procedures: procs.length, open_reports: reportsNew[0]?.n ?? 0, conflicts: conflicts.length, unanswered: unanswered.length },
+      counts: { places: places.length, people: people.length, procedures: procs.length, services: offices.list().length, issues: offices.issues().length, open_reports: reportsNew[0]?.n ?? 0, conflicts: conflicts.length, unanswered: unanswered.length },
       conflicts, shared_offices: sharedRows, stale: { places: stalePlaces, people: stalePeople.slice(0, 50), people_total: stalePeople.length },
       missing: missing.slice(0, 50), missing_total: missing.length, unanswered, procedures_not_live: procs.filter(p => p.status !== 'live'),
     });
@@ -358,11 +414,20 @@ export function createApp(ctx: AppContext) {
     if (b.floor !== undefined) fields.floor = b.floor === null ? null : Math.round(num(b.floor) ?? 0);
     if (b.office_hours !== undefined) { const h = hoursInput(b.office_hours); fields.office_hours = h ? JSON.stringify(h) : null; }
     if (b.hours_raw !== undefined) { fields.hours_raw = str(b.hours_raw, 500) ?? null; if (b.office_hours === undefined) { const h = parseHours(fields.hours_raw as string | null).hours; fields.office_hours = h ? JSON.stringify(h) : null; } }
+    if (b.lunch !== undefined) {
+      if (b.lunch !== null && (!Array.isArray(b.lunch) || b.lunch.length !== 2 || !b.lunch.every((t: unknown) => typeof t === 'string' && TIME.test(t)))) throw bad('lunch must be ["HH:MM","HH:MM"] or null');
+      fields.lunch = b.lunch ? JSON.stringify(b.lunch) : null;
+    }
+    if (b.note_kind !== undefined && b.note_kind !== null && !NOTE_KINDS.includes(b.note_kind)) throw bad('unknown note_kind');
+    if (b.presence !== undefined && !['in', 'busy', 'out', 'clear'].includes(b.presence)) throw bad('presence must be in, busy, out or clear');
     if (b.resolve_conflict === true) fields.conflict = null;
     if (b.verify === true) fields.verified_at = now();
+    fields.admin_edited = 1;
     fields.updated_at = now();
     const keys = Object.keys(fields);
     db.prepare(`UPDATE people SET ${keys.map(k => `${k} = ?`).join(', ')} WHERE id = ?`).run(...keys.map(k => fields[k] as string | number | null), id);
+    if (b.note !== undefined) saveNote(id, b.note, b.note_kind ?? null);
+    if (b.presence !== undefined) directory.setPresence(id, { status: b.presence }, 'admin');
     changeLog('person', id, 'update', fields, 'admin');
     await assistant.refresh();
     res.json(directory.view(directory.row(id)!, await placeNames()));
@@ -472,6 +537,152 @@ export function createApp(ctx: AppContext) {
     await campus.refreshClosures();
     await assistant.refresh();
     res.json({ ok: true });
+  }));
+
+  // ── offices & services ──
+  const saveService = (id: string, b: Record<string, unknown>, existing?: ServiceRow) => {
+    const row = {
+      name: b.name !== undefined ? str(b.name) : existing?.name,
+      short_name: b.short_name !== undefined ? str(b.short_name, 80) ?? null : existing?.short_name ?? null,
+      category: (b.category ?? existing?.category ?? 'service') as string,
+      handles: b.handles !== undefined ? JSON.stringify(strList(b.handles, 200)) : existing?.handles ?? '[]',
+      keywords: b.keywords !== undefined ? JSON.stringify(strList(b.keywords, 80)) : existing?.keywords ?? '[]',
+      place_ids: b.place_ids !== undefined ? JSON.stringify(strList(b.place_ids, 80)) : existing?.place_ids ?? '[]',
+      location_text: b.location_text !== undefined ? str(b.location_text, 300) ?? null : existing?.location_text ?? null,
+      room: b.room !== undefined ? str(b.room, 40) ?? null : existing?.room ?? null,
+      email: b.email !== undefined ? str(b.email, 120) ?? null : existing?.email ?? null,
+      extension: b.extension !== undefined ? str(b.extension, 20) ?? null : existing?.extension ?? null,
+      phone: b.phone !== undefined ? str(b.phone, 40) ?? null : existing?.phone ?? null,
+      hours: b.hours !== undefined ? (() => { const h = hoursInput(b.hours); return h ? JSON.stringify(h) : null; })() : existing?.hours ?? null,
+      hours_raw: b.hours_raw !== undefined ? str(b.hours_raw, 400) ?? null : existing?.hours_raw ?? null,
+      notes: b.notes !== undefined ? str(b.notes, 1000) ?? null : existing?.notes ?? null,
+      sort: b.sort !== undefined ? Math.round(num(b.sort) ?? 0) : existing?.sort ?? 999,
+      verified_at: b.verify === true ? now() : existing?.verified_at ?? null,
+    };
+    if (!row.name) throw bad('name is required');
+    if (!SERVICE_CATEGORIES.includes(row.category as never)) throw bad(`category must be one of ${SERVICE_CATEGORIES.join(', ')}`);
+    db.prepare(`INSERT INTO services (id,name,short_name,category,handles,keywords,place_ids,location_text,room,email,extension,phone,hours,hours_raw,notes,sort,admin_edited,verified_at,source,updated_at)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?,?)
+      ON CONFLICT(id) DO UPDATE SET name=excluded.name, short_name=excluded.short_name, category=excluded.category, handles=excluded.handles, keywords=excluded.keywords,
+      place_ids=excluded.place_ids, location_text=excluded.location_text, room=excluded.room, email=excluded.email, extension=excluded.extension, phone=excluded.phone,
+      hours=excluded.hours, hours_raw=excluded.hours_raw, notes=excluded.notes, sort=excluded.sort, admin_edited=1, verified_at=excluded.verified_at, updated_at=excluded.updated_at`)
+      .run(id, row.name, row.short_name, row.category, row.handles, row.keywords, row.place_ids, row.location_text, row.room, row.email, row.extension, row.phone,
+        row.hours, row.hours_raw, row.notes, row.sort, row.verified_at, existing?.source ?? 'Admin', now());
+    changeLog('service', id, existing ? 'update' : 'create', row, 'admin');
+  };
+  const checkPlaces = async (ids: unknown) => {
+    if (ids === undefined) return;
+    for (const id of strList(ids, 80)) if (!(await Place.exists({ _id: id }))) throw bad(`unknown place ${id}`);
+  };
+  admin.get('/services', wrap(async (_req, res) => {
+    const names = await placeNames();
+    res.json(offices.list().map(r => offices.view(r, names)));
+  }));
+  admin.post('/services', wrap(async (req, res) => {
+    const name = str(req.body?.name);
+    if (!name) throw bad('name is required');
+    await checkPlaces(req.body?.place_ids);
+    const id = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) + '-' + randomUUID().slice(0, 4);
+    saveService(id, req.body);
+    await assistant.refresh();
+    res.status(201).json(offices.view(offices.row(id)!, await placeNames()));
+  }));
+  admin.put('/services/:id', wrap(async (req, res) => {
+    const id = String(req.params.id);
+    const existing = offices.row(id);
+    if (!existing) throw new HttpError(404, 'Service not found');
+    await checkPlaces(req.body?.place_ids);
+    saveService(id, req.body ?? {}, existing);
+    await assistant.refresh();
+    res.json(offices.view(offices.row(id)!, await placeNames()));
+  }));
+  admin.delete('/services/:id', wrap(async (req, res) => {
+    const id = String(req.params.id);
+    if (!db.prepare('DELETE FROM services WHERE id = ?').run(id).changes) throw new HttpError(404, 'Service not found');
+    changeLog('service', id, 'delete', null, 'admin');
+    await assistant.refresh();
+    res.json({ ok: true });
+  }));
+
+  const saveIssue = (id: string, b: Record<string, unknown>, existing?: IssueRow) => {
+    const row = {
+      issue: b.issue !== undefined ? str(b.issue, 300) : existing?.issue,
+      go_to: b.go_to !== undefined ? str(b.go_to, 200) : existing?.go_to,
+      service_id: b.service_id !== undefined ? (b.service_id === null ? null : str(b.service_id, 80) ?? null) : existing?.service_id ?? null,
+      location_text: b.location_text !== undefined ? str(b.location_text, 300) ?? null : existing?.location_text ?? null,
+      place_id: b.place_id !== undefined ? (b.place_id === null ? null : str(b.place_id, 80) ?? null) : existing?.place_id ?? null,
+      notes: b.notes !== undefined ? str(b.notes, 1000) ?? null : existing?.notes ?? null,
+      keywords: b.keywords !== undefined ? JSON.stringify(strList(b.keywords, 80)) : existing?.keywords ?? '[]',
+      sort: b.sort !== undefined ? Math.round(num(b.sort) ?? 0) : existing?.sort ?? 999,
+    };
+    if (!row.issue || !row.go_to) throw bad('issue and go_to are required');
+    if (row.service_id && !offices.row(row.service_id)) throw bad('unknown service_id');
+    db.prepare(`INSERT INTO issue_routing (id,issue,go_to,service_id,location_text,place_id,notes,keywords,sort,admin_edited,updated_at) VALUES (?,?,?,?,?,?,?,?,?,1,?)
+      ON CONFLICT(id) DO UPDATE SET issue=excluded.issue, go_to=excluded.go_to, service_id=excluded.service_id, location_text=excluded.location_text,
+      place_id=excluded.place_id, notes=excluded.notes, keywords=excluded.keywords, sort=excluded.sort, admin_edited=1, updated_at=excluded.updated_at`)
+      .run(id, row.issue, row.go_to, row.service_id, row.location_text, row.place_id, row.notes, row.keywords, row.sort, now());
+    changeLog('issue', id, existing ? 'update' : 'create', row, 'admin');
+  };
+  admin.get('/issues', wrap(async (_req, res) => {
+    const names = await placeNames();
+    res.json(offices.issues().map(i => offices.issueView(i, names)));
+  }));
+  admin.post('/issues', wrap(async (req, res) => {
+    if (req.body?.place_id) await checkPlaces([req.body.place_id]);
+    const id = `issue-${randomUUID().slice(0, 8)}`;
+    saveIssue(id, req.body ?? {});
+    await assistant.refresh();
+    res.status(201).json(offices.issueView(offices.issue(id)!, await placeNames()));
+  }));
+  admin.put('/issues/:id', wrap(async (req, res) => {
+    const id = String(req.params.id);
+    const existing = offices.issue(id);
+    if (!existing) throw new HttpError(404, 'Issue not found');
+    if (req.body?.place_id) await checkPlaces([req.body.place_id]);
+    saveIssue(id, req.body ?? {}, existing);
+    await assistant.refresh();
+    res.json(offices.issueView(offices.issue(id)!, await placeNames()));
+  }));
+  admin.delete('/issues/:id', wrap(async (req, res) => {
+    const id = String(req.params.id);
+    if (!db.prepare('DELETE FROM issue_routing WHERE id = ?').run(id).changes) throw new HttpError(404, 'Issue not found');
+    changeLog('issue', id, 'delete', null, 'admin');
+    await assistant.refresh();
+    res.json({ ok: true });
+  }));
+
+  admin.put('/campus-hours', wrap(async (req, res) => {
+    const b = req.body ?? {};
+    const c: CampusHours = { ...offices.campus() };
+    for (const k of ['open', 'close'] as const) if (b[k] !== undefined) { if (typeof b[k] !== 'string' || !TIME.test(b[k])) throw bad(`${k} must be HH:MM`); c[k] = b[k]; }
+    if (b.lunch !== undefined) { if (!Array.isArray(b.lunch) || b.lunch.length !== 2 || !b.lunch.every((t: unknown) => typeof t === 'string' && TIME.test(t))) throw bad('lunch must be ["HH:MM","HH:MM"]'); c.lunch = b.lunch; }
+    if (b.emergencies !== undefined) c.emergencies = str(b.emergencies, 300) ?? null;
+    if (b.weekend_working !== undefined) c.weekend_working = !!b.weekend_working;
+    if (c.open >= c.close) throw bad('open must be before close');
+    meta.set(db, 'campus_hours', JSON.stringify(c));
+    changeLog('campus', 'hours', 'update', c, 'admin');
+    await assistant.refresh();
+    res.json(c);
+  }));
+
+  /** Published office hours vs time marked "in the office", per person. */
+  admin.get('/office-time', wrap(async (req, res) => {
+    const days = Math.max(1, Math.min(60, num(req.query.days) ?? 7));
+    const logged = directory.officeTime(days);
+    const names = await placeNames();
+    const dep = str(req.query.department);
+    const rows = directory.list({ department: dep }).filter(r => r.role === 'faculty' || logged.has(r.id)).map(r => {
+      const v = directory.view(r, names);
+      const l = logged.get(r.id);
+      const published = weeklyMinutes(v.hours) * (days / 7);
+      return {
+        id: r.id, name: r.name, department: r.department, place: v.place, office_number: v.office_number,
+        hours: v.hours, hours_text: v.hours_text, published_min: Math.round(published), in_min: l?.in ?? 0, busy_min: l?.busy ?? 0,
+        sessions: l?.sessions ?? 0, by_day: l?.days ?? {}, ratio: published ? Math.round(((l?.in ?? 0) / published) * 100) / 100 : null,
+        availability: v.availability, note: v.note, note_kind: v.note_kind, lunch: v.lunch,
+      };
+    });
+    res.json({ days, people: rows.sort((a, b) => b.in_min - a.in_min || a.name.localeCompare(b.name)) });
   }));
 
   admin.get('/assistant-log', (_req, res) => {

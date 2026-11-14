@@ -86,6 +86,15 @@ export function openState(hours: Hours | null | undefined, tz?: string, now = ne
 const DAY_LABEL: Record<Day, string> = { mon: 'Mon', tue: 'Tue', wed: 'Wed', thu: 'Thu', fri: 'Fri', sat: 'Sat', sun: 'Sun' };
 export function formatHours(hours: Hours | null | undefined): string | null {
   if (!hours) return null;
-  return DAYS.filter(d => hours[d] !== undefined)
-    .map(d => `${DAY_LABEL[d]} ${hours[d]!.length ? hours[d]!.map(([a, b]) => `${a}–${b}`).join(', ') : 'closed'}`).join(' · ');
+  // consecutive days with the same ranges collapse: 'Mon–Fri 09:00–13:00, 14:00–17:30 · Sat–Sun closed'
+  const text = (d: Day) => (hours[d]!.length ? hours[d]!.map(([a, b]) => (a === '00:00' && b === '23:59' ? '24h' : `${a}–${b}`)).join(', ') : 'closed');
+  const groups: { from: Day; to: Day; text: string }[] = [];
+  for (const d of DAYS) {
+    if (hours[d] === undefined) continue;
+    const t = text(d), last = groups[groups.length - 1];
+    if (last && last.text === t && DAYS.indexOf(last.to) === DAYS.indexOf(d) - 1) last.to = d;
+    else groups.push({ from: d, to: d, text: t });
+  }
+  if (groups.length === 1 && groups[0].from === 'mon' && groups[0].to === 'sun') return groups[0].text === '24h' ? 'Open 24/7' : `Every day ${groups[0].text}`;
+  return groups.map(g => `${DAY_LABEL[g.from]}${g.to !== g.from ? `–${DAY_LABEL[g.to]}` : ''} ${g.text}`).join(' · ');
 }

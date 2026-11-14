@@ -5,6 +5,7 @@ import { json, type Sql } from '../db/sqlite.js';
 import { formatHours, openState, type Hours } from '../lib/hours.js';
 import type { Campus } from '../services/campus.js';
 import { Directory, isStale } from '../services/directory.js';
+import { Offices, type IssueRow } from '../services/offices.js';
 import { config } from '../config.js';
 import { Gemini, GeminiUnavailable, type ToolCall } from './gemini.js';
 import { transcribeSoniox } from './soniox.js';
@@ -17,13 +18,17 @@ export type AnswerAction =
 
 export type Answer = {
   id: string;
-  intent: 'place' | 'person' | 'procedure' | 'help' | 'unknown';
+  intent: 'place' | 'person' | 'procedure' | 'service' | 'info' | 'help' | 'unknown';
   lang: Lang;
   text: string;
   place?: { id: string; name: string; category: string; status: string; closed_reason: string | null; hours: string | null; open: string; coordinates: Position };
   route?: { distance_m: number; duration_s: number; mode: string } | null;
   person?: ReturnType<Directory['view']>;
   procedure?: { id: string; title: string; owner_office: string; steps: { title: string; body: string }[]; status: string };
+  service?: ReturnType<Offices['view']>;
+  issue?: { id: string; issue: string; go_to: string; notes: string | null };
+  /** Shown above the answer: emergencies, closures. */
+  alert?: { tone: 'urgent' | 'closed' | 'info'; text: string };
   contact?: { email: string | null; phone: string | null };
   source?: string;
   verified_at?: string | null;
@@ -74,9 +79,11 @@ export class Assistant {
   private router: IntentRouter | null = null;
   private places = new Map<string, PlaceLite>();
   private directory: Directory;
+  private offices: Offices;
 
   constructor(private db: Sql, private campus: Campus, private gemini: Gemini) {
     this.directory = new Directory(db);
+    this.offices = new Offices(db);
   }
 
   /** Rebuild the local index. Called at boot and after admin edits. */
@@ -90,13 +97,22 @@ export class Assistant {
       places.map(p => ({ id: p._id, keys: [p.name, ...p.aliases] })),
       people.map(p => ({ id: p.id, keys: [p.name, p.name.split(' ').slice(-1)[0]] })),
       procs.map(p => ({ id: p.id, keys: [p.title, ...json.parse<string[]>(p.match_phrases, [])] })),
+      this.offices.list().map(s => {
+        // a service that IS its building (the Library) is found as the place; only its own keywords point to the service
+        const home = places.find(p => p._id === json.parse<string[]>(s.place_ids, [])[0]);
+        const homeNames = home ? [home.name, ...home.aliases].map(n => n.toLowerCase()) : [];
+        const names = [s.name, s.short_name ?? ''].filter(n => n && !homeNames.some(h => h === n.toLowerCase() || n.toLowerCase().includes(h) && h.length > 5));
+        return { id: s.id, keys: [...names, ...json.parse<string[]>(s.keywords, []), ...json.parse<string[]>(s.handles, [])].filter(Boolean) };
+      }),
+      // 'food' alone means the cafeteria, not the dining office
+      this.offices.issues().map(r => ({ id: r.id, keys: [r.issue, ...json.parse<string[]>(r.keywords, [])].filter(k => k.toLowerCase() !== 'food') })),
     );
   }
 
   private placeNames() { return new Map([...this.places.values()].map(p => [p._id, p.name])); }
 
   /** 'when does X close' asks for hours, not for directions. */
-  private static HOURS = /\b(open|opens|close|closes|closing|hours|what time|when)\b|horaires|ouvert|ferme|متى|مفتوح/i;
+  private static HOURS = /\b(open|opens|opening|close|closes|closing|hours|what time)\b|\bwhen (does|do|is|will)\b.*\b(open|close|start|finish)|horaires|ouvert|ferme|متى|مفتوح/i;
 
   private placeAnswer(id: string, lang: Lang, from: Position | null, mode: Match['mode'], question = ''): Answer | null {
     const p = this.places.get(id);
@@ -125,6 +141,67 @@ export class Assistant {
     base.text = route ? T.place[lang](p.name, T.dist[lang](route.distance_m, Math.max(1, Math.round(route.duration_s / 60)))) : T.placeNoRoute[lang](p.name);
     base.action = { type: 'route', place_id: id, mode: mode ?? 'walk' };
     return base;
+  }
+
+  private static EMERGENCY = /\b(emergency|urgent|fire|accident|attacked|danger)\b|urgence|طوارئ|حريق/i;
+  private static DAYS: Record<string, string> = { mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday', sat: 'Saturday', sun: 'Sunday' };
+
+  private serviceAnswer(id: string, lang: Lang, from: Position | null, question = '', issue?: IssueRow): Answer | null {
+    const r = this.offices.row(id);
+    if (!r) return null;
+    const v = this.offices.view(r, this.placeNames());
+    const mainId = (issue?.place_id && this.places.has(issue.place_id) ? issue.place_id : undefined) ?? v.places.find(p => this.places.has(p.id))?.id;
+    const placeAns = mainId ? this.placeAnswer(mainId, lang, from, null) : null;
+    // 'Building 6, Room 108 (main counselor); also …' → the main desk; the card shows the rest
+    const where = (issue?.location_text ?? v.location_text)?.split(/;|\(/)[0].trim() || (lang === 'fr' ? 'lieu non publié' : lang === 'ar' ? 'المكان غير منشور' : 'location not published');
+    const allDay = v.open.state === 'open' && v.open.until === '23:59';
+    const openTxt = allDay ? (lang === 'fr' ? 'Ouvert 24h/24' : lang === 'ar' ? 'مفتوح 24/7' : 'Open 24/7') : v.open.state === 'open' ? (lang === 'fr' ? `Ouvert jusqu'à ${v.open.until}` : lang === 'ar' ? `مفتوح حتى ${v.open.until}` : `Open now until ${v.open.until}`)
+      : v.open.state === 'closed' ? (lang === 'fr' ? 'Fermé maintenant' : lang === 'ar' ? 'مغلق الآن' : `Closed now${v.open.next ? `, opens ${Assistant.DAYS[v.open.next.day]} ${v.open.next.time}` : ''}`)
+      : null;
+    const asksHours = Assistant.HOURS.test(question) && !issue;
+    let text: string;
+    if (asksHours) text = `${v.short_name}: ${v.hours_text ?? v.notes ?? 'hours not published'}.${openTxt ? ` ${openTxt}.` : ''}`;
+    else if (issue) {
+      text = lang === 'fr' ? `Pour cela, allez à : ${issue.go_to} (${where}).` : lang === 'ar' ? `لهذا، توجه إلى: ${issue.go_to} (${where}).`
+        : `Go to ${issue.go_to}, ${where}.`;
+      if (issue.notes) text += ` ${issue.notes}`;
+      if (openTxt) text += ` ${openTxt}.`;
+    } else {
+      text = lang === 'fr' ? `${v.short_name} : ${where}.` : lang === 'ar' ? `${v.short_name}: ${where}.` : `${v.short_name} is in ${where}.`;
+      if (openTxt) text += ` ${openTxt}.`;
+      else if (v.notes) text += ` ${v.notes}`;
+    }
+    if (v.id === 'health-center' && v.open.state !== 'open') text += ' A doctor and nurse are on call 24/7 for emergencies.';
+    const emergency = id === 'security' && Assistant.EMERGENCY.test(question) || Assistant.EMERGENCY.test(question);
+    const campus = this.offices.campus();
+    const closed = placeAns?.place?.status === 'closed';
+    return {
+      id: randomUUID(), intent: 'service', lang, text, answered_by: 'local', service: v,
+      issue: issue ? { id: issue.id, issue: issue.issue, go_to: issue.go_to, notes: issue.notes } : undefined,
+      place: placeAns?.place, route: asksHours ? null : placeAns?.route,
+      contact: { email: v.email, phone: v.phone }, source: v.source ?? 'AUI offices and services list',
+      verified_at: v.verified_at, unverified: v.stale || !v.places.length,
+      alert: emergency ? { tone: 'urgent', text: campus.emergencies ?? 'Emergency: Security, 24/7, ext. 2222 / 0535-86-2222.' }
+        : closed ? { tone: 'closed', text: placeAns!.text } : undefined,
+      action: mainId && !asksHours && !closed ? { type: 'route', place_id: mainId, mode: 'walk' } : undefined,
+    };
+  }
+
+  private issueAnswer(id: string, lang: Lang, from: Position | null, question: string): Answer | null {
+    const r = this.offices.issue(id);
+    if (!r) return null;
+    if (r.service_id) return this.serviceAnswer(r.service_id, lang, from, question, r);
+    const placeAns = r.place_id ? this.placeAnswer(r.place_id, lang, from, null) : null;
+    return {
+      id: randomUUID(), intent: 'service', lang, text: `Go to ${r.go_to}${r.location_text ? `, ${r.location_text}` : ''}.${r.notes ? ` ${r.notes}` : ''}`,
+      answered_by: 'local', issue: { id: r.id, issue: r.issue, go_to: r.go_to, notes: r.notes }, place: placeAns?.place, route: placeAns?.route,
+      source: 'AUI student issue routing', unverified: false, action: placeAns?.action,
+    };
+  }
+
+  private infoAnswer(lang: Lang, text: string): Answer {
+    const c = this.offices.campus();
+    return { id: randomUUID(), intent: 'info', lang, text, answered_by: 'gemini', source: `AUI working hours: ${c.open}–${c.close}, lunch ${c.lunch[0]}–${c.lunch[1]}` };
   }
 
   private personAnswer(id: string, lang: Lang): Answer | null {
@@ -163,6 +240,8 @@ export class Assistant {
     if (m.intent === 'place') return this.placeAnswer(m.id, lang, from, m.mode, question);
     if (m.intent === 'person') return this.personAnswer(m.id, lang);
     if (m.intent === 'procedure') return this.procedureAnswer(m.id, lang, from);
+    if (m.intent === 'service') return this.serviceAnswer(m.id, lang, from, question);
+    if (m.intent === 'issue') return this.issueAnswer(m.id, lang, from, question);
     return { id: randomUUID(), intent: 'help', lang, text: T.help[lang], answered_by: 'local', action: { type: 'help', topic: 'walkthrough' } };
   }
 
@@ -174,7 +253,27 @@ export class Assistant {
   /** Tools Gemini may call, run against our own data. */
   private async runTool(call: ToolCall) {
     const q = String(call.args.query ?? call.args.name ?? '');
+    if (call.name === 'campus_info') {
+      const c = this.offices.campus();
+      return { found: true, info: true, office_hours: `Monday–Friday ${c.open}–${c.close}, closed for lunch ${c.lunch[0]}–${c.lunch[1]}`, weekend: c.weekend_working ? 'open' : 'closed (except dining)',
+        exceptions: c.exceptions, emergencies: c.emergencies, offices: this.offices.list().map(s => `${s.short_name ?? s.name}: ${s.location_text ?? 'location not published'}`) };
+    }
+    if (call.name === 'find_service') {
+      const hit = this.router!.match(q, 'issue') ?? this.router!.match(q, 'service');
+      if (!hit) return { found: false };
+      const issue = hit.intent === 'issue' ? this.offices.issue(hit.id) : undefined;
+      const r = this.offices.row(issue?.service_id ?? hit.id);
+      if (!r && !issue) return { found: false };
+      const v = r ? this.offices.view(r, this.placeNames()) : null;
+      return { found: true, id: hit.intent === 'issue' ? `issue:${hit.id}` : `service:${hit.id}`, office: issue?.go_to ?? v?.name, location: issue?.location_text ?? v?.location_text ?? 'not published',
+        notes: issue?.notes ?? v?.notes ?? null, hours: v?.hours_text ?? 'not published', email: v?.email ?? 'not published', extension: v?.extension ?? 'not published', handles: v?.handles ?? [] };
+    }
     const intent = call.name === 'find_place' ? 'place' : call.name === 'get_person_office' ? 'person' : 'procedure';
+    if (call.name === 'find_place' && !this.router!.match(q, 'place')) {
+      const sm = this.router!.match(q, 'service');
+      const r = sm ? this.offices.row(sm.id) : undefined;
+      if (r) return { found: true, id: `service:${r.id}`, name: r.name, location: r.location_text ?? 'not published', hours: formatHours(json.parse(r.hours, null)) ?? 'not published' };
+    }
     const m = this.router!.match(q, intent);
     if (call.name === 'find_place') {
       const p = m?.intent === 'place' ? this.places.get(m.id) : undefined;
@@ -197,7 +296,13 @@ export class Assistant {
     const review = lang !== 'en';
 
     // 1–3: local router
-    const m = this.router!.match(text);
+    const all = this.router!.matchAll(text);
+    let m = all[0] ?? null;
+    if (m?.intent === 'service') {
+      const home = json.parse<string[]>(this.offices.row(m.id)?.place_ids ?? null, [])[0];
+      const place = all.find(c => c.intent === 'place' && c.id === home && c.score - m!.score < 0.01);
+      if (place) m = place;
+    }
     if (m) {
       const a = this.fromMatch(m, lang, from, text);
       if (a) { if (!input.localOnly) this.log(text, lang, a.intent, 'local'); return { ...a, translation_review: review }; }
@@ -207,20 +312,29 @@ export class Assistant {
     // 4: Gemini with function calling
     if (!this.gemini.configured) {
       this.log(text, lang, 'unknown', 'none');
-      return { id: randomUUID(), intent: 'unknown', lang, text: T.unknown[lang], answered_by: 'none', translation_review: review, suggestions: ['Where is the library?', 'How do I declare a minor?', 'Is Harit Satt in?'] };
+      return { id: randomUUID(), intent: 'unknown', lang, text: T.unknown[lang], answered_by: 'none', translation_review: review, suggestions: ['Where is the library?', 'How do I declare a minor?', 'Where do I pay my fees?'] };
     }
     try {
-      const { calls } = await this.gemini.ask(text, lang, input.history ?? [], c => this.runTool(c));
-      const hit = [...calls].reverse().find(c => (c.result as { found?: boolean })?.found);
+      const { text: prose, calls } = await this.gemini.ask(text, lang, input.history ?? [], c => this.runTool(c));
+      const found = (c: { result: unknown }) => (c.result as { found?: boolean })?.found === true;
+      const isInfo = (c: { result: unknown }) => (c.result as { info?: boolean })?.info === true;
+      const hit = [...calls].reverse().find(c => found(c) && !isInfo(c));
+      const info = calls.find(isInfo);
       let answer: Answer;
       if (hit) {
-        const id = String((hit.result as { id: string }).id);
-        const intent = hit.call.name === 'find_place' ? 'place' : hit.call.name === 'get_person_office' ? 'person' : 'procedure';
+        const raw = String((hit.result as { id: string }).id);
+        const sep = raw.indexOf(':');
+        const kind = sep > 0 ? raw.slice(0, sep) : '';
+        const id = sep > 0 ? raw.slice(sep + 1) : raw;
+        const intent = kind === 'service' ? 'service' : kind === 'issue' ? 'issue' : hit.call.name === 'find_place' ? 'place' : hit.call.name === 'get_person_office' ? 'person' : 'procedure';
         const structured = this.fromMatch({ intent, id, score: 0, mode: modeFrom(text) }, lang, from, text)!;
         // The model resolves intent; factual content comes from the current campus record.
         answer = { ...structured, answered_by: 'gemini' };
+      } else if (info && prose) {
+        // general campus facts: the model's sentence is grounded in campus_info only
+        answer = this.infoAnswer(lang, prose);
       } else {
-        answer = { id: randomUUID(), intent: 'unknown', lang, text: T.unknown[lang], answered_by: 'gemini', suggestions: ['Where is the library?', 'How do I declare a minor?'] };
+        answer = { id: randomUUID(), intent: 'unknown', lang, text: T.unknown[lang], answered_by: 'gemini', suggestions: ['Where is the library?', 'How do I declare a minor?', 'I lost my student card'] };
       }
       this.log(text, lang, answer.intent, 'gemini');
       return { ...answer, translation_review: review };

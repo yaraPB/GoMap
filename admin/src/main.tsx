@@ -6,12 +6,16 @@ import Overview from './screens/Overview';
 import Places from './screens/Places';
 import Offices from './screens/Offices';
 import Procedures from './screens/Procedures';
+import Services from './screens/Services';
+import Issues from './screens/Issues';
+import OfficeTime from './screens/OfficeTime';
 import Reports from './screens/Reports';
 import { AssistantLog, Changes } from './screens/Log';
 import { Notice } from './ui';
 
 const SECTIONS = [
-  ['overview', 'Overview'], ['places', 'Places & POIs'], ['offices', 'Offices & hours'], ['procedures', 'Services & procedures'],
+  ['overview', 'Overview'], ['places', 'Places & POIs'], ['services', 'Offices & services'], ['issues', 'Where to go for…'], ['offices', 'Faculty & staff'],
+  ['time', 'Office time'], ['procedures', 'Procedures'],
   ['reports', 'Reports'], ['log', 'Assistant log'], ['changes', 'Change history'],
 ] as const;
 type Section = typeof SECTIONS[number][0];
@@ -66,6 +70,9 @@ function App() {
       <main className="main">
         {section === 'overview' && <Overview go={go} />}
         {section === 'places' && <Places selected={id} select={pid => go('places', pid)} />}
+        {section === 'services' && <Services selected={id} select={sid => go('services', sid || undefined)} />}
+        {section === 'issues' && <Issues />}
+        {section === 'time' && <OfficeTime go={go} />}
         {section === 'offices' && <Offices selected={id} select={pid => go('offices', pid)} />}
         {section === 'procedures' && <Procedures selected={id} select={pid => go('procedures', pid)} />}
         {section === 'reports' && <Reports />}

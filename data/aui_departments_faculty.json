@@ -7,14 +7,17 @@
     "website": "https://aui.ma",
     "academic_catalog": "https://aui.ma/hubfs/Academic%20Catalog%202024-2025%20V2.pdf"
   },
-  "retrieved_on": "2026-11-13",
+  "retrieved_on": "2026-11-14",
   "notes": [
     "Faculty data comes from each professor's profile page on aui.ma (teacher-bio pages); school details from each school's page and the Language Center page.",
     "Phone numbers shown as 'ext. NNNN' are internal extensions; from outside dial +212 535-86 followed by the extension (e.g. ext. 2114 -> +212 535-862-114).",
     "null means the field is not published on the profile. 'TBA' means the profile itself says office hours are to be announced.",
     "Office hours are as posted on the website and may be for a past semester; confirm with the professor or the office door.",
     "Known website issues: Eda Orhun's profile repeats Adil Akaaboune's extension and email, so those were left out; Frances Loustau-Williams has two profiles with different offices (Building 7/102 and Building 8/102).",
-    "Buildings: 'NAB' = New Academic Building (Building 16)."
+    "Buildings: 'NAB' = New Academic Building (Building 16).",
+    "Office hours, weekend rules and the issue-routing list were provided by the user and combined with office contacts from aui.ma/contact-us and the Health Center, Counseling and Community Care pages.",
+    "Locations shown as null were not published on the website; ask at the Registrar (Building 1) or call the main line +212 535-862-000.",
+    "Phone numbers: dial +212 535-86 followed by the 4-digit extension."
   ],
   "departments": [
     {
@@ -90,12 +93,12 @@
       "faculty": [
         {
           "name": "Lakshmi Goel",
-          "title": null,
-          "office": null,
-          "building": null,
+          "title": "Dean of the School of Business Administration",
+          "office": "Building 11, Office 4",
+          "building": "11",
           "office_hours": null,
-          "phone": null,
-          "email": null,
+          "phone": "(+212) 535-862-317",
+          "email": "l.goel@aui.ma",
           "profile_url": "https://aui.ma/teacher-bio/lakshmi-goel"
         },
         {
@@ -120,12 +123,12 @@
         },
         {
           "name": "Jawad Abrache",
-          "title": null,
+          "title": "Professor of Finance, Accounting, and Economics",
           "office": "Building 8B, Office 313",
           "building": "8B",
           "office_hours": "Monday 15:00-18:00; Thursday 8:00-11:00",
           "phone": "(+212) 535-862-335",
-          "email": null,
+          "email": "j.abrache@aui.ma",
           "profile_url": "https://aui.ma/teacher-bio/jawad-abrache"
         },
         {
@@ -150,7 +153,7 @@
         },
         {
           "name": "Abdelhamid Bennani Bouchiba",
-          "title": null,
+          "title": "Lecturer",
           "office": "Building 11, Office 107",
           "building": "11",
           "office_hours": "Wednesday 9:00-13:00, 13:30-18:30",
@@ -180,7 +183,7 @@
         },
         {
           "name": "Murat Doganlar",
-          "title": null,
+          "title": "Full Professor",
           "office": "Building 8B, Office 301",
           "building": "8B",
           "office_hours": "Monday, Tuesday & Wednesday 13:00-16:00",
@@ -200,7 +203,7 @@
         },
         {
           "name": "Ahlam Fakhar",
-          "title": null,
+          "title": "Assistant Professor",
           "office": "Building 11, Office 110",
           "building": "11",
           "office_hours": "Monday & Wednesday 12:00-16:30",
@@ -210,7 +213,7 @@
         },
         {
           "name": "Alae Gamar",
-          "title": null,
+          "title": "Assistant Professor",
           "office": "Building 11, Office 111",
           "building": "11",
           "office_hours": "Tuesday & Thursday 15:30-17:00; Wednesday 10:30-13:30 & 15:00-18:00",
@@ -220,7 +223,7 @@
         },
         {
           "name": "Abdelhamid Hamidi Alaoui",
-          "title": null,
+          "title": "Associate Professor",
           "office": "Building 8B, Office 219",
           "building": "8B",
           "office_hours": "Tuesday & Thursday 12:30-15:20; Tuesday 17:00-17:20",
@@ -231,7 +234,7 @@
         {
           "name": "Rhizlane Hammoud",
           "title": "Teaches Accounting and Economics (Fulbright scholar)",
-          "office": "Building 8B, Office 313",
+          "office": "Building 11, Office 104",
           "building": "11",
           "office_hours": "Tuesday & Thursday 9:00-9:30, 15:20-17:20; Wednesday 9:30-13:30",
           "phone": "(+212) 535-862-944",
@@ -295,12 +298,12 @@
           "building": "11",
           "office_hours": "Tuesday & Thursday 11:00-12:30; Wednesday 10:00-13:00",
           "phone": "(+212) 535-862-320",
-          "email": null,
+          "email": "h.lebdaoui@aui.ma",
           "profile_url": "https://aui.ma/teacher-bio/hind-lebdaoui"
         },
         {
           "name": "Onur Ozsoy",
-          "title": null,
+          "title": "Assistant Professor of Economics",
           "office": "Building 8B, Office 304",
           "building": "8B",
           "office_hours": "Monday, Wednesday & Friday 10:30-11:30",
@@ -310,7 +313,7 @@
         },
         {
           "name": "Malek Sarhani",
-          "title": null,
+          "title": "assistant Professor",
           "office": "Building 11, Office 6",
           "building": "11",
           "office_hours": "Monday & Wednesday 15:00-17:30; Tuesday & Thursday 15:00-17:00",
@@ -320,12 +323,12 @@
         },
         {
           "name": "Maryem Naili",
-          "title": null,
+          "title": "Assistant Professor of Finance",
           "office": null,
           "building": null,
           "office_hours": null,
           "phone": null,
-          "email": null,
+          "email": "m.naili@aui.ma",
           "profile_url": "https://aui.ma/teacher-bio/maryem-naili"
         },
         {
@@ -335,7 +338,7 @@
           "building": null,
           "office_hours": null,
           "phone": null,
-          "email": null,
+          "email": "y.elbouchikhi@aui.ma",
           "profile_url": "https://aui.ma/teacher-bio/yassine-el-bouchikhi"
         },
         {
@@ -360,7 +363,7 @@
         },
         {
           "name": "Hayat El Asri",
-          "title": null,
+          "title": "Assistant Professor",
           "office": "Building 11, Office 4",
           "building": "11",
           "office_hours": "Monday 14:00-18:30; Tuesday 14:00-18:30",
@@ -385,7 +388,7 @@
           "building": "11",
           "office_hours": "Monday, Wednesday & Friday 9:00-10:00, 12:00-14:00",
           "phone": null,
-          "email": null,
+          "email": "e.erragragui",
           "profile_url": "https://aui.ma/teacher-bio/elias-erragragui"
         },
         {
@@ -405,7 +408,7 @@
           "building": "16",
           "office_hours": "Monday, Wednesday & Friday 10:40-12:10 & 16:00-18:00",
           "phone": null,
-          "email": null,
+          "email": "a.Nourmohammadzadeh@aui.ma",
           "profile_url": "https://aui.ma/teacher-bio/abtin-nourmohammadzadeh"
         },
         {
@@ -425,27 +428,27 @@
           "building": "16",
           "office_hours": "Monday & Wednesday 11:25-13:55; Tuesday 12:00-16:00",
           "phone": null,
-          "email": null,
+          "email": "w.ouladbenaissa@aui.ma",
           "profile_url": "https://aui.ma/teacher-bio/wafa-oulad-benaissa"
         },
         {
           "name": "El Mehdi Ibnoulouafi",
-          "title": null,
+          "title": "Assistant Professor",
           "office": "Building 16, Office 017",
           "building": "16",
           "office_hours": "Monday & Wednesday 11:20-12:30, 13:20-15:00; Friday 11:20-12:30, 13:20-15:00, 15:50-16:20",
           "phone": null,
-          "email": null,
+          "email": "e.ibnoulouafi",
           "profile_url": "https://aui.ma/teacher-bio/el-mehdi-ibnoulouafi"
         },
         {
           "name": "Omer Cayirli",
-          "title": null,
+          "title": "Assistant Professor",
           "office": "Building 16, Office 017",
           "building": "16",
           "office_hours": "Monday 10:00-12:00, 13:00-15:00; Tuesday 14:30-15:30; Wednesday 10:00-12:00, 13:00-15:00",
           "phone": null,
-          "email": null,
+          "email": "o.cayirli@aui.ma",
           "profile_url": "https://aui.ma/teacher-bio/omer-cayirli"
         },
         {
@@ -455,7 +458,7 @@
           "building": "11",
           "office_hours": "Monday, Wednesday & Friday 10:00-13:00",
           "phone": null,
-          "email": null,
+          "email": "w.shibuya@aui.ma",
           "profile_url": "https://aui.ma/teacher-bio/william-shibuya"
         }
       ]
@@ -504,7 +507,7 @@
           "role": "Student Affairs Supporting Coordinator",
           "office": "Building 5, Office 9",
           "hours": "8:30-17:30",
-          "phone": null,
+          "phone": "ext. 2333",
           "email": "h.bourjila@aui.ma"
         },
         {
@@ -512,7 +515,7 @@
           "role": "Administrative Assistant",
           "office": "Building 5, Office 9",
           "hours": "8:30-17:30",
-          "phone": null,
+          "phone": "ext. 2126",
           "email": "z.dehbialaoui@aui.ma"
         },
         {
@@ -564,12 +567,12 @@
         },
         {
           "name": "Naeem Nisar Sheikh",
-          "title": null,
+          "title": "Assistant Professor of Mathematics",
           "office": "Building 6, Office 102",
           "building": "6",
           "office_hours": "Communicated to students at the beginning of every semester",
           "phone": "ext. 2355",
-          "email": null,
+          "email": "n.sheikh@aui.ma",
           "profile_url": "https://aui.ma/teacher-bio/naeem-nisar-sheikh"
         },
         {
@@ -579,7 +582,7 @@
           "building": "16",
           "office_hours": "Monday, Wednesday & Friday 9:00-10:00, 12:00-14:00",
           "phone": null,
-          "email": null,
+          "email": "h.assoudi@aui.ma",
           "profile_url": "https://aui.ma/teacher-bio/hicham-assoudi"
         },
         {
@@ -674,7 +677,7 @@
         },
         {
           "name": "Nasser Assem",
-          "title": null,
+          "title": "Assistant Professor of Computer Science",
           "office": "Building 7, Office 9",
           "building": "7",
           "office_hours": "Tuesday & Thursday 9:00-10:00, 14:30-16:00; Wednesday 9:00-13:00",
@@ -689,12 +692,12 @@
           "building": "8B",
           "office_hours": null,
           "phone": "ext. 2301",
-          "email": null,
+          "email": "m.azzouz@aui.ma",
           "profile_url": "https://aui.ma/teacher-bio/mohamed-azzouz"
         },
         {
           "name": "Anas Bentamy",
-          "title": null,
+          "title": "Assistant Professor",
           "office": "Building 7, Office 109",
           "building": "7",
           "office_hours": "TBA",
@@ -714,7 +717,7 @@
         },
         {
           "name": "Sara Bouri",
-          "title": null,
+          "title": "Full-Time Lab Instructor",
           "office": null,
           "building": null,
           "office_hours": null,
@@ -737,7 +740,7 @@
           "title": "Assistant Professor of Computer Science",
           "office": "Building 8B, Office 220",
           "building": "8B",
-          "office_hours": null,
+          "office_hours": "Monday, Wednesday & Friday 8:30 - 9:30 AM, Tuesday & Thursday 9:30 - 11 AM",
           "phone": "ext. 3161",
           "email": "h.chakiri@aui.ma",
           "profile_url": "https://aui.ma/teacher-bio/houda-chakiri"
@@ -747,7 +750,7 @@
           "title": "Assistant Professor of Computer Science",
           "office": "Building 5, Office 102",
           "building": "5",
-          "office_hours": "TBA",
+          "office_hours": null,
           "phone": "ext. 2379",
           "email": "y.chtouki@aui.ma",
           "profile_url": "https://aui.ma/teacher-bio/yousra-chtouki"
@@ -794,7 +797,7 @@
         },
         {
           "name": "Samir El Hajjaji",
-          "title": null,
+          "title": "Associate Professor of Chemistry",
           "office": "Building 5, Office 104",
           "building": "5",
           "office_hours": "Tuesday & Thursday 9:00-11:15; Wednesday 8:00-12:30",
@@ -819,7 +822,7 @@
           "building": "16",
           "office_hours": "Monday 9:55-11:25, 12:25-13:55, 16:00-16:30; Tuesday & Thursday by appointment; Wednesday 9:55-11:25, 12:25-13:55; Friday 9:55-11:25, 12:55-13:55",
           "phone": "ext. 2139",
-          "email": null,
+          "email": "m.kalmoun@aui.ma",
           "profile_url": "https://aui.ma/teacher-bio/el-mostafa-kalmoun"
         },
         {
@@ -849,7 +852,7 @@
           "building": "16",
           "office_hours": null,
           "phone": "ext. 2300",
-          "email": null,
+          "email": "m.khalili@aui.ma",
           "profile_url": "https://aui.ma/teacher-bio/mohamed-hassan-khalili"
         },
         {
@@ -874,7 +877,7 @@
         },
         {
           "name": "Lahcen Laayouni",
-          "title": null,
+          "title": "Associate Professor of Mathematics",
           "office": "Building 7, Office 5",
           "building": "7",
           "office_hours": "Tuesday & Thursday 10:30-13:00, 14:30-16:00; Friday 11:00-12:00",
@@ -889,7 +892,7 @@
           "building": "8B",
           "office_hours": "None this semester",
           "phone": "ext. 3165",
-          "email": null,
+          "email": "i.latachi@aui.ma",
           "profile_url": "https://aui.ma/teacher-bio/ibtissam-latachi"
         },
         {
@@ -909,7 +912,7 @@
           "building": "8B",
           "office_hours": null,
           "phone": "ext. 3519",
-          "email": null,
+          "email": "h.limami@aui.ma",
           "profile_url": "https://aui.ma/teacher-bio/houssame-limami"
         },
         {
@@ -919,7 +922,7 @@
           "building": "8B",
           "office_hours": null,
           "phone": "ext. 3165",
-          "email": null,
+          "email": "j.lotfi@aui.ma",
           "profile_url": "https://aui.ma/teacher-bio/jawad-lotfi"
         },
         {
@@ -954,7 +957,7 @@
         },
         {
           "name": "Yassine Salih Alj",
-          "title": null,
+          "title": "Full Professor of Engineering",
           "office": "Building 7, Office 105",
           "building": "7",
           "office_hours": "TBA",
@@ -969,7 +972,7 @@
           "building": "5",
           "office_hours": "Tuesday & Thursday 15:55-17:25, 18:55-20:25; Wednesday 14:30-17:30; or by appointment",
           "phone": "(+212) 535-862-179",
-          "email": null,
+          "email": "s.samadi@aui.ma",
           "profile_url": "https://aui.ma/teacher-bio/sedki-samadi"
         },
         {
@@ -984,7 +987,7 @@
         },
         {
           "name": "Hanaa Talei",
-          "title": null,
+          "title": "Lecturer",
           "office": "Building 5, Office 101",
           "building": "5",
           "office_hours": "TBA",
@@ -1014,7 +1017,7 @@
         },
         {
           "name": "Rabie Zine",
-          "title": null,
+          "title": "Associate Professor of Mathematics",
           "office": "Building 8B, Office 221",
           "building": "8B",
           "office_hours": "TBA",
@@ -1024,7 +1027,7 @@
         },
         {
           "name": "Ahmed Aly",
-          "title": null,
+          "title": "Associate Professor of Biology",
           "office": "Building 8B, Office 210",
           "building": "8B",
           "office_hours": null,
@@ -1089,7 +1092,7 @@
           "building": "16",
           "office_hours": "Monday, Wednesday & Friday 9:00-10:00, 12:00-14:00",
           "phone": "ext. 2347",
-          "email": null,
+          "email": "o.hourrane@aui.ma",
           "profile_url": "https://aui.ma/teacher-bio/oumaima-hourrane"
         },
         {
@@ -2093,38 +2096,528 @@
       ]
     }
   ],
-  "university_centers_and_services": [
+  "working_hours": {
+    "standard_office_hours": {
+      "days": "Monday to Friday",
+      "open": "09:00",
+      "close": "17:30",
+      "lunch_break": {
+        "start": "13:00",
+        "end": "14:00",
+        "note": "Offices are closed during lunch."
+      }
+    },
+    "weekend": {
+      "days": [
+        "Saturday",
+        "Sunday"
+      ],
+      "working": false,
+      "exceptions": [
+        "Dining services (cafeteria and restaurants) operate on weekends."
+      ],
+      "emergencies": "Security (24/7) ext. 2222 / 0535-86-2222; Health Center on-call doctor and nurse 24/7."
+    },
+    "applies_to": "All administrative and student services unless an office lists its own hours."
+  },
+  "offices_and_services": [
     {
-      "name": "Center for Learning Excellence (CLE)",
-      "services": "Mentor and tutor training; tutoring and academic support services."
+      "name": "Registrar (Registration Office)",
+      "handles": [
+        "Add/drop and course registration",
+        "Changing major, minor, specialization or concentration",
+        "Changing catalog year",
+        "Grade appeals",
+        "Official transcripts",
+        "Enrollment verification letters",
+        "Graduation applications / degree audit",
+        "Withdrawal from courses"
+      ],
+      "location": "Building 1",
+      "email": "s.moujahid@aui.ma",
+      "extension": "2175",
+      "phone": "+212 535-86-2175",
+      "hours": "Monday-Friday 9:00-17:30 (lunch break 13:00-14:00); closed Saturday and Sunday"
     },
     {
-      "name": "Writing Center (part of CLE)",
-      "services": "Socratic-style writing tutoring for students of all levels and disciplines."
+      "name": "Business Office",
+      "handles": [
+        "Student account balance",
+        "Tuition and fee payments",
+        "Cash wallet / student card top-ups",
+        "Refunds",
+        "Payment plans and financial holds",
+        "Any other financial/billing issue"
+      ],
+      "location": "Building 1",
+      "email": "obs@aui.ma",
+      "extension": "2368",
+      "phone": "+212 535-86-2368",
+      "hours": "Monday-Friday 9:00-17:30 (lunch break 13:00-14:00); closed Saturday and Sunday"
     },
     {
-      "name": "Center for Learning and Teaching (CLT)",
-      "services": "Technical support, consultation and production services for faculty; digital teaching."
+      "name": "Financial Aid Office",
+      "handles": [
+        "Financial aid applications",
+        "Scholarships and merit awards",
+        "Aid renewal and eligibility",
+        "Student employment / work-study"
+      ],
+      "location": "Building 1",
+      "email": "a.mhammedi@aui.ma",
+      "extension": "2172",
+      "phone": "+212 535-86-2172",
+      "hours": "Monday-Friday 9:00-17:30 (lunch break 13:00-14:00); closed Saturday and Sunday"
+    },
+    {
+      "name": "Office of International Programs (OIP)",
+      "handles": [
+        "Exchange and study abroad (outgoing and incoming)",
+        "Transfer students and transfer of credits from abroad",
+        "International student support and visas/residence documents",
+        "Summer program for international students"
+      ],
+      "location": "Building 10",
+      "email": "oip@aui.ma",
+      "extension": "2010",
+      "phone": "+212 535-86-2010",
+      "hours": "Monday-Friday 9:00-17:30 (lunch break 13:00-14:00); closed Saturday and Sunday"
+    },
+    {
+      "name": "Academic Advising",
+      "handles": [
+        "Degree planning",
+        "Course selection and advisor approval for registration",
+        "Academic progress questions"
+      ],
+      "location": "Your advisor's own office (see the 'faculty' list of your school for building, room and office hours)",
+      "email": null,
+      "extension": null,
+      "phone": null,
+      "hours": "Your advisor's posted office hours",
+      "notes": "Every student is assigned an advisor, who is a professor. Advising issues go to that professor during their office hours. SBA also has a dedicated undergraduate advisor (Comlanvi Martin Konou, Building 10, Office 11)."
+    },
+    {
+      "name": "Admissions",
+      "handles": [
+        "New undergraduate, graduate and international applications"
+      ],
+      "location": "Building 14",
+      "email": "admissions@aui.ma",
+      "extension": "2086",
+      "phone": "+212 535-86-2086",
+      "hours": "Monday-Friday 9:00-17:30 (lunch break 13:00-14:00); closed Saturday and Sunday"
+    },
+    {
+      "name": "Dean of Students / Division of Student Affairs (DSA)",
+      "handles": [
+        "Student conduct",
+        "General student life concerns",
+        "Referrals to the right office"
+      ],
+      "location": "Building 2",
+      "email": "dsa@aui.ma",
+      "extension": "2031",
+      "phone": "+212 535-86-2031",
+      "hours": "Monday-Friday 9:00-17:30 (lunch break 13:00-14:00); closed Saturday and Sunday"
+    },
+    {
+      "name": "Housing & Residential Life",
+      "handles": [
+        "Room assignments and changes",
+        "Dorm maintenance issues",
+        "Residence rules and hall directors"
+      ],
+      "location": "Building 38 & Building 39",
+      "email": "housingservices@aui.ma",
+      "extension": "3333",
+      "phone": "+212 535-86-3333",
+      "hours": "Monday-Friday 9:00-17:30 (lunch break 13:00-14:00); closed Saturday and Sunday",
+      "notes": "After hours, contact hall directors: men ext. 555, women ext. 3333."
+    },
+    {
+      "name": "Dining Services (cafeteria and restaurants)",
+      "handles": [
+        "Meals, cafeteria and on-campus restaurants",
+        "Meal-related payment questions (balance itself: Business Office)"
+      ],
+      "location": "Building 2 & Building 3 & Building 14",
+      "email": "restaurant@aui.ma",
+      "extension": "2709",
+      "phone": "+212 535-86-2709",
+      "hours": "Open 7 days a week, including weekends (meal times vary by outlet)"
+    },
+    {
+      "name": "Health Center",
+      "handles": [
+        "Primary care and consultations",
+        "Injury treatment",
+        "Pharmacy",
+        "Dental care",
+        "Medical certificates for absences (only if authorized by Health Center physicians)",
+        "Health insurance coordination"
+      ],
+      "location": "Building 26",
+      "email": "healthcenter@aui.ma",
+      "extension": "2057",
+      "phone": "+212 535-86-2057",
+      "hours": "Website lists consultations 9:00-18:00 daily and the center open until 23:00; another page lists Mon-Fri 8:00-20:00, Sat 10:00-12:00. Doctor and nurse on call 24/7 for emergencies.",
+      "url": "https://aui.ma/health-center"
+    },
+    {
+      "name": "Counseling Services",
+      "handles": [
+        "Free, confidential individual or group counseling",
+        "Stress, anxiety, personal or academic difficulties",
+        "Referral to the on-campus psychiatrist"
+      ],
+      "location": "Building 6, Room 108 (main counselor); also Building 8B Rooms 309 and 203, Building 16 (NAB) Room 133, Building 26",
+      "email": "counselor@aui.ma",
+      "extension": "2034",
+      "phone": "+212 535-86-2034",
+      "hours": "Monday-Friday 9:00-17:30 (lunch break 13:00-14:00); closed Saturday and Sunday",
+      "url": "https://aui.ma/counseling-services"
+    },
+    {
+      "name": "Community Care and Safety Office (CCSO)",
+      "handles": [
+        "Reports of sexual misconduct or gender-based discrimination",
+        "Wellness check-ins and support groups",
+        "No-contact orders (with Security)"
+      ],
+      "location": "Building 7",
+      "email": "ccso@aui.ma",
+      "extension": "2323",
+      "phone": "+212 535-86-2323",
+      "hours": "By appointment via ccso@aui.ma",
+      "url": "https://aui.ma/community-care-and-safety"
+    },
+    {
+      "name": "Security and Safety",
+      "handles": [
+        "Emergencies on campus",
+        "Lost and found",
+        "Safety concerns",
+        "Access and campus security"
+      ],
+      "location": "Building 9",
+      "email": "z.yassine@aui.ma",
+      "extension": "2222",
+      "phone": "+212 535-86-2222",
+      "hours": "24/7",
+      "notes": "Emergency line ext. 2222 / 0535-86-2222. Office number listed on Contact Us: ext. 2071."
+    },
+    {
+      "name": "Information Technologies and Services (ITS)",
+      "handles": [
+        "Student account / password problems",
+        "Email, Wi-Fi and network",
+        "Canvas, My AUI portal access",
+        "Computer labs"
+      ],
+      "location": "Building 9",
+      "email": "its@aui.ma",
+      "extension": "2404",
+      "phone": "+212 535-86-2404",
+      "hours": "Monday-Friday 9:00-17:30 (lunch break 13:00-14:00); closed Saturday and Sunday"
     },
     {
       "name": "Mohammed VI Library",
-      "services": "University library and research guides.",
+      "handles": [
+        "Borrowing and returns",
+        "Research help and databases",
+        "Study spaces"
+      ],
+      "location": "Library",
+      "email": "libcom@aui.ma",
+      "extension": "2190",
+      "phone": "+212 535-86-2190",
+      "hours": "Monday-Friday 9:00-17:30 (lunch break 13:00-14:00); closed Saturday and Sunday",
       "url": "https://libguides.aui.ma"
     },
     {
+      "name": "Center for Learning Excellence (CLE)",
+      "handles": [
+        "Tutoring",
+        "Peer mentoring",
+        "Academic support for struggling students"
+      ],
+      "location": "Building 7",
+      "email": "cle@aui.ma",
+      "extension": "4357",
+      "phone": "+212 535-86-4357",
+      "hours": "Monday-Friday 9:00-17:30 (lunch break 13:00-14:00); closed Saturday and Sunday"
+    },
+    {
+      "name": "Writing Center",
+      "handles": [
+        "Help with essays, reports and academic writing"
+      ],
+      "location": "Building 7",
+      "email": "wcenter@aui.ma",
+      "extension": "3288",
+      "phone": "+212 535-86-3288",
+      "hours": "Monday-Friday 9:00-17:30 (lunch break 13:00-14:00); closed Saturday and Sunday"
+    },
+    {
+      "name": "Language Center",
+      "handles": [
+        "English, French, Spanish, Tamazight and Korean courses",
+        "Placement in English/French levels"
+      ],
+      "location": "Building 8",
+      "email": "lc@aui.ma",
+      "extension": "2420",
+      "phone": "+212 535-86-2420",
+      "hours": "Monday-Friday 9:00-17:30 (lunch break 13:00-14:00); closed Saturday and Sunday"
+    },
+    {
       "name": "Employability & Entrepreneurship Office (Pathways)",
-      "services": "Career preparation, internships and entrepreneurship support.",
+      "handles": [
+        "Internship and job search",
+        "CV and interview preparation",
+        "Entrepreneurship support"
+      ],
+      "location": "Building 4",
+      "email": "mycareer@aui.ma",
+      "extension": null,
+      "phone": null,
+      "hours": "Monday-Friday 9:00-17:30 (lunch break 13:00-14:00); closed Saturday and Sunday",
       "url": "https://aui.ma/employability-and-entrepreneurship-office"
     },
     {
-      "name": "Azrou Center for Community Development",
-      "services": "Community engagement and development programs.",
-      "url": "https://aui.ma/azrou-center-for-community-developement"
+      "name": "Student Activities Office (SAO)",
+      "handles": [
+        "Clubs and student organizations",
+        "Events and student leadership"
+      ],
+      "location": "Building 2",
+      "email": "sao@aui.ma",
+      "extension": "2013",
+      "phone": "+212 535-86-2013",
+      "hours": "Monday-Friday 9:00-17:30 (lunch break 13:00-14:00); closed Saturday and Sunday"
     },
     {
-      "name": "Executive Education Center",
-      "services": "Executive and continuing education programs.",
-      "url": "https://aui.ma/executive-education"
+      "name": "Athletics",
+      "handles": [
+        "Sports teams, gym and sports facilities"
+      ],
+      "location": "Building 14",
+      "email": "ath-com@aui.ma",
+      "extension": "2015",
+      "phone": "+212 535-86-2015",
+      "hours": "Monday-Friday 9:00-17:30 (lunch break 13:00-14:00); closed Saturday and Sunday"
+    },
+    {
+      "name": "University Honors Program",
+      "handles": [
+        "Honors program admission and requirements"
+      ],
+      "location": null,
+      "email": "uhp@aui.ma",
+      "extension": "2024",
+      "phone": "+212 535-86-2024",
+      "hours": "Monday-Friday 9:00-17:30 (lunch break 13:00-14:00); closed Saturday and Sunday"
+    },
+    {
+      "name": "Bookstore",
+      "handles": [
+        "Textbooks and course materials"
+      ],
+      "location": "Library",
+      "email": "bookstore@aui.ma",
+      "extension": "2072",
+      "phone": "+212 535-86-2072",
+      "hours": "Monday-Friday 9:00-17:30 (lunch break 13:00-14:00); closed Saturday and Sunday"
+    },
+    {
+      "name": "Campus Store",
+      "handles": [
+        "Supplies and AUI merchandise"
+      ],
+      "location": "Building 2",
+      "email": "cs-com@aui.ma",
+      "extension": "2311",
+      "phone": "+212 535-86-2311",
+      "hours": "Monday-Friday 9:00-17:30 (lunch break 13:00-14:00); closed Saturday and Sunday"
+    },
+    
+    {
+      "name": "Vice President for Academic Affairs (VPAA)",
+      "handles": [
+        "Escalated academic issues not resolved at school level"
+      ],
+      "location": "Building 1",
+      "email": "vpaa@aui.ma",
+      "extension": "2024",
+      "phone": "+212 535-86-2024",
+      "hours": "Monday-Friday 9:00-17:30 (lunch break 13:00-14:00); closed Saturday and Sunday"
+    },
+    {
+      "name": "School deans' offices",
+      "handles": [
+        "Academic petitions and school-level escalations"
+      ],
+      "location": "SBA: Building 11; SSE: Building 5; SSAH: Building 8",
+      "email": "sbadean@aui.ma / ssedean@aui.ma / shssdean@aui.ma",
+      "extension": null,
+      "phone": null,
+      "hours": "Monday-Friday 9:00-17:30 (lunch break 13:00-14:00); closed Saturday and Sunday",
+      "notes": "SBA ext. 2311, SSE ext. 2114, SSAH ext. 2427."
+    }
+  ],
+  "student_issue_routing": [
+    {
+      "issue": "Account balance, unpaid fees, financial hold",
+      "go_to": "Business Office",
+      "location": "Building 1"
+    },
+    {
+      "issue": "Cash wallet / student card money",
+      "go_to": "Business Office",
+      "location": "Building 1"
+    },
+    {
+      "issue": "Tuition payment, refunds, payment plans, any other money/billing issue",
+      "go_to": "Business Office",
+      "location": "Building 1"
+    },
+    {
+      "issue": "Financial aid application or status",
+      "go_to": "Financial Aid Office",
+      "location": "Building 1"
+    },
+    {
+      "issue": "Scholarships (application, renewal, losing a scholarship)",
+      "go_to": "Financial Aid Office",
+      "location": "Building 1"
+    },
+    {
+      "issue": "Add / drop a course, registration problems",
+      "go_to": "Registrar (Registration Office)",
+      "location": "Building 1"
+    },
+    {
+      "issue": "Change of major",
+      "go_to": "Registrar (Registration Office)",
+      "location": "Building 1"
+    },
+    {
+      "issue": "Declare or change a minor",
+      "go_to": "Registrar (Registration Office)",
+      "location": "Building 1"
+    },
+    {
+      "issue": "Change specialization or concentration",
+      "go_to": "Registrar (Registration Office)",
+      "location": "Building 1"
+    },
+    {
+      "issue": "Grade appeal",
+      "go_to": "Registrar (Registration Office)",
+      "location": "Building 1"
+    },
+    {
+      "issue": "Change catalog year",
+      "go_to": "Registrar (Registration Office)",
+      "location": "Building 1"
+    },
+    {
+      "issue": "Official transcript",
+      "go_to": "Registrar (Registration Office)",
+      "location": "Building 1"
+    },
+    {
+      "issue": "Enrollment certificate / graduation application",
+      "go_to": "Registrar (Registration Office)",
+      "location": "Building 1"
+    },
+    {
+      "issue": "Advising: degree plan, course approval, academic progress",
+      "go_to": "Your academic advisor (a professor)",
+      "location": "Your advisor's office",
+      "notes": "Find your advisor in the school's faculty list in this file for building, room and office hours."
+    },
+    {
+      "issue": "Exchange / study abroad",
+      "go_to": "Office of International Programs (OIP)",
+      "location": "Building 10"
+    },
+    {
+      "issue": "Transfer (incoming transfer or transferring credits)",
+      "go_to": "Office of International Programs (OIP)",
+      "location": "Building 10"
+    },
+    {
+      "issue": "Housing, room change, dorm maintenance",
+      "go_to": "Housing & Residential Life",
+      "location": "Building 39"
+    },
+    {
+      "issue": "Feeling sick, injury, medical certificate for absence",
+      "go_to": "Health Center",
+      "location": "Building 26"
+    },
+    {
+      "issue": "Stress, anxiety, personal problems",
+      "go_to": "Counseling Services",
+      "location": "Building 6, Room 108"
+    },
+    {
+      "issue": "Harassment or sexual misconduct report",
+      "go_to": "Community Care and Safety Office (CCSO)",
+      "location": "Building 7"
+    },
+    {
+      "issue": "Emergency, safety issue, lost and found",
+      "go_to": "Security and Safety",
+      "location": "Building 9",
+      "notes": "Emergency: ext. 2222 / 0535-86-2222, 24/7."
+    },
+    {
+      "issue": "Password, email, Wi-Fi, Canvas or portal access",
+      "go_to": "Information Technologies and Services (ITS)",
+      "location": "Building 9"
+    },
+    {
+      "issue": "Tutoring or academic support",
+      "go_to": "Center for Learning Excellence (CLE)",
+      "location": "Building 7"
+    },
+    {
+      "issue": "Help with writing an essay or report",
+      "go_to": "Writing Center",
+      "location": "Building 7"
+    },
+    {
+      "issue": "Language course placement",
+      "go_to": "Language Center",
+      "location": "Building 8"
+    },
+    {
+      "issue": "Internship or job search, CV help",
+      "go_to": "Employability & Entrepreneurship Office (Pathways)",
+      "location": "Building 4"
+    },
+    {
+      "issue": "Clubs and student events",
+      "go_to": "Student Activities Office (SAO)",
+      "location": "Building 2"
+    },
+    {
+      "issue": "Food / meals (open on weekends)",
+      "go_to": "Dining Services (cafeteria and restaurants)",
+      "location": "Building 2 & 3 & 14"
+    },
+    {
+      "issue": "Textbooks",
+      "go_to": "Bookstore",
+      "location": "Library"
+    },
+    {
+      "issue": "Issue not resolved by the office or advisor",
+      "go_to": "Your school's dean's office",
+      "location": "SBA: Building 11; SSE: Building 5; SSAH: Building 8"
     }
   ]
 }

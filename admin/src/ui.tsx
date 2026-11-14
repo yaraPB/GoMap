@@ -110,3 +110,97 @@ export function Tags({ value, onChange, placeholder }: { value: string[]; onChan
     </div>
   );
 }
+
+const CAL_DAYS: [keyof Hours, string][] = [['mon', 'Mon'], ['tue', 'Tue'], ['wed', 'Wed'], ['thu', 'Thu'], ['fri', 'Fri'], ['sat', 'Sat'], ['sun', 'Sun']];
+const toMin = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
+const toTime = (m: number) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+const STANDARD_DAY: [string, string][] = [['09:00', '13:00'], ['14:00', '17:30']];
+
+/**
+ * Week calendar for office hours: drag over the grid to paint hours, drag over painted hours to
+ * erase them. Click a day name to switch between "not published" and "closed". Lunch is shaded.
+ */
+export function WeekCalendar({ value, onChange, lunch, from = 7, to = 21, step = 30 }: {
+  value: Hours | null; onChange: (h: Hours | null) => void; lunch?: [string, string]; from?: number; to?: number; step?: number;
+}) {
+  const slots = Array.from({ length: ((to - from) * 60) / step }, (_, i) => from * 60 + i * step);
+  const [drag, setDrag] = useState<{ d0: number; s0: number; d1: number; s1: number; paint: boolean } | null>(null);
+  const h = value ?? {};
+  const painted = (d: keyof Hours, m: number) => (h[d] ?? []).some(([a, b]) => m >= toMin(a) && m < toMin(b));
+  const inDrag = (di: number, si: number) => !!drag && di >= Math.min(drag.d0, drag.d1) && di <= Math.max(drag.d0, drag.d1) && si >= Math.min(drag.s0, drag.s1) && si <= Math.max(drag.s0, drag.s1);
+  const shown = (di: number, si: number) => (inDrag(di, si) ? drag!.paint : painted(CAL_DAYS[di][0], slots[si]));
+
+  const commit = () => {
+    if (!drag) return;
+    const next: Hours = { ...h };
+    CAL_DAYS.forEach(([d], di) => {
+      if (di < Math.min(drag.d0, drag.d1) || di > Math.max(drag.d0, drag.d1)) return;
+      // minutes outside the visible window are kept; the rest is rebuilt slot by slot
+      const ranges: [string, string][] = (h[d] ?? []).filter(([a, b]) => toMin(b) <= from * 60 || toMin(a) >= to * 60);
+      let start: number | null = null;
+      slots.forEach((m, si) => {
+        const on = shown(di, si);
+        if (on && start === null) start = m;
+        const last = si === slots.length - 1;
+        if ((!on || last) && start !== null) { ranges.push([toTime(start), toTime(on ? m + step : m)]); start = null; }
+      });
+      next[d] = ranges.sort((a, b) => a[0].localeCompare(b[0]));
+    });
+    onChange(next);
+    setDrag(null);
+  };
+  const cycleDay = (d: keyof Hours) => {
+    const next = { ...h };
+    if (next[d] === undefined) next[d] = [];
+    else delete next[d];
+    onChange(Object.keys(next).length ? next : null);
+  };
+  const lunchFrom = lunch ? toMin(lunch[0]) : -1, lunchTo = lunch ? toMin(lunch[1]) : -1;
+  const dayMin = (d: keyof Hours) => (h[d] ?? []).reduce((x, [a, b]) => x + toMin(b) - toMin(a), 0);
+  const total = CAL_DAYS.reduce((s, [d]) => s + dayMin(d), 0);
+
+  return (
+    <div className="cal-wrap">
+      <div className="cal" style={{ gridTemplateColumns: '52px repeat(7, 1fr)' }} onMouseLeave={commit} onMouseUp={commit} role="grid" aria-label="Weekly hours: drag to paint or erase">
+        <div />
+        {CAL_DAYS.map(([d, name]) => (
+          <button key={d} type="button" className={`cal-day ${h[d] === undefined ? 'unpub' : !h[d]!.length ? 'closed' : ''}`} onClick={() => cycleDay(d)}
+            title="Switch between not published and closed">
+            {name}<small>{h[d] === undefined ? 'not published' : !h[d]!.length ? 'closed' : `${Math.round(dayMin(d) / 6) / 10} h`}</small>
+          </button>
+        ))}
+        {slots.map((m, si) => (
+          <div key={m} style={{ display: 'contents' }}>
+            <div className="cal-time">{m % 60 === 0 ? toTime(m) : ''}</div>
+            {CAL_DAYS.map(([d], di) => (
+              <div key={d} role="gridcell" aria-selected={shown(di, si)}
+                className={`cal-cell ${shown(di, si) ? 'on' : ''} ${m >= lunchFrom && m < lunchTo ? 'lunch' : ''} ${h[d] === undefined ? 'unpub' : ''} ${m % 60 === 0 ? 'hr' : ''}`}
+                onMouseDown={e => { e.preventDefault(); setDrag({ d0: di, s0: si, d1: di, s1: si, paint: !painted(d, m) }); }}
+                onMouseEnter={() => { if (drag) setDrag({ ...drag, d1: di, s1: si }); }} />
+            ))}
+          </div>
+        ))}
+      </div>
+      <div className="toolbar" style={{ marginTop: 8 }}>
+        <span className="pill">{Math.round(total / 6) / 10} h per week</span>
+        {lunch && <span className="pill busy">Lunch {lunch[0]}–{lunch[1]} shaded</span>}
+        <button type="button" className="btn sm" onClick={() => onChange({ mon: STANDARD_DAY, tue: STANDARD_DAY, wed: STANDARD_DAY, thu: STANDARD_DAY, fri: STANDARD_DAY, sat: [], sun: [] })}>Standard office week</button>
+        <button type="button" className="btn sm" onClick={() => onChange(null)}>Clear (not published)</button>
+      </div>
+    </div>
+  );
+}
+
+/** Calendar or day-by-day list over the same value. */
+export function HoursField({ value, onChange, lunch }: { value: Hours | null; onChange: (h: Hours | null) => void; lunch?: [string, string] }) {
+  const [mode, setMode] = useState<'calendar' | 'list'>('calendar');
+  return (
+    <div className="stack" style={{ gap: 10 }}>
+      <div className="toolbar">
+        <button type="button" className={`btn sm ${mode === 'calendar' ? 'dark' : ''}`} onClick={() => setMode('calendar')}>Calendar</button>
+        <button type="button" className={`btn sm ${mode === 'list' ? 'dark' : ''}`} onClick={() => setMode('list')}>Day by day</button>
+      </div>
+      {mode === 'calendar' ? <WeekCalendar value={value} onChange={onChange} lunch={lunch} /> : <HoursEditor value={value} onChange={onChange} />}
+    </div>
+  );
+}

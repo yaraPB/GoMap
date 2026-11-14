@@ -94,6 +94,70 @@ export function openSqlite(file: string): Sql {
       created_at  TEXT NOT NULL
     );
 
+    -- Offices and student services (data/aui_departments_faculty.json → offices_and_services)
+    CREATE TABLE IF NOT EXISTS services (
+      id            TEXT PRIMARY KEY,
+      name          TEXT NOT NULL,
+      short_name    TEXT,
+      category      TEXT NOT NULL DEFAULT 'service',  -- academic | money | wellbeing | campus_life | it | admin
+      handles       TEXT NOT NULL DEFAULT '[]',       -- JSON [string]: what students come for
+      keywords      TEXT NOT NULL DEFAULT '[]',       -- JSON [string]: extra words the assistant matches
+      place_ids     TEXT NOT NULL DEFAULT '[]',       -- JSON [Mongo places._id], first = main desk
+      location_text TEXT,
+      room          TEXT,
+      email         TEXT,
+      extension     TEXT,
+      phone         TEXT,
+      hours         TEXT,                             -- JSON hours, NULL = not published
+      hours_raw     TEXT,
+      notes         TEXT,
+      sort          INTEGER NOT NULL DEFAULT 0,
+      admin_edited  INTEGER NOT NULL DEFAULT 0,       -- 1 = re-import from the JSON leaves it alone
+      verified_at   TEXT,
+      source        TEXT,
+      updated_at    TEXT NOT NULL
+    );
+
+    -- "I have problem X, where do I go?" (student_issue_routing)
+    CREATE TABLE IF NOT EXISTS issue_routing (
+      id            TEXT PRIMARY KEY,
+      issue         TEXT NOT NULL,
+      go_to         TEXT NOT NULL,
+      service_id    TEXT REFERENCES services(id) ON DELETE SET NULL,
+      location_text TEXT,
+      place_id      TEXT,
+      notes         TEXT,
+      keywords      TEXT NOT NULL DEFAULT '[]',
+      sort          INTEGER NOT NULL DEFAULT 0,
+      admin_edited  INTEGER NOT NULL DEFAULT 0,
+      updated_at    TEXT NOT NULL
+    );
+
+    -- Every presence change, so the admin sees time actually spent in the office.
+    CREATE TABLE IF NOT EXISTS presence_log (
+      id          TEXT PRIMARY KEY,
+      person_id   TEXT NOT NULL REFERENCES people(id) ON DELETE CASCADE,
+      status      TEXT NOT NULL,       -- in | busy | out
+      started_at  TEXT NOT NULL,
+      ended_at    TEXT
+    );
+    CREATE INDEX IF NOT EXISTS presence_log_person ON presence_log(person_id, started_at);
+
+    -- Demo accounts for the role views (no passwords; GoCampus SSO later). Admin is separate.
+    CREATE TABLE IF NOT EXISTS accounts (
+      id          TEXT PRIMARY KEY,
+      name        TEXT NOT NULL,
+      role        TEXT NOT NULL,       -- student | faculty | staff | guest (visitor)
+      person_id   TEXT,                -- people.id for faculty/staff
+      description TEXT,
+      sort        INTEGER NOT NULL DEFAULT 0
+    );
+
+    CREATE TABLE IF NOT EXISTS meta (
+      key   TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS change_log (
       id          TEXT PRIMARY KEY,
       entity      TEXT NOT NULL,       -- place | person | procedure | report
@@ -104,8 +168,22 @@ export function openSqlite(file: string): Sql {
       created_at  TEXT NOT NULL
     );
   `);
+  addColumn(db, 'people', 'admin_edited', 'INTEGER NOT NULL DEFAULT 0');
+  addColumn(db, 'people', 'lunch', 'TEXT'); // JSON ["13:00","14:00"], NULL = campus default
+  addColumn(db, 'office_notes', 'kind', 'TEXT'); // sick | online | appointment | email | back_soon | custom
   return db;
 }
+
+/** Tiny migration helper for files created by an older schema. */
+function addColumn(db: Sql, table: string, column: string, def: string) {
+  const cols = db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
+  if (!cols.some(c => c.name === column)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${def}`);
+}
+
+export const meta = {
+  get(db: Sql, key: string): string | null { return (db.prepare('SELECT value FROM meta WHERE key = ?').get(key) as { value: string } | undefined)?.value ?? null; },
+  set(db: Sql, key: string, value: string) { db.prepare('INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(key, value); },
+};
 
 export const json = {
   parse<T>(value: unknown, fallback: T): T {

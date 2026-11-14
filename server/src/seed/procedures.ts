@@ -12,15 +12,36 @@ export type ProcedureSeed = {
 export function procedureSeeds(retrievedOn: string): ProcedureSeed[] {
   return [
     {
-      id: 'declare-minor', title: 'Declare a minor', owner_office: "Registrar's Office", place_id: 'building-2', contact_email: 'registrar@aui.ma',
-      summary: "You declare a minor through the Registrar's Office, after your academic advisor signs the declaration form.",
+      id: 'declare-minor', title: 'Declare a minor', owner_office: 'Registrar (Registration Office)', place_id: 'building-1', contact_email: 's.moujahid@aui.ma',
+      summary: 'You declare or change a minor at the Registrar (Building 1, ext. 2175), after your academic advisor signs the declaration form.',
       steps: [
         { title: 'Talk to your advisor', body: 'Check the minor fits your degree plan and get the declaration form signed.' },
         { title: 'Get the minor coordinator to sign', body: 'The school that runs the minor signs the form too.' },
-        { title: "Hand it in at the Registrar's Office", body: 'Bring the signed form to Building 2 during office hours.' },
+        { title: 'Hand it in at the Registrar', body: 'Bring the signed form to Building 1, Monday to Friday 9:00–17:30 (closed 13:00–14:00).' },
       ],
-      match_phrases: ['declare a minor', 'add a minor', 'minor declaration', 'how do i get a minor', 'minor form', 'déclarer une mineure', 'mineure'],
-      source: 'Design brief example — office, building and email not yet confirmed', status: 'draft', verified_at: null,
+      match_phrases: ['declare a minor', 'add a minor', 'change my minor', 'minor declaration', 'how do i get a minor', 'minor form', 'déclarer une mineure', 'mineure'],
+      source: `Offices and services list (aui.ma), retrieved ${retrievedOn}; form steps not yet confirmed`, status: 'review', verified_at: retrievedOn,
+    },
+    {
+      id: 'graduation-application', title: 'Apply to graduate (graduation declaration)', owner_office: 'Registrar (Registration Office)', place_id: 'building-1', contact_email: 's.moujahid@aui.ma',
+      summary: 'You declare your graduation by filing a graduation application with the Registrar (Building 1), which runs a degree audit to check every requirement is met.',
+      steps: [
+        { title: 'Check your degree audit', body: 'Review your remaining requirements with your academic advisor the term before you graduate.' },
+        { title: 'File the graduation application', body: 'Submit it to the Registrar in Building 1 (ext. 2175) before the deadline in the academic calendar.' },
+        { title: 'Clear any holds', body: 'Financial holds block graduation: settle them at the Business Office (Building 1, ext. 2368).' },
+      ],
+      match_phrases: ['apply to graduate', 'graduation application', 'graduation declaration', 'declare graduation', 'declare my graduation', 'degree audit', 'how do i graduate', 'demande de diplome', 'التخرج'],
+      source: `Offices and services list (aui.ma), retrieved ${retrievedOn}; deadline not in our records`, status: 'review', verified_at: retrievedOn,
+    },
+    {
+      id: 'change-major', title: 'Change your major', owner_office: 'Registrar (Registration Office)', place_id: 'building-1', contact_email: 's.moujahid@aui.ma',
+      summary: 'Changing major, specialization, concentration or catalog year goes through the Registrar in Building 1, after your advisor agrees.',
+      steps: [
+        { title: 'Talk to your advisor', body: 'Check how the change affects your degree plan and graduation date.' },
+        { title: 'Request the change at the Registrar', body: 'Building 1, ext. 2175, s.moujahid@aui.ma.' },
+      ],
+      match_phrases: ['change major', 'change my major', 'switch major', 'change specialization', 'change concentration', 'change catalog year', 'changer de majeure'],
+      source: `Offices and services list (aui.ma), retrieved ${retrievedOn}`, status: 'review', verified_at: retrievedOn,
     },
     {
       id: 'sba-internship', title: 'SBA internship (INT 4301)', owner_office: 'School of Business Administration', place_id: 'building-11', contact_email: 'm.ettoualy@aui.ma',
@@ -67,16 +88,16 @@ export function procedureSeeds(retrievedOn: string): ProcedureSeed[] {
       source: `School pages (aui.ma), retrieved ${retrievedOn}`, status: 'review', verified_at: retrievedOn,
     },
     {
-      id: 'it-account', title: 'Wi-Fi or campus account problems', owner_office: 'ITS', place_id: 'its', contact_email: null,
-      summary: 'ITS handles campus accounts, passwords and Wi-Fi access.',
-      steps: [{ title: 'Go to ITS', body: 'Bring your student or staff ID.' }],
+      id: 'it-account', title: 'Wi-Fi or campus account problems', owner_office: 'Information Technologies and Services (ITS)', place_id: 'building-9', contact_email: 'its@aui.ma',
+      summary: 'ITS (Building 9, ext. 2404) handles passwords, email, Wi-Fi, Canvas and portal access.',
+      steps: [{ title: 'Go to ITS in Building 9', body: 'Bring your student or staff ID. Monday to Friday 9:00–17:30, closed 13:00–14:00.' }],
       match_phrases: ['wifi', 'wi-fi', 'password', 'reset my password', 'campus account', 'internet not working', 'email account', 'واي فاي', 'الانترنت'],
-      source: 'Map label "ITS"; process not confirmed', status: 'draft', verified_at: null,
+      source: `Offices and services list (aui.ma), retrieved ${retrievedOn}`, status: 'review', verified_at: retrievedOn,
     },
     {
-      id: 'writing-help', title: 'Writing and tutoring help', owner_office: 'Center for Learning Excellence (CLE)', place_id: null, contact_email: null,
+      id: 'writing-help', title: 'Writing and tutoring help', owner_office: 'Center for Learning Excellence (CLE)', place_id: 'building-7', contact_email: 'wcenter@aui.ma',
       summary: 'The Writing Center (part of the CLE) offers Socratic-style writing tutoring for all levels; the CLE also runs tutoring and academic support.',
-      steps: [{ title: 'Book a session', body: 'Contact the Center for Learning Excellence. Its location is not in our map data yet.' }],
+      steps: [{ title: 'Book a session', body: 'The Writing Center (ext. 3288) and the CLE (ext. 4357) are both in Building 7.' }],
       match_phrases: ['writing center', 'tutoring', 'tutor', 'essay help', 'cle'],
       source: `University centres list (aui.ma), retrieved ${retrievedOn}`, status: 'review', verified_at: retrievedOn,
     },

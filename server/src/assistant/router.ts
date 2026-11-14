@@ -5,7 +5,7 @@
 import Fuse from 'fuse.js';
 
 export type Lang = 'en' | 'fr' | 'ar';
-export type Intent = 'place' | 'person' | 'procedure' | 'help';
+export type Intent = 'place' | 'person' | 'procedure' | 'service' | 'issue' | 'help';
 export type Match = { intent: Intent; id: string; score: number; mode: 'walk' | 'step_free' | 'ar' | null };
 
 const NUMBER_WORDS: Record<string, string> = {
@@ -34,6 +34,7 @@ const CUES = {
   procedure: /\b(how (do|can) i|how to|declare|form|sign|signature|apply|register|request|procedure|comment (faire|declarer)|demande|internship|stage|minor)\b/,
   person: /\b(professor|prof|dr|doctor|office hours|is .+ in|his office|her office|their office|bureau|professeur)\b|أستاذ|دكتور/,
   place: /\b(where|take me|directions?|navigate|go to|get to|guide me|walk|way to|ou est|emmene|aller)\b|وين|أين|خذني|فين/,
+  issue: /\b(i (have|need|lost|want|feel|am|can t)|my|problem|issue|who (do|should) i (see|ask|talk to)|where (do|should|can) i (go|ask|pay))\b|j ai|probleme|مشكلة/,
   help: /\b(how (do|does) (i )?use (this|the|gomap)|what can you do|help me use|tutorial|walkthrough|how does this (app|map) work|aide)\b/,
 };
 
@@ -52,7 +53,11 @@ export class IntentRouter {
   private people: Fuse<Doc>;
   private procedures: Fuse<Doc>;
   private procedureDocs: Doc[];
-  constructor(places: Doc[], people: Doc[], procedures: Doc[]) {
+  private services: Fuse<Doc>;
+  private serviceDocs: Doc[];
+  private issues: Fuse<Doc>;
+  private issueDocs: Doc[];
+  constructor(places: Doc[], people: Doc[], procedures: Doc[], services: Doc[] = [], issues: Doc[] = []) {
     const opts = { keys: ['keys'], includeScore: true, includeMatches: true, ignoreLocation: true, threshold: 0.34, minMatchCharLength: 2 };
     // keys get the same treatment as questions: normalised, filler words dropped ('park my car' → 'park car')
     const prep = (docs: Doc[]) => docs.map(d => ({ ...d, keys: [...new Set(d.keys.map(normalise).flatMap(k => [k, stripFiller(k)]).filter(Boolean))] }));
@@ -60,6 +65,18 @@ export class IntentRouter {
     this.people = new Fuse(prep(people), opts);
     this.procedureDocs = prep(procedures);
     this.procedures = new Fuse(this.procedureDocs, { ...opts, threshold: 0.38 });
+    this.serviceDocs = prep(services);
+    this.services = new Fuse(this.serviceDocs, { ...opts, threshold: 0.3 });
+    this.issueDocs = prep(issues);
+    this.issues = new Fuse(this.issueDocs, { ...opts, threshold: 0.32 });
+  }
+
+  /** A known multi-word phrase anywhere in the sentence ("i lost my", "feel sick") counts as exact. */
+  private phrase(docs: Doc[], t: string) {
+    const padded = ` ${t} `;
+    let best: { id: string; len: number } | null = null;
+    for (const d of docs) for (const k of d.keys) if (k.length > 5 && padded.includes(` ${k} `) && (!best || k.length > best.len)) best = { id: d.id, len: k.length };
+    return best ? { id: best.id, score: 0 } : null;
   }
 
   private best(fuse: Fuse<Doc>, windows: string[], exactBonus: (doc: Doc, w: string) => boolean) {
@@ -85,34 +102,38 @@ export class IntentRouter {
   }
 
   match(text: string, wanted?: Exclude<Intent, 'help'>): Match | null {
+    return this.matchAll(text, wanted)[0] ?? null;
+  }
+
+  /** Every candidate under the confidence bar, best first. */
+  matchAll(text: string, wanted?: Exclude<Intent, 'help'>): Match[] {
     const t = normalise(text);
     const mode = modeFrom(text);
-    if (!wanted && CUES.help.test(t)) return { intent: 'help', id: 'walkthrough', score: 0, mode };
+    if (!wanted && CUES.help.test(t)) return [{ intent: 'help', id: 'walkthrough', score: 0, mode }];
     const words = t.split(' ').filter(w => !FILLER.has(w));
-    if (!words.length) return null;
+    if (!words.length) return [];
     const windows = new Set<string>();
     // fuzzy matching works on short windows only (Fuse scores patterns over 32 chars in chunks)
     for (let n = Math.min(4, words.length); n >= 1; n--) for (let i = 0; i + n <= words.length; i++) windows.add(words.slice(i, i + n).join(' '));
     const list = [...windows].filter(w => w.length <= 32);
-    if (!list.length) return null;
+    if (!list.length) return [];
     const exact = (doc: Doc, w: string) => doc.keys.includes(w);
     const place = this.best(this.places, list, exact);
     const person = this.best(this.people, list.filter(w => w.length > 2), exact);
     // procedures: a known phrase anywhere in the sentence ("how do I declare a minor") is exact
     const procExact = this.procedureDocs.find(d => d.keys.some(k => k.length > 5 && t.includes(k)));
     const proc = procExact ? { id: procExact.id, score: 0.001 } : this.best(this.procedures, list, () => false);
+    const service = this.phrase(this.serviceDocs, t) ?? this.best(this.services, list, exact);
+    const issue = this.phrase(this.issueDocs, t) ?? this.best(this.issues, list, exact);
 
     const cands: Match[] = [];
-    if (place) cands.push({ intent: 'place', id: place.id, score: place.score - (CUES.place.test(t) ? 0.08 : 0), mode });
-    if (person) cands.push({ intent: 'person', id: person.id, score: person.score - (CUES.person.test(t) ? 0.1 : 0), mode });
+    if (place) cands.push({ intent: 'place', id: place.id, score: place.score + 0.0006 - (CUES.place.test(t) ? 0.08 : 0), mode });
+    if (person) cands.push({ intent: 'person', id: person.id, score: person.score + 0.0008 - (CUES.person.test(t) ? 0.1 : 0), mode });
     if (proc) cands.push({ intent: 'procedure', id: proc.id, score: proc.score - (CUES.procedure.test(t) ? 0.15 : 0), mode });
-    if (wanted) {
-      const matching = cands.find(candidate => candidate.intent === wanted);
-      return matching && matching.score < 0.15 ? matching : null;
-    }
-    cands.sort((a, b) => a.score - b.score);
-    const top = cands[0];
+    // an office is a place you go to, and its card says more than the building's: it wins ties
+    if (service) cands.push({ intent: 'service', id: service.id, score: service.score + 0.0002 - (CUES.place.test(t) ? 0.08 : 0), mode });
+    if (issue) cands.push({ intent: 'issue', id: issue.id, score: issue.score + 0.0004 - (CUES.issue.test(t) ? 0.06 : 0), mode });
     // exact hits score ~0; fuzzy ones must be strong, or we would rather ask Gemini than guess
-    return top && top.score < 0.15 ? top : null;
+    return cands.filter(c => c.score < 0.15 && (!wanted || c.intent === wanted)).sort((a, b) => a.score - b.score);
   }
 }
