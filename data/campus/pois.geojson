@@ -1,0 +1,1095 @@
+{
+ "type": "FeatureCollection",
+ "attribution": "© Mapbox © OpenStreetMap contributors",
+ "generated_at": "2026-11-14T11:26:32.973Z",
+ "features": [
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -5.1081343,
+     33.5428668
+    ]
+   },
+   "properties": {
+    "name": "Parc D'Ifrane",
+    "poi_class": "park_like",
+    "maki": "park",
+    "source": "mapbox"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -5.1080042,
+     33.5404848
+    ]
+   },
+   "properties": {
+    "name": "Student Center",
+    "poi_class": "building",
+    "maki": "marker",
+    "source": "mapbox"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -5.1076582,
+     33.5404971
+    ]
+   },
+   "properties": {
+    "name": "",
+    "poi_class": "sport_and_leisure",
+    "maki": "tennis",
+    "source": "mapbox"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -5.1078741,
+     33.5407564
+    ]
+   },
+   "properties": {
+    "name": "",
+    "poi_class": "sport_and_leisure",
+    "maki": "tennis",
+    "source": "mapbox"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -5.107331,
+     33.5398622
+    ]
+   },
+   "properties": {
+    "name": "15 Al Akhawayn University Mohammed VI Library",
+    "poi_class": "public_facilities",
+    "maki": "library",
+    "source": "mapbox"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -5.1086895,
+     33.5387678
+    ]
+   },
+   "properties": {
+    "name": "ITS",
+    "poi_class": "general",
+    "maki": "marker",
+    "source": "mapbox"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -5.1074034,
+     33.5389556
+    ]
+   },
+   "properties": {
+    "name": "4",
+    "poi_class": "building",
+    "maki": "marker",
+    "source": "mapbox"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -5.1079157,
+     33.5392809
+    ]
+   },
+   "properties": {
+    "name": "10",
+    "poi_class": "building",
+    "maki": "marker",
+    "source": "mapbox"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -5.1077937,
+     33.5377942
+    ]
+   },
+   "properties": {
+    "name": "7",
+    "poi_class": "building",
+    "maki": "marker",
+    "source": "mapbox"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -5.1082255,
+     33.5382491
+    ]
+   },
+   "properties": {
+    "name": "8b",
+    "poi_class": "building",
+    "maki": "marker",
+    "source": "mapbox"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -5.1082496,
+     33.5390763
+    ]
+   },
+   "properties": {
+    "name": "11",
+    "poi_class": "building",
+    "maki": "marker",
+    "source": "mapbox"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -5.1078714,
+     33.5385755
+    ]
+   },
+   "properties": {
+    "name": "8",
+    "poi_class": "building",
+    "maki": "marker",
+    "source": "mapbox"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -5.1085447,
+     33.5387108
+    ]
+   },
+   "properties": {
+    "name": "9",
+    "poi_class": "building",
+    "maki": "marker",
+    "source": "mapbox"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -5.108593,
+     33.5388438
+    ]
+   },
+   "properties": {
+    "name": "Security Office",
+    "poi_class": "general",
+    "maki": "marker",
+    "source": "mapbox"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -5.1078688,
+     33.5402064
+    ]
+   },
+   "properties": {
+    "name": "",
+    "poi_class": "sport_and_leisure",
+    "maki": "tennis",
+    "source": "mapbox"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -5.109399,
+     33.5398622
+    ]
+   },
+   "properties": {
+    "name": "",
+    "poi_class": "sport_and_leisure",
+    "maki": "fitness-centre",
+    "source": "mapbox"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -5.1088384,
+     33.5400533
+    ]
+   },
+   "properties": {
+    "name": "",
+    "poi_class": "motorist",
+    "maki": "parking",
+    "source": "mapbox"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -5.107618,
+     33.5346564
+    ]
+   },
+   "properties": {
+    "name": "Hotel Michliffen",
+    "poi_class": "lodging",
+    "maki": "lodging",
+    "source": "mapbox"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -5.1083837,
+     33.5355462
+    ]
+   },
+   "properties": {
+    "name": "",
+    "poi_class": "sport_and_leisure",
+    "maki": "tennis",
+    "source": "mapbox"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -5.1074356,
+     33.5352164
+    ]
+   },
+   "properties": {
+    "name": "",
+    "poi_class": "motorist",
+    "maki": "parking",
+    "source": "mapbox"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -5.1086305,
+     33.5348218
+    ]
+   },
+   "properties": {
+    "name": "",
+    "poi_class": "motorist",
+    "maki": "parking",
+    "source": "mapbox"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -5.1082738,
+     33.5350118
+    ]
+   },
+   "properties": {
+    "name": "",
+    "poi_class": "motorist",
+    "maki": "parking",
+    "source": "mapbox"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -5.108593,
+     33.5354612
+    ]
+   },
+   "properties": {
+    "name": "",
+    "poi_class": "sport_and_leisure",
+    "maki": "tennis",
+    "source": "mapbox"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -5.1051423,
+     33.5425069
+    ]
+   },
+   "properties": {
+    "name": "38",
+    "poi_class": "building",
+    "maki": "marker",
+    "source": "mapbox"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -5.1042786,
+     33.542034
+    ]
+   },
+   "properties": {
+    "name": "39",
+    "poi_class": "place_like",
+    "maki": "marker",
+    "source": "mapbox"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -5.1056063,
+     33.5414081
+    ]
+   },
+   "properties": {
+    "name": "34",
+    "poi_class": "place_like",
+    "maki": "marker",
+    "source": "mapbox"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -5.1069179,
+     33.541379
+    ]
+   },
+   "properties": {
+    "name": "18",
+    "poi_class": "building",
+    "maki": "marker",
+    "source": "mapbox"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -5.1049572,
+     33.5412695
+    ]
+   },
+   "properties": {
+    "name": "27",
+    "poi_class": "place_like",
+    "maki": "marker",
+    "source": "mapbox"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -5.1054709,
+     33.5406614
+    ]
+   },
+   "properties": {
+    "name": "25",
+    "poi_class": "place_like",
+    "maki": "marker",
+    "source": "mapbox"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -5.1054588,
+     33.5403428
+    ]
+   },
+   "properties": {
+    "name": "26",
+    "poi_class": "place_like",
+    "maki": "marker",
+    "source": "mapbox"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -5.1069032,
+     33.5409889
+    ]
+   },
+   "properties": {
+    "name": "36",
+    "poi_class": "place_like",
+    "maki": "marker",
+    "source": "mapbox"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -5.1061428,
+     33.5408268
+    ]
+   },
+   "properties": {
+    "name": "35",
+    "poi_class": "place_like",
+    "maki": "marker",
+    "source": "mapbox"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -5.1054025,
+     33.541028
+    ]
+   },
+   "properties": {
+    "name": "24",
+    "poi_class": "place_like",
+    "maki": "marker",
+    "source": "mapbox"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -5.1061293,
+     33.540477
+    ]
+   },
+   "properties": {
+    "name": "23",
+    "poi_class": "place_like",
+    "maki": "marker",
+    "source": "mapbox"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -5.1071821,
+     33.5411566
+    ]
+   },
+   "properties": {
+    "name": "19",
+    "poi_class": "place_like",
+    "maki": "marker",
+    "source": "mapbox"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -5.1064485,
+     33.5405753
+    ]
+   },
+   "properties": {
+    "name": "22",
+    "poi_class": "place_like",
+    "maki": "marker",
+    "source": "mapbox"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -5.106407,
+     33.541037
+    ]
+   },
+   "properties": {
+    "name": "29",
+    "poi_class": "place_like",
+    "maki": "marker",
+    "source": "mapbox"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -5.1068106,
+     33.5406569
+    ]
+   },
+   "properties": {
+    "name": "21",
+    "poi_class": "place_like",
+    "maki": "marker",
+    "source": "mapbox"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -5.1032299,
+     33.5405116
+    ]
+   },
+   "properties": {
+    "name": "",
+    "poi_class": "motorist",
+    "maki": "parking",
+    "source": "mapbox"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -5.1044744,
+     33.5414807
+    ]
+   },
+   "properties": {
+    "name": "",
+    "poi_class": "motorist",
+    "maki": "parking",
+    "source": "mapbox"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -5.1057726,
+     33.5393088
+    ]
+   },
+   "properties": {
+    "name": "Restaurants",
+    "poi_class": "food_and_drink",
+    "maki": "restaurant",
+    "source": "mapbox"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -5.1048177,
+     33.5364707
+    ]
+   },
+   "properties": {
+    "name": "Ground and Maintenance",
+    "poi_class": "building",
+    "maki": "marker",
+    "source": "mapbox"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -5.1057404,
+     33.5389623
+    ]
+   },
+   "properties": {
+    "name": "Business Office",
+    "poi_class": "general",
+    "maki": "marker",
+    "source": "mapbox"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -5.1065934,
+     33.5376209
+    ]
+   },
+   "properties": {
+    "name": "Main Auditorium",
+    "poi_class": "arts_and_entertainment",
+    "maki": "theatre",
+    "source": "mapbox"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -5.1057123,
+     33.5392921
+    ]
+   },
+   "properties": {
+    "name": "3",
+    "poi_class": "building",
+    "maki": "marker",
+    "source": "mapbox"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -5.106879,
+     33.5394452
+    ]
+   },
+   "properties": {
+    "name": "Masjid Al Akhawayn",
+    "poi_class": "religion",
+    "maki": "religious-muslim",
+    "source": "mapbox"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -5.1043041,
+     33.539035
+    ]
+   },
+   "properties": {
+    "name": "31",
+    "poi_class": "place_like",
+    "maki": "marker",
+    "source": "mapbox"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -5.1047266,
+     33.5389668
+    ]
+   },
+   "properties": {
+    "name": "32",
+    "poi_class": "place_like",
+    "maki": "marker",
+    "source": "mapbox"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -5.1050511,
+     33.5393033
+    ]
+   },
+   "properties": {
+    "name": "AUI Post Office",
+    "poi_class": "public_facilities",
+    "maki": "post",
+    "source": "mapbox"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -5.1065867,
+     33.5376232
+    ]
+   },
+   "properties": {
+    "name": "17",
+    "poi_class": "building",
+    "maki": "marker",
+    "source": "mapbox"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -5.1049559,
+     33.5392977
+    ]
+   },
+   "properties": {
+    "name": "33",
+    "poi_class": "place_like",
+    "maki": "marker",
+    "source": "mapbox"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -5.1044516,
+     33.5394016
+    ]
+   },
+   "properties": {
+    "name": "29",
+    "poi_class": "place_like",
+    "maki": "marker",
+    "source": "mapbox"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -5.1040775,
+     33.5393971
+    ]
+   },
+   "properties": {
+    "name": "30",
+    "poi_class": "place_like",
+    "maki": "marker",
+    "source": "mapbox"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -5.1062581,
+     33.5391233
+    ]
+   },
+   "properties": {
+    "name": "AUI Shop",
+    "poi_class": "food_and_drink_stores",
+    "maki": "convenience",
+    "source": "mapbox"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -5.1059845,
+     33.5387365
+    ]
+   },
+   "properties": {
+    "name": "1",
+    "poi_class": "building",
+    "maki": "marker",
+    "source": "mapbox"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -5.1063842,
+     33.5390719
+    ]
+   },
+   "properties": {
+    "name": "2",
+    "poi_class": "building",
+    "maki": "marker",
+    "source": "mapbox"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -5.1060703,
+     33.5392753
+    ]
+   },
+   "properties": {
+    "name": "Cafeteria Newrest",
+    "poi_class": "food_and_drink",
+    "maki": "cafe",
+    "source": "mapbox"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -5.1064096,
+     33.5393759
+    ]
+   },
+   "properties": {
+    "name": "Al Akhawayn University ⵜⴰⵙⴷⴰⵡⵉⵜ ⵏⵍ ⴰⵅⴰⵡⴰⵢⵏ جامعة الأخوين",
+    "poi_class": "education",
+    "maki": "college",
+    "source": "mapbox"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -5.1072626,
+     33.5382357
+    ]
+   },
+   "properties": {
+    "name": "6",
+    "poi_class": "building",
+    "maki": "marker",
+    "source": "mapbox"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -5.1070547,
+     33.5385297
+    ]
+   },
+   "properties": {
+    "name": "5",
+    "poi_class": "building",
+    "maki": "marker",
+    "source": "mapbox"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -5.1063989,
+     33.539016
+    ]
+   },
+   "properties": {
+    "name": "Book Store",
+    "poi_class": "store_like",
+    "maki": "shop",
+    "source": "mapbox"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -5.1066001,
+     33.5388595
+    ]
+   },
+   "properties": {
+    "name": "Old Game Room",
+    "poi_class": "sport_and_leisure",
+    "maki": "marker",
+    "source": "mapbox"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -5.106234,
+     33.5385577
+    ]
+   },
+   "properties": {
+    "name": "Enrollment Services",
+    "poi_class": "general",
+    "maki": "marker",
+    "source": "mapbox"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -5.10704,
+     33.5381552
+    ]
+   },
+   "properties": {
+    "name": "Therapist Office",
+    "poi_class": "general",
+    "maki": "marker",
+    "source": "mapbox"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -5.1052751,
+     33.5374398
+    ]
+   },
+   "properties": {
+    "name": "",
+    "poi_class": "motorist",
+    "maki": "parking",
+    "source": "mapbox"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -5.1045442,
+     33.536398
+    ]
+   },
+   "properties": {
+    "name": "",
+    "poi_class": "motorist",
+    "maki": "parking",
+    "source": "mapbox"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -5.1067369,
+     33.5339197
+    ]
+   },
+   "properties": {
+    "name": "",
+    "poi_class": "motorist",
+    "maki": "parking",
+    "source": "mapbox"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -5.1063493,
+     33.534122
+    ]
+   },
+   "properties": {
+    "name": "",
+    "poi_class": "motorist",
+    "maki": "parking",
+    "source": "mapbox"
+   }
+  }
+ ]
+}
