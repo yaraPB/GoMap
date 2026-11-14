@@ -9,6 +9,8 @@ import { useApp, useLocation } from '../state/app';
 import { usePanels } from '../state/panels';
 import { Chip, Icon, IconBtn, T, rise } from '../ui/kit';
 import { categories, color, schools, shadow } from '../ui/theme';
+import RoleWidget from './RoleWidget';
+import { ROLE_LOOK } from './Views';
 
 const COUNT_LABEL: Record<string, (n: number) => string> = {
   academic: n => `${n} academic places`, residential: n => `${n} residences`, dining: n => `${n} dining places`, athletics: n => `${n} sports facilities`,
@@ -47,6 +49,9 @@ export default function Home({ chipsDelay }: { chipsDelay: number }) {
       {/* chip rail: the chips ARE the filter */}
       <Animated.View entering={FadeIn.delay(chipsDelay).duration(380)} style={{ position: 'absolute', top: insets.top + 8, left: 0, right: 0 }} pointerEvents="box-none">
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.rail, rtl && { flexDirection: 'row-reverse' }]} keyboardShouldPersistTaps="handled">
+          <Pressable accessibilityRole="button" accessibilityLabel={`View: ${ROLE_LOOK[user.role]?.title ?? user.role}. Tap to switch.`} onPress={() => push({ name: 'views' })} style={styles.role}>
+            <T style={{ fontSize: 20 }}>{ROLE_LOOK[user.role]?.emoji ?? '🙂'}</T>
+          </Pressable>
           <IconBtn icon="search" label="Search the campus" onPress={() => push({ name: 'search' })} />
           {chips.map((c, i) => (
             <Animated.View key={c.id} entering={FadeInDown.delay(chipsDelay + i * 40).duration(320)}>
@@ -92,6 +97,9 @@ export default function Home({ chipsDelay }: { chipsDelay: number }) {
         </Animated.View>
       )}
 
+      {/* role widget: campus pulse, lunch, or the professor's door */}
+      <RoleWidget bottom={insets.bottom + 88} />
+
       {/* FAB stack */}
       <View style={[styles.fabs, { bottom: insets.bottom + 96 }, guest && { bottom: insets.bottom + 260 }]} pointerEvents="box-none">
         {!guest && <IconBtn icon="flame" label="Crowding by walkway" size={50} onPress={() => push({ name: 'crowding' })} />}
@@ -125,6 +133,7 @@ function Banner({ icon, text, tone = 'light', action, onAction }: { icon: 'user'
 }
 
 const styles = StyleSheet.create({
+  role: { width: 46, height: 46, borderRadius: 23, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', ...shadow.float },
   rail: { paddingHorizontal: 14, gap: 10, alignItems: 'center', paddingBottom: 6 },
   strip: { position: 'absolute', left: 14, right: 14, height: 40, borderRadius: 12, backgroundColor: 'rgba(21,23,26,0.86)', flexDirection: 'row', alignItems: 'center', paddingLeft: 14, paddingRight: 6, gap: 10 },
   clear: { height: 30, paddingHorizontal: 11, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.18)', justifyContent: 'center' },

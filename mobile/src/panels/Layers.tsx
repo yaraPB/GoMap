@@ -1,3 +1,4 @@
+import { useAccounts } from '../api/hooks';
 import React from 'react';
 import { Pressable, ScrollView, Switch, View } from 'react-native';
 import { router } from 'expo-router';
@@ -18,6 +19,7 @@ export default function Layers() {
   const { pop, push } = usePanels();
   const map = useMap();
   const { user, setUser, lang, setLang } = useApp();
+  const accounts = useAccounts();
   const toggles: { key: keyof typeof map.layers; label: string; sub: string; icon: IconName }[] = [
     { key: 'threeD', label: '3D buildings', sub: 'See buildings rise from the map as you zoom in', icon: 'building' },
     { key: 'cars', label: 'Show where cars go', sub: 'Roads as a solid band, paths stay dotted', icon: 'car' },
@@ -67,9 +69,9 @@ export default function Layers() {
         <View>
           <Label style={{ marginBottom: 8 }}>Demo account · until GoCampus sign-in</Label>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-            {USERS.map(u => (
+            {(accounts.data?.length ? accounts.data : USERS).map(u => (
               <Pressable key={u.id} accessibilityRole="radio" accessibilityState={{ selected: user.id === u.id }} onPress={() => setUser(u)} style={{ paddingHorizontal: 12, height: 36, borderRadius: 999, borderWidth: 1, borderColor: user.id === u.id ? color.blue : color.line, backgroundColor: user.id === u.id ? '#EEF4FF' : '#fff', justifyContent: 'center' }}>
-                <T weight="semibold" style={{ fontSize: 13, color: user.id === u.id ? color.blue : color.ink }}>{u.role === 'faculty' ? `Faculty (${u.name})` : u.role[0].toUpperCase() + u.role.slice(1)}</T>
+                <T weight="semibold" style={{ fontSize: 13, color: user.id === u.id ? color.blue : color.ink }}>{u.role === 'faculty' ? `Faculty (${u.name})` : u.role === 'guest' ? 'Visitor' : u.role[0].toUpperCase() + u.role.slice(1)}</T>
               </Pressable>
             ))}
           </View>

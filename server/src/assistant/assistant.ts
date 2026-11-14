@@ -168,7 +168,8 @@ export class Assistant {
       if (openTxt) text += ` ${openTxt}.`;
     } else {
       text = lang === 'fr' ? `${v.short_name} : ${where}.` : lang === 'ar' ? `${v.short_name}: ${where}.` : `${v.short_name} is in ${where}.`;
-      if (openTxt) text += ` ${openTxt}.`;
+      if (openTxt && !allDay) text += ` ${openTxt}.`;
+      else if (allDay) text += lang === 'fr' ? ' Ouvert 24h/24, toujours joignable.' : lang === 'ar' ? ' مفتوح دائمًا.' : ' Always reachable, day and night.';
       else if (v.notes) text += ` ${v.notes}`;
     }
     if (v.id === 'health-center' && v.open.state !== 'open') text += ' A doctor and nurse are on call 24/7 for emergencies.';

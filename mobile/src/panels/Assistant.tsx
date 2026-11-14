@@ -80,7 +80,7 @@ export default function Assistant({ ask }: { ask?: string }) {
     <View style={[styles.head, rtl && { flexDirection: 'row-reverse' }]}>
       <Icon name="sparkle" size={20} stroke={color.blue} />
       <T weight="bold" style={{ flex: 1, fontSize: 17, textAlign: rtl ? 'right' : 'left' }}>{t(lang, 'assistantTitle')}</T>
-      <IconBtn icon={voice ? 'bolt' : 'ban'} label={voice ? 'Mute GoMap’s voice' : 'Let GoMap answer out loud'} onPress={() => { if (voice) stopSpeaking(); chat.setVoice(!voice); }} float={false} bg={voice ? color.blueSoft : color.surface} stroke={voice ? color.blue : color.ink} size={34} />
+      <IconBtn icon={voice ? 'bolt' : 'ban'} label={voice ? 'Mute GoMap’s voice' : 'Let GoMap answer out loud'} onPress={() => { if (voice) stopSpeaking(); chat.setVoice(!voice); }} float={false} bg={voice ? '#EEF4FF' : color.surface} stroke={voice ? color.blue : color.ink} size={34} />
       <View style={styles.langs} accessibilityRole="radiogroup" accessibilityLabel="Language">
         {(['en', 'fr', 'ar'] as Lang[]).map(l => (
           <Pressable key={l} accessibilityRole="radio" accessibilityState={{ selected: lang === l }} onPress={() => setLang(l)} style={[styles.lang, lang === l && { backgroundColor: color.ink }]}>
@@ -211,7 +211,7 @@ export function AnswerCard({ a, onAsk, onReplay }: { a: Answer; onAsk: (q: strin
             <StatusPill tone={s.open.state === 'open' ? 'open' : s.open.state === 'closed' ? 'closed' : 'missing'}
               text={s.open.state === 'open' ? (s.open.until === '23:59' ? 'Open 24/7' : `Open · until ${s.open.until}`) : s.open.state === 'closed' ? (s.open.next ? `Opens ${DAYS[s.open.next.day]} ${s.open.next.time}` : 'Closed') : 'Hours?'} />
           </View>
-          {s.hours_text && <T style={{ fontSize: 12.5, color: color.ink2, marginTop: 8 }}><Icon name="clock" size={12} stroke={color.muted} /> {s.hours_text}</T>}
+          {s.hours_text && s.hours_text !== 'Open 24/7' && <T style={{ fontSize: 12.5, color: color.ink2, marginTop: 8 }}><Icon name="clock" size={12} stroke={color.muted} /> {s.hours_text}</T>}
           {!!s.handles.length && (
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
               {s.handles.slice(0, 4).map(h => <View key={h} style={styles.handle}><T style={{ fontSize: 11.5, color: color.ink2 }}>{h}</T></View>)}
@@ -289,7 +289,7 @@ const styles = StyleSheet.create({
   where: { padding: 12, borderRadius: 13, backgroundColor: '#fff', borderWidth: 1, borderColor: color.hairline },
   handle: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999, backgroundColor: color.surface },
   dot: { width: 32, height: 32, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
-  speaking: { flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 12, marginBottom: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, backgroundColor: color.blueSoft },
+  speaking: { flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 12, marginBottom: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, backgroundColor: '#EEF4FF' },
   composer: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingTop: 8, borderTopWidth: 1, borderTopColor: color.hairline, backgroundColor: '#fff' },
   talk: { height: 44, paddingHorizontal: 10, borderRadius: 22, backgroundColor: color.surface, alignItems: 'center', justifyContent: 'center', gap: 1 },
   input: { flex: 1, height: 44, borderRadius: 22, paddingHorizontal: 16, backgroundColor: color.surface2, fontSize: 15, color: color.ink },

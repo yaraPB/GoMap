@@ -48,6 +48,17 @@ html,body,#map{width:100%;height:100%;margin:0;overflow:hidden;background:#0E182
 .closure i{width:20px;height:20px;border-radius:50%;background:#B5342B;display:flex;align-items:center;justify-content:center}
 .closure svg{width:12px;height:12px}
 .drop-pin{width:30px;height:42px}
+.pinwrap{transition:opacity 220ms ease,transform 220ms ease;transform:scale(var(--pin-scale,1));transform-origin:50% 0}
+.appear{animation:appear 260ms ease-out backwards}
+@keyframes appear{0%{opacity:0;transform:scale(calc(var(--pin-scale,1)*.6))}100%{opacity:1;transform:scale(var(--pin-scale,1))}}
+.out{opacity:0!important;transform:scale(calc(var(--pin-scale,1)*.6))!important}
+.label{opacity:0;max-height:0;transition:opacity 260ms ease}
+body.z17 .label{opacity:1;max-height:30px}
+body.nolabels .label{display:none}
+.pin.lit{box-shadow:0 0 0 3px rgba(255,214,102,.55),0 0 18px 6px rgba(255,196,64,.65)}
+.pin.lit:after{content:'';position:absolute;top:-6px;right:-6px;width:12px;height:12px;border-radius:50%;background:#FFD666;border:2px solid #fff;box-shadow:0 0 8px #FFC440}
+body.night .pin.dark{filter:saturate(.4) brightness(.8)}
+.cluster.appear{animation:appear 260ms ease-out backwards}
 @media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
 </style></head><body><div id="map" role="application" aria-label="Campus map"></div>
 <script>
@@ -67,6 +78,8 @@ var map,ready=false,markers={},clusterMarkers={},meMarker=null,destMarker=null,c
 try{
   map=new mapboxgl.Map({container:'map',style:STYLES.default,
     projection:'globe',center:arriving?[-18,24]:CENTER,zoom:arriving?0.65:16.4,pitch:arriving?0:55,bearing:arriving?0:-23,
+    // worldview MA: borders as recognised in Morocco (no line through the Moroccan Sahara); boundaries hidden anyway
+    worldview:'MA',
     attributionControl:false,config:{basemap:{showPointOfInterestLabels:false,showTransitLabels:false,showAdminBoundaries:false,colorBuildings:'#C4C1BA',lightPreset:campusLight()}}});
   map.addControl(new mapboxgl.AttributionControl({compact:true,customAttribution:'© OpenStreetMap contributors'}),'bottom-left');
 }catch(e){send('error',String(e&&e.message||e));return;}
@@ -96,13 +109,37 @@ function flyIn(){
 function lock(){map.setMaxBounds(BOUNDS);map.setMinZoom(14.2);}
 
 function emptyFC(){return {type:'FeatureCollection',features:[]};}
-function campusLight(){var h=Number(new Intl.DateTimeFormat('en-GB',{hour:'2-digit',hourCycle:'h23',timeZone:'Africa/Casablanca'}).format(new Date()));return h>=18||h<6?'night':'day';}
+/** The map follows the campus clock: dawn, day, dusk from 17:30, night from 19:00. */
+function campusLight(){
+  var p=new Intl.DateTimeFormat('en-GB',{hour:'2-digit',minute:'2-digit',hourCycle:'h23',timeZone:'Africa/Casablanca'}).formatToParts(new Date());
+  var h=0,m=0;p.forEach(function(x){if(x.type==='hour')h=Number(x.value);if(x.type==='minute')m=Number(x.value);});
+  var t=h+m/60;
+  return t<6?'night':t<8?'dawn':t<17.5?'day':t<19?'dusk':'night';
+}
+function isDark(){var l=campusLight();return l==='night'||l==='dusk';}
+function applyLight(){
+  var l=campusLight();config('lightPreset',l);
+  document.body.classList.toggle('night',isDark());
+  // open buildings keep their lights on after dark
+  if(map.getLayer('lights'))map.setLayoutProperty('lights','visibility',isDark()?'visible':'none');
+  if(map.getSource('lights'))map.getSource('lights').setData(lightsFC());
+  Object.keys(markers).forEach(function(id){var p=byId[id];var b=markers[id].getElement().firstChild;if(!p||!b)return;
+    b.classList.toggle('lit',isDark()&&p.open==='open'&&p.status!=='closed');b.classList.toggle('dark',isDark()&&p.open!=='open');});
+}
+function lightsFC(){return {type:'FeatureCollection',features:state.places.filter(function(p){return p.open==='open'&&p.status!=='closed';}).map(function(p){return {type:'Feature',properties:{},geometry:{type:'Point',coordinates:p.coordinates}};})};}
+/** Pins grow gently with zoom; labels fade in past 17.2. No markers are rebuilt on zoom. */
+function onZoom(){
+  var z=map.getZoom();
+  var root=document.documentElement;if(root&&root.style)root.style.setProperty('--pin-scale',String(Math.max(0.72,Math.min(1.12,0.72+(z-14.5)*0.16))));
+  document.body.classList.toggle('z17',z>=17.2);
+}
 function config(key,value){try{map.setConfigProperty('basemap',key,value);}catch(e){}}
 function addLayers(){
   var light=state.style!=='satellite';
   var pathColor=light?'#5B6B60':'#FFFFFF';
   config('show3dObjects',state.layers.threeD);config('showPlaceLabels',state.layers.labels);
   config('showRoadLabels',state.layers.labels);config('showAdminBoundaries',false);config('lightPreset',campusLight());
+  try{if(map.setWorldview)map.setWorldview('MA');}catch(e){}
   if(light)config('colorBuildings','#C4C1BA');
   if(state.style==='contrast')config('theme','monochrome');
   map.addSource('walkways',{type:'geojson',data:state.walkways||emptyFC()});
@@ -123,6 +160,10 @@ function addLayers(){
   map.addLayer({id:'route-line',type:'line',source:'route',layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':'#16A34A','line-width':['interpolate',['linear'],['zoom'],15,4,18,9]}});
   map.addLayer({id:'route-flow',type:'line',source:'route',layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':'#D9FBE5','line-width':['interpolate',['linear'],['zoom'],15,1.5,18,3.5],'line-dasharray':[0,4,3]}});
   map.addLayer({id:'crossings',type:'circle',source:'crossings',paint:{'circle-radius':7,'circle-color':'#FFFFFF','circle-stroke-color':'#15171A','circle-stroke-width':2.5}});
+  // warm light on the ground around buildings still open after dark
+  map.addSource('lights',{type:'geojson',data:lightsFC()});
+  map.addLayer({id:'lights',type:'circle',source:'lights',layout:{visibility:isDark()?'visible':'none'},paint:{'circle-color':'#FFC440','circle-blur':1,
+    'circle-radius':['interpolate',['exponential',2],['zoom'],15,10,18,70],'circle-opacity':0.55,'circle-pitch-alignment':'map'}});
   map.addLayer({id:'places-hit',type:'circle',source:'places',paint:{'circle-radius':1,'circle-opacity':0}});
   if(state.route)animateDash();
 }
@@ -147,8 +188,10 @@ function pinEl(p,i){
   b.setAttribute('aria-label',p.name+(p.status==='closed'?', closed':''));b.innerHTML=svg(c.icon);
   if(p.status==='closed'){var bad=document.createElement('span');bad.className='badge';bad.innerHTML=svg(ICON.ban,'#fff',3);b.appendChild(bad);}
   b.onclick=function(e){e.stopPropagation();send('select',p.id);};
+  if(isDark()){if(p.open==='open'&&p.status!=='closed')b.classList.add('lit');else b.classList.add('dark');}
+  if(!firstPins&&!state.animatePins)wrap.classList.add('appear');
   wrap.appendChild(b);
-  if(state.layers.labels&&map.getZoom()>=17.2&&p.number){var l=document.createElement('div');l.className='label';l.textContent=p.number.length<4?'B'+p.number:p.name;wrap.appendChild(l);}
+  if(p.number){var l=document.createElement('div');l.className='label';l.textContent=p.number.length<4?'B'+p.number:p.name;wrap.appendChild(l);}
   return wrap;
 }
 var byId={};
@@ -158,7 +201,7 @@ function renderPins(){
   feats.forEach(function(f){
     var pr=f.properties;
     if(pr.cluster){var cid='c'+pr.cluster_id;if(keepC[cid])return;keepC[cid]=1;
-      if(!clusterMarkers[cid]){var el=document.createElement('button');el.className='cluster drop';el.textContent=pr.point_count;el.setAttribute('aria-label',pr.point_count+' places, tap to open');
+      if(!clusterMarkers[cid]){var el=document.createElement('button');el.className='cluster '+(firstPins?'drop':'appear');el.textContent=pr.point_count;el.setAttribute('aria-label',pr.point_count+' places, tap to open');
         var coords=f.geometry.coordinates;el.onclick=function(e){e.stopPropagation();map.getSource('places').getClusterExpansionZoom(pr.cluster_id).then(function(z){map.easeTo({center:coords,zoom:z+0.3,duration:450});}).catch(function(){});};
         clusterMarkers[cid]=new mapboxgl.Marker({element:el}).setLngLat(coords).addTo(map);}
       return;}
@@ -166,10 +209,11 @@ function renderPins(){
     if(!markers[id]){markers[id]=new mapboxgl.Marker({element:pinEl(p,i++),anchor:'top',offset:[0,-17]}).setLngLat(p.coordinates).addTo(map);}
     var btn=markers[id].getElement().firstChild;btn.classList.toggle('sel',state.selected===id);btn.classList.toggle('dim',state.dim&&state.selected!==id&&state.highlight!==id);
   });
-  Object.keys(markers).forEach(function(id){if(!keep[id]){markers[id].remove();delete markers[id];}});
-  Object.keys(clusterMarkers).forEach(function(id){if(!keepC[id]){clusterMarkers[id].remove();delete clusterMarkers[id];}});
+  Object.keys(markers).forEach(function(id){if(!keep[id]){fadeOut(markers[id]);delete markers[id];}});
+  Object.keys(clusterMarkers).forEach(function(id){if(!keepC[id]){fadeOut(clusterMarkers[id]);delete clusterMarkers[id];}});
   if(feats.length)firstPins=false;state.animatePins=false;
 }
+function fadeOut(m){var el=m.getElement();if(reduce||!el||!el.classList){m.remove();return;}el.classList.add('out');setTimeout(function(){m.remove();},200);}
 function resetPins(animate){Object.keys(markers).forEach(function(id){markers[id].remove();});markers={};Object.keys(clusterMarkers).forEach(function(id){clusterMarkers[id].remove();});clusterMarkers={};state.animatePins=!!animate;}
 function setPlacesData(animate){if(!map.getSource('places'))return;resetPins(animate);map.getSource('places').setData(placesFC());}
 
@@ -199,7 +243,7 @@ function setClosures(){
 function vis(id,on){if(map.getLayer(id))map.setLayoutProperty(id,'visibility',on?'visible':'none');}
 
 var handlers={
-  places:function(d){state.places=d.places;byId={};d.places.forEach(function(p){byId[p.id]=p;});setPlacesData(true);},
+  places:function(d){state.places=d.places;byId={};d.places.forEach(function(p){byId[p.id]=p;});setPlacesData(true);if(map.getSource('lights'))map.getSource('lights').setData(lightsFC());},
   filter:function(d){state.filter={category:d.category,school:d.school};setPlacesData(true);
     var v=visiblePlaces();if(!arriving&&d.fit&&v.length&&d.category!=='all')fit(v.map(function(p){return p.coordinates;}),d.padding);},
   select:function(d){state.selected=d.id;state.dim=!!d.dim;renderPins();var p=byId[d.id];
@@ -219,8 +263,11 @@ var handlers={
   layers:function(d){var o=state.layers;state.layers=Object.assign({},o,d.layers);
     vis('roads-band',state.layers.cars);vis('roads-centre',state.layers.cars);vis('crowding',state.layers.crowding);
     try{map.setConfigProperty('basemap','show3dObjects',state.layers.threeD);map.setConfigProperty('basemap','showPlaceLabels',state.layers.labels);map.setConfigProperty('basemap','showRoadLabels',state.layers.labels);}catch(e){}
-    if(o.labels!==state.layers.labels)resetPins(false),renderPins();},
-  style:function(d){if(d.style===state.style||!STYLES[d.style])return;state.style=d.style;ready=false;resetPins(false);map.setStyle(STYLES[d.style]);},
+    document.body.classList.toggle('nolabels',!state.layers.labels);},
+  style:function(d){if(d.style===state.style||!STYLES[d.style])return;var prev=state.style;state.style=d.style;
+    // default and contrast are the same style: switch the theme in place, no reload
+    if(STYLES[prev]===STYLES[d.style]){config('theme',d.style==='contrast'?'monochrome':'default');return;}
+    ready=false;resetPins(false);stopDash();map.setStyle(STYLES[d.style],{diff:false});},
   pick:function(d){state.pick=!!d.on;if(!d.on&&pickMarker){pickMarker.remove();pickMarker=null;}},
   flyIn:function(){flyIn();},
   skipIntro:function(){finishArrival();},
@@ -232,18 +279,23 @@ window.addEventListener('message',onMessage);document.addEventListener('message'
 
 map.on('style.load',function(){
   map.setFog({color:'#DFE9EE','high-color':'#7399BF','space-color':'#0E1827','horizon-blend':0.08,'star-intensity':0.15});
-  addLayers();ready=true;setPlacesData(false);setClosures();setMe();send('ready');
+  try{addLayers();}catch(e){send('log','layers: '+String(e&&e.message||e));}
+  ready=true;applyLight();onZoom();setPlacesData(false);setClosures();setMe();send('ready');
 });
-setInterval(function(){if(ready)config('lightPreset',campusLight());},60000);
+setInterval(function(){if(ready)applyLight();},60000);
+map.on('zoom',onZoom);
 map.on('render',function(){if(ready)renderPins();});
-map.on('zoomend',function(){if(state.layers.labels){resetPins(false);renderPins();}});
+
 map.on('click',function(e){
   if(state.pick){var c=[e.lngLat.lng,e.lngLat.lat];if(!pickMarker){var el=document.createElement('div');el.className='drop-pin';
     el.innerHTML='<svg viewBox="0 0 30 42"><path d="M15 41s13-13.6 13-25A13 13 0 002 16c0 11.4 13 25 13 25z" fill="#B5342B" stroke="#fff" stroke-width="2.5"/><circle cx="15" cy="16" r="5" fill="#fff"/></svg>';
     pickMarker=new mapboxgl.Marker({element:el,anchor:'bottom'}).setLngLat(c).addTo(map);}else pickMarker.setLngLat(c);send('picked',c);return;}
   send('tapMap',[e.lngLat.lng,e.lngLat.lat]);});
 map.on('dragstart',function(){if(state.follow){state.follow=false;send('followOff');}});
-map.on('error',function(e){if(!ready)send('error','The map could not load. Check your connection and reopen GoMap.');});
+map.on('error',function(e){
+  // satellite unavailable for this token/region: fall back to classic satellite imagery
+  if(!ready&&state.style==='satellite'&&STYLES.satellite.indexOf('standard')>=0){STYLES.satellite='mapbox://styles/mapbox/satellite-streets-v12';map.setStyle(STYLES.satellite,{diff:false});return;}
+  if(!ready)send('error','The map could not load. Check your connection and reopen GoMap.');});
 map.once('load',function(){if(FLY)flyIn();else finishArrival();});
 setTimeout(function(){if(!ready)send('error','The map is taking a little longer. Check your connection and reopen GoMap.');},20000);
 })();

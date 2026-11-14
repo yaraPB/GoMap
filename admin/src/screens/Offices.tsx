@@ -12,7 +12,7 @@ export default function Offices({ selected, select }: { selected?: string; selec
   const count = (f: typeof filter) => (people.data ?? []).filter(p => (f === 'conflict' ? p.conflict : f === 'missing' ? p.missing.length : p.stale)).length;
   return (
     <>
-      <div className="head"><div><h1>Offices & hours</h1><p className="sub">From the school directories on aui.ma. An empty day publishes “no office hours”, never a guess.</p></div></div>
+      <div className="head"><div><h1>Faculty & staff</h1><p className="sub">From the school directories on aui.ma. An empty day publishes “no office hours”, never a guess.</p></div></div>
       <div className="split">
         <div className="card" style={{ padding: 10 }}>
           <input className="search" placeholder="Name or office number" value={q} onChange={e => setQ(e.target.value)} aria-label="Find a person" style={{ marginBottom: 8 }} />
@@ -39,7 +39,7 @@ function PersonEditor({ id, onSaved }: { id: string; onSaved: () => void }) {
   const places = useLoad(api.places);
   const [f, setF] = useState<Person | null>(null);
   const [msg, setMsg] = useState<{ tone: 'ok' | 'miss'; text: string } | null>(null);
-  useEffect(() => { if (data) setF(data); }, [data]);
+  useEffect(() => { if (data) setF({ ...data, lunch: data.lunch ?? ['13:00', '14:00'], lunch_custom: !!data.lunch_custom }); }, [data]);
   if (error) return <Notice tone="miss">{error}</Notice>;
   if (!f) return <div className="card empty">Loading…</div>;
   const save = async (extra: Record<string, unknown> = {}) => {

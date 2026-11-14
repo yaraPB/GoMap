@@ -21,6 +21,7 @@ import Report from '../src/panels/Report';
 import { Arrived, RoutePreview, TurnByTurn } from '../src/panels/Route';
 import Search from '../src/panels/Search';
 import Voice from '../src/panels/Voice';
+import Views from '../src/panels/Views';
 import { Btn, Icon, Notice, T } from '../src/ui/kit';
 import { color, font } from '../src/ui/theme';
 
@@ -75,6 +76,7 @@ function Panels() {
     case 'layers': return <Layers />;
     case 'report': return <Report at={top.at} />;
     case 'help': return <Help step={top.step} />;
+    case 'views': return <Views />;
     default: return null;
   }
 }

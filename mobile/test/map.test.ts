@@ -29,7 +29,7 @@ function mapHarness({ flyIn = true, reduced = false } = {}) {
   let options: any;
   const record = (name: string) => (args: any) => { calls.push({ name, args }); };
   const el = () => {
-    const node: any = { className: '', style: { setProperty() {} }, classList: { toggle() {} }, children: [] as unknown[], setAttribute() {}, appendChild(c: unknown) { node.children.push(c); node.firstChild ??= c; }, querySelector: () => ({ style: {} }), innerHTML: '', textContent: '' };
+    const node: any = { className: '', style: { setProperty() {} }, classList: { toggle() {}, add() {}, remove() {} }, children: [] as unknown[], setAttribute() {}, appendChild(c: unknown) { node.children.push(c); node.firstChild ??= c; }, querySelector: () => ({ style: {} }), innerHTML: '', textContent: '' };
     created.push(node);
     return node;
   };
@@ -44,7 +44,7 @@ function mapHarness({ flyIn = true, reduced = false } = {}) {
     getZoom: () => 16.4, getBearing: () => 0, setConfigProperty(_scope: string, key: string, value: any) { record('config')({ key, value }); },
     getConfigProperty: () => true, setPaintProperty() {}, setLayoutProperty() {},
     addSource: (id: string, s: any) => { sources[id] = { data: s.data, setData(d) { this.data = d; }, getClusterExpansionZoom() {} }; },
-    getSource: (id: string) => sources[id], addLayer() {}, getLayer: () => true, setStyle() {},
+    getSource: (id: string) => sources[id], addLayer() {}, getLayer: () => true, setStyle: record('setStyle'),
     querySourceFeatures: (id: string) => (sources[id]?.data.features ?? []),
   };
   class Marker { el: any; constructor(o: any) { this.el = o.element; } setLngLat() { return this; } addTo() { return this; } remove() {} getElement() { return this.el; } }
@@ -137,4 +137,14 @@ test('tour filters real places and leaves room for its card; building tint survi
   const tints = h.calls.filter(c => c.name === 'config' && c.args.key === 'colorBuildings');
   assert.equal(tints.length, 2);
   assert.equal(tints[1].args.value, '#C4C1BA');
+});
+
+test('contrast switches theme in place; satellite reloads the style without diffing', () => {
+  const h = mapHarness({ flyIn: false });
+  h.emit('style.load'); h.emit('load');
+  h.command({ type: 'style', style: 'contrast' });
+  assert.ok(h.calls.some(c => c.name === 'config' && c.args.key === 'theme' && c.args.value === 'monochrome'));
+  h.command({ type: 'style', style: 'default' });
+  assert.ok(h.calls.some(c => c.name === 'config' && c.args.key === 'theme' && c.args.value === 'default'));
+  assert.ok(h.calls.every(c => c.name !== 'config' || c.args.key !== 'showAdminBoundaries' || c.args.value === false), 'country borders stay hidden');
 });

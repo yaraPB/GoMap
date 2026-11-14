@@ -10,6 +10,7 @@ import { useNav } from '../state/navigation';
 import { usePanels } from '../state/panels';
 import { availabilityText, availabilityTone, fmtDate, HoursTable, timeAgo } from '../ui/bits';
 import { Btn, IconBtn, Label, Loading, Notice, Provenance, StatusPill, T, Tag } from '../ui/kit';
+import { StickyNote } from '../ui/StickyNote';
 import { color, status } from '../ui/theme';
 
 export default function PersonPanel({ id }: { id: string }) {
@@ -62,7 +63,7 @@ export default function PersonPanel({ id }: { id: string }) {
             </View>
           )}
 
-          {!!p.note && <View style={{ backgroundColor: '#FFF4C7', borderRadius: 12, padding: 14 }}><T weight="bold" style={{ marginBottom: 5 }}>A note from {first}</T><T style={{ lineHeight: 20 }}>{p.note}</T></View>}
+          {(!!p.note || !!p.note_kind) && <View style={{ gap: 6 }}><T weight="bold" style={{ fontSize: 12, color: color.muted }}>ON {first.toUpperCase()}'S DOOR</T><StickyNote kind={p.note_kind} text={p.note} /></View>}
 
           {nothing ? (
             <>

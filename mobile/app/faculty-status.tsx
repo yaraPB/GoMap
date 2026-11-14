@@ -11,6 +11,8 @@ import { usePanels } from '../src/state/panels';
 import { todayKey } from '../src/ui/bits';
 import { Avatar, Btn, Icon, IconBtn, Label, Loading, Notice, T } from '../src/ui/kit';
 import { color, type IconName } from '../src/ui/theme';
+import { NOTE_CHARACTERS, NotePicker, StickyNote } from '../src/ui/StickyNote';
+import type { NoteKind } from '../src/api/types';
 
 type Status = 'in' | 'busy' | 'out';
 const STATES: { id: Status; name: string; colour: string; icon: IconName }[] = [
@@ -46,11 +48,16 @@ export default function FacultyStatus() {
   const untils = useMemo(untilOptions, []);
   const [until, setUntil] = useState('today');
   const [note, setNote] = useState<string | null>(null);
+  const [kind, setKind] = useState<NoteKind | null | undefined>(undefined);
+  const [lunch, setLunch] = useState<[string, string] | null | undefined>(undefined);
   const today = todayKey();
   const todayHours = me?.hours?.[today];
   const inPostedHours = me?.open.state === 'open';
   const save = useMutation({
-    mutationFn: (s: Status | 'clear') => api.setPresence(user.id, s === 'clear' ? { status: 'clear', note: note ?? me?.note ?? '' } : { status: s, reason: s === 'in' ? null : reason, until: untils.find(u => u.id === until)?.iso ?? null, note: note ?? me?.note ?? '' }),
+    mutationFn: (s: Status | 'clear') => {
+      const extra = { note: note ?? me?.note ?? '', note_kind: kind === undefined ? me?.note_kind ?? null : kind, ...(lunch !== undefined ? { lunch } : {}) };
+      return api.setPresence(user.id, s === 'clear' ? { status: 'clear', ...extra } : { status: s, reason: s === 'in' ? null : reason, until: untils.find(u => u.id === until)?.iso ?? null, ...extra });
+    },
     onSuccess: p => { qc.setQueryData(['person', user.id], p); qc.invalidateQueries({ queryKey: ['offices'] }); qc.invalidateQueries({ queryKey: ['people'] }); },
   });
 
@@ -110,11 +117,23 @@ export default function FacultyStatus() {
         )}
         {status === 'in' && !inPostedHours && <Notice tone="info" icon="info" text="This is outside your posted hours. Students will see that you are in anyway, and your posted hours stay as they are." />}
 
-        <View style={{ backgroundColor: '#FFF4C7', padding: 15, borderRadius: 12, gap: 8 }}>
-          <T weight="bold">A note for students</T>
-          <T style={{ fontSize: 12, color: color.muted }}>This stays on your public card until you edit or remove it.</T>
-          <View style={styles.wrap}>{['In a meeting, back soon', 'Online meetings today', 'Please email me', 'Please make an appointment', 'Out sick today'].map(text => <Choice key={text} label={text} on={note === text} onPress={() => setNote(text)} />)}</View>
+        <View style={{ backgroundColor: '#FFFBEA', padding: 15, borderRadius: 12, gap: 10 }}>
+          <T weight="bold">A note on your door</T>
+          <T style={{ fontSize: 12, color: color.muted }}>Pick a character. It shows on your card, in the office list and when students ask the assistant, until you remove it.</T>
+          <NotePicker value={kind === undefined ? me.note_kind : kind} onPick={k => { setKind(k); setNote(k ? NOTE_CHARACTERS[k].label : ''); }} />
+          {((kind === undefined ? me.note_kind : kind) || (note ?? me.note)) && <StickyNote kind={kind === undefined ? me.note_kind : kind} text={note ?? me.note} />}
           <TextInput accessibilityLabel="Note for students" multiline maxLength={500} value={note ?? me.note ?? ''} onChangeText={setNote} placeholder="Write your own note…" style={{ minHeight: 70, padding: 10, backgroundColor: '#fff', borderRadius: 8, textAlignVertical: 'top' }} />
+        </View>
+
+        <View>
+          <Label style={{ marginBottom: 8 }}>Lunch break · shown as “At lunch” on your card</Label>
+          <View style={styles.wrap}>
+            {([null, ['12:00', '13:00'], ['12:30', '13:30'], ['13:00', '14:00'], ['14:00', '15:00']] as ([string, string] | null)[]).map(l => {
+              const current = lunch === undefined ? (me.lunch_custom ? me.lunch : null) : lunch;
+              const on = JSON.stringify(current) === JSON.stringify(l);
+              return <Choice key={l ? l.join('-') : 'campus'} label={l ? `${l[0]}–${l[1]}` : `Campus default${me.lunch_custom ? '' : ` (${me.lunch[0]}–${me.lunch[1]})`}`} on={on} onPress={() => setLunch(l)} />;
+            })}
+          </View>
         </View>
 
         <View>

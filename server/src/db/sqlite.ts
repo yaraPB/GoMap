@@ -15,6 +15,7 @@ export type Sql = DatabaseSync;
 export function openSqlite(file: string): Sql {
   if (file !== ':memory:') mkdirSync(dirname(file), { recursive: true });
   const db = new DatabaseSync(file);
+  renameLegacy(db);
   db.exec(`
     PRAGMA journal_mode = WAL;
     PRAGMA foreign_keys = ON;
@@ -172,6 +173,25 @@ export function openSqlite(file: string): Sql {
   addColumn(db, 'people', 'lunch', 'TEXT'); // JSON ["13:00","14:00"], NULL = campus default
   addColumn(db, 'office_notes', 'kind', 'TEXT'); // sick | online | appointment | email | back_soon | custom
   return db;
+}
+
+/**
+ * The first prototype kept its own `services` table (title/destination_id) in the same file.
+ * Keep its rows as `legacy_services` and make room for the offices table. legacy_alter_table
+ * stops SQLite from re-pointing other tables' foreign keys at the renamed table.
+ */
+function renameLegacy(db: Sql) {
+  const cols = (t: string) => (db.prepare(`PRAGMA table_info(${t})`).all() as { name: string }[]).map(c => c.name);
+  const services = cols('services');
+  if (services.length && !services.includes('short_name')) {
+    db.exec('PRAGMA legacy_alter_table = ON; DROP TABLE IF EXISTS legacy_services; ALTER TABLE services RENAME TO legacy_services; PRAGMA legacy_alter_table = OFF;');
+  }
+  // issue_routing created while the old table still held the name points its key at it: rebuild
+  // (its rows come from the JSON and are re-imported on the next seed)
+  const fk = db.prepare('PRAGMA foreign_key_list(issue_routing)').all() as { table: string }[];
+  if (fk.some(f => f.table !== 'services')) {
+    db.exec("DROP TABLE issue_routing; DELETE FROM meta WHERE key = 'directory_hash';");
+  }
 }
 
 /** Tiny migration helper for files created by an older schema. */
