@@ -18,8 +18,10 @@ data/     faculty directory, imported campus geometry, hand-drawn mock paths
 | Store | Holds | Why |
 |---|---|---|
 | **MongoDB** | places, entrances, walkways, report pins | GeoJSON with `2dsphere` indexes: "nearest place to this pin" and "reports within 20 m" are one query each |
-| **SQLite** | people, today's presence, procedures, crowding, assistant cache and log | built into Node, Postgres-safe types for a later move |
+| **SQLite** | people, presence and its time log, door notes, offices and services, “where to go for…” routing, procedures, demo accounts, crowding, assistant cache and log | built into Node, Postgres-safe types for a later move |
 | Postgres | users, later | not ours until GoCampus SSO |
+
+**Keys, databases and builds (Gemini, Soniox, MongoDB Atlas, Mapbox, EAS):** see [setup_guide.md](setup_guide.md).
 
 ## Run it
 
