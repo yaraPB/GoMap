@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ago, api, API_URL, fmtDate, type ReportCluster } from '../api';
-import { Notice, PinMap, useLoad } from '../ui';
+import { CampusMap, Notice, PinMap, useLoad } from '../ui';
 
 const KIND: Record<string, string> = { closed: 'Closed or blocked', broken: 'Out of order', info: 'Wrong information', hazard: 'Hazard', light: 'Lighting', access: 'Access blocked' };
 const plusDays = (d: number) => new Date(Date.now() + d * 864e5).toISOString().slice(0, 10);
@@ -15,8 +15,9 @@ export default function Reports() {
   return (
     <>
       <div className="head"><div><h1>Reports from campus</h1><p className="sub">Anyone can drop a pin on something that is wrong. Nothing reaches the map until you confirm it here.</p></div></div>
+      <CampusMap height={340} selected={sel} onSelect={setSel} points={(list.data ?? []).map(r => ({ id: r.cluster_id, coord: r.coordinates, label: `${KIND[r.kind] ?? r.kind}${r.place ? ` · ${r.place.name}` : ''}`, color: tab === 'new' ? '#D63B2F' : tab === 'confirmed' ? '#E0841F' : '#64748B', text: r.count > 1 ? String(r.count) : '!', size: 26 }))} />
       <div className="toolbar" style={{ marginBottom: 14 }}>
-        {(['new', 'confirmed', 'resolved', 'dismissed'] as const).map(t => <button key={t} className={`btn sm ${tab === t ? 'dark' : ''}`} onClick={() => setTab(t)}>{t === 'new' ? 'Waiting on you' : t[0].toUpperCase() + t.slice(1)}</button>)}
+        {(['new', 'confirmed', 'resolved', 'dismissed'] as const).map(t => <button key={t} className={`chip ${tab === t ? 'on' : ''}`} onClick={() => setTab(t)}>{t === 'new' ? 'Waiting on you' : t[0].toUpperCase() + t.slice(1)}</button>)}
       </div>
       {list.error && <Notice tone="miss">{list.error}</Notice>}
       <div className="split">

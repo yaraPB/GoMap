@@ -1,18 +1,29 @@
 import { useEffect, useState } from 'react';
 import { api, fmtDate, type Procedure } from '../api';
-import { Notice, Tags, useLoad } from '../ui';
+import { CampusMap, Notice, Tags, useLoad, type MapPoint } from '../ui';
 
 const EMPTY: Procedure = { id: 'new', title: '', summary: '', owner_office: '', place_id: null, contact_email: null, steps: [{ title: '', body: '' }], match_phrases: [], source: '', status: 'draft', verified_at: null, unverified: true };
 
 /** Board 27: the register the assistant answers from. Linking a place is what makes "guide me there" route. */
 export default function Procedures({ selected, select }: { selected?: string; select: (id: string) => void }) {
   const list = useLoad(api.procedures);
+  const places = useLoad(api.places);
+  const points: MapPoint[] = (list.data ?? []).flatMap((p, i) => {
+    const c = places.data?.find(x => x.id === p.place_id)?.coordinates;
+    const same = (list.data ?? []).filter(x => x.place_id === p.place_id);
+    const k = same.findIndex(x => x.id === p.id), a = (k / Math.max(1, same.length)) * Math.PI * 2, r = same.length > 1 ? 0.0001 : 0;
+    void i;
+    return c ? [{ id: p.id, coord: [c[0] + Math.cos(a) * r, c[1] + Math.sin(a) * r] as [number, number], label: p.title, color: p.status === 'live' ? '#0B7A47' : p.status === 'review' ? '#E0841F' : '#D63B2F', size: 24, text: p.title.slice(0, 1) }] : [];
+  });
   return (
     <>
       <div className="head">
         <div><h1>Services the assistant answers from</h1><p className="sub">Only <b>live</b> entries answer without an “unverified” banner. Draft and review entries are flagged in the app.</p></div>
         <button className="btn dark" onClick={() => select('new')}>New procedure</button>
       </div>
+      <CampusMap points={points} selected={selected} onSelect={select} height={320}>
+        <div className="glass"><div className="legend"><span><i className="dot" style={{ background: '#0B7A47' }} />Live</span><span><i className="dot" style={{ background: '#E0841F' }} />In review</span><span><i className="dot" style={{ background: '#D63B2F' }} />Draft</span></div></div>
+      </CampusMap>
       {!selected && <ProcedureTable list={list.data ?? []} select={select} />}
       <div className="split">
         <div className="card" style={{ padding: 10 }}>

@@ -707,10 +707,10 @@ export function createApp(ctx: AppContext) {
         id: r.id, name: r.name, department: r.department, place: v.place, office_number: v.office_number,
         hours: v.hours, hours_text: v.hours_text, published_min: Math.round(published), in_min: l?.in ?? 0, busy_min: l?.busy ?? 0,
         sessions: l?.sessions ?? 0, by_day: l?.days ?? {}, ratio: published ? Math.round(((l?.in ?? 0) / published) * 100) / 100 : null,
-        availability: v.availability, note: v.note, note_kind: v.note_kind, lunch: v.lunch,
+        heat: l?.heat ?? null,
       };
     });
-    res.json({ days, people: rows.sort((a, b) => b.in_min - a.in_min || a.name.localeCompare(b.name)) });
+    res.json({ days, heat: logged.heat, people: rows.sort((a, b) => b.in_min - a.in_min || a.name.localeCompare(b.name)) });
   }));
 
   admin.get('/assistant-log', (_req, res) => {

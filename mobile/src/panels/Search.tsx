@@ -121,7 +121,7 @@ export default function Search({ initial }: { initial?: string }) {
 const styles = StyleSheet.create({
   bar: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: color.hairline },
   input: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, height: 44, paddingHorizontal: 14, borderRadius: 12, backgroundColor: color.surface2 },
-  text: { flex: 1, fontSize: 15, fontFamily: font.regular, color: color.ink, paddingVertical: 0 },
+  text: { flex: 1, minWidth: 0, fontSize: 15, fontFamily: font.regular, color: color.ink, paddingVertical: 0 },
   shortcut: { flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 16, marginTop: 12, padding: 14, borderRadius: 12, backgroundColor: '#EEF4FF' },
   header: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 6 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 11 },

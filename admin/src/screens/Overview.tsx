@@ -1,11 +1,13 @@
-import { api, fmtDate } from '../api';
-import { Notice, useLoad } from '../ui';
+import { api, CAT_COLOR, fmtDate } from '../api';
+import { CampusMap, Notice, useLoad, type MapPoint } from '../ui';
 
 export type Go = (section: string, id?: string) => void;
 
 /** Board 24: opens on what makes the app wrong, not on usage statistics. */
 export default function Overview({ go }: { go: Go }) {
   const { data: o, error, loading } = useLoad(api.overview);
+  const places = useLoad(api.places);
+  const reports = useLoad(() => api.reports('new'));
   if (loading) return <p className="empty">Loading…</p>;
   if (error || !o) return <Notice tone="miss">{error}</Notice>;
   const today = new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
@@ -21,6 +23,16 @@ export default function Overview({ go }: { go: Go }) {
         <div><h1>What needs you today</h1><p className="sub">{today}</p></div>
         <div className="toolbar"><button className="btn" onClick={() => go('procedures', 'new')}>Add a procedure</button><button className="btn dark" onClick={() => go('places')}>Start the sweep</button></div>
       </div>
+      <CampusMap height={380} points={[
+        ...(places.data ?? []).map((p): MapPoint => ({ id: p.id, coord: p.coordinates, label: `${p.name}${p.position_estimated ? ' · pin estimated' : !p.verified ? ' · unverified' : ''}`,
+          color: p.status === 'closed' ? '#6B7280' : p.position_estimated ? '#E0841F' : !p.verified ? '#F2C14E' : CAT_COLOR[p.category], size: p.position_estimated ? 24 : 16, text: p.position_estimated ? '?' : '' })),
+        ...(reports.data ?? []).map((r): MapPoint => ({ id: `r:${r.cluster_id}`, coord: r.coordinates, label: `Report: ${r.kind}${r.count > 1 ? ` ×${r.count}` : ''}`, color: '#D63B2F', size: 26, text: '!' })),
+      ]} onSelect={id => (id.startsWith('r:') ? go('reports') : go('places', id))}>
+        <div className="glass"><div className="legend">
+          <span><i className="dot" style={{ background: '#D63B2F' }} />Report waiting</span><span><i className="dot" style={{ background: '#E0841F' }} />Pin estimated</span>
+          <span><i className="dot" style={{ background: '#F2C14E' }} />Unverified</span><span><i className="dot" style={{ background: '#6B7280' }} />Closed</span>
+        </div></div>
+      </CampusMap>
       <div className="tiles">
         {tiles.map(t => <button key={t.l} className="tile" style={{ textAlign: 'left', cursor: 'pointer' }} onClick={() => go(t.go)}><div className="l">{t.l}</div><div className="v">{t.v}</div><div className="sub" style={{ fontSize: 12 }}>{t.note}</div></button>)}
       </div>

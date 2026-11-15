@@ -1,28 +1,35 @@
 import { StrictMode, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
+import { CalendarClock, ClipboardList, Flag, LayoutDashboard, LogOut, MapPinned, MessageSquareText, Signpost, Building2, Users, type LucideIcon } from 'lucide-react';
 import './styles.css';
 import { api, API_URL, clearToken, getToken, setToken } from './api';
 import Overview from './screens/Overview';
 import Places from './screens/Places';
 import Offices from './screens/Offices';
 import Procedures from './screens/Procedures';
+import Reports from './screens/Reports';
 import Services from './screens/Services';
 import Issues from './screens/Issues';
 import OfficeTime from './screens/OfficeTime';
-import Reports from './screens/Reports';
-import { AssistantLog, Changes } from './screens/Log';
+import { AssistantLog } from './screens/Log';
 import { Notice } from './ui';
 
-const SECTIONS = [
-  ['overview', 'Overview'], ['places', 'Places & POIs'], ['services', 'Offices & services'], ['issues', 'Where to go for…'], ['offices', 'Faculty & staff'],
-  ['time', 'Office time'], ['procedures', 'Procedures'],
-  ['reports', 'Reports'], ['log', 'Assistant log'], ['changes', 'Change history'],
-] as const;
-type Section = typeof SECTIONS[number][0];
+const SECTIONS: [string, string, LucideIcon][] = [
+  ['overview', 'Overview', LayoutDashboard],
+  ['places', 'Places & POIs', MapPinned],
+  ['services', 'Offices & services', Building2],
+  ['issues', 'Where to go for…', Signpost],
+  ['offices', 'Faculty & staff', Users],
+  ['time', 'Office time', CalendarClock],
+  ['procedures', 'Procedures', ClipboardList],
+  ['reports', 'Reports', Flag],
+  ['log', 'Assistant log', MessageSquareText],
+];
+type Section = string;
 
 /** Section and selection live in the URL hash, so a link opens the same screen. */
 function useHash(): [Section, string | undefined, (s: string, id?: string) => void] {
-  const read = () => { const [s, id] = location.hash.replace('#', '').split('/'); return [(SECTIONS.some(x => x[0] === s) ? s : 'overview') as Section, id || undefined] as const; };
+  const read = () => { const [s, id] = location.hash.replace('#', '').split('/'); return [(SECTIONS.some(x => x[0] === s) ? s : 'overview'), id || undefined] as const; };
   const [state, setState] = useState(read);
   useEffect(() => { const on = () => setState(read()); addEventListener('hashchange', on); return () => removeEventListener('hashchange', on); }, []);
   return [state[0], state[1], (s, id) => { location.hash = id ? `${s}/${id}` : s; }];
@@ -60,16 +67,16 @@ function App() {
     <div className="shell">
       <nav className="side" aria-label="Sections">
         <div className="brand"><div className="logo">G</div><div><b>GoMap Admin</b><small>Al Akhawayn University</small></div></div>
-        {SECTIONS.map(([sid, name]) => (
+        {SECTIONS.map(([sid, name, Icon]) => (
           <button key={sid} className={`nav ${section === sid ? 'on' : ''}`} aria-current={section === sid ? 'page' : undefined} onClick={() => go(sid)}>
-            {name}{badges[sid] ? <span className="badge">{badges[sid]}</span> : null}
+            <Icon size={17} strokeWidth={2} aria-hidden />{name}{badges[sid] ? <span className="badge">{badges[sid]}</span> : null}
           </button>
         ))}
-        <div style={{ marginTop: 'auto' }}><button className="nav" onClick={() => { clearToken(); setAuthed(false); }}>Sign out</button></div>
+        <div style={{ marginTop: 'auto' }}><button className="nav" onClick={() => { clearToken(); setAuthed(false); }}><LogOut size={17} aria-hidden />Sign out</button></div>
       </nav>
-      <main className="main">
+      <main className="main" key={section}>
         {section === 'overview' && <Overview go={go} />}
-        {section === 'places' && <Places selected={id} select={pid => go('places', pid)} />}
+        {section === 'places' && <Places selected={id} select={pid => go('places', pid || undefined)} />}
         {section === 'services' && <Services selected={id} select={sid => go('services', sid || undefined)} />}
         {section === 'issues' && <Issues />}
         {section === 'time' && <OfficeTime go={go} />}
@@ -77,7 +84,6 @@ function App() {
         {section === 'procedures' && <Procedures selected={id} select={pid => go('procedures', pid)} />}
         {section === 'reports' && <Reports />}
         {section === 'log' && <AssistantLog />}
-        {section === 'changes' && <Changes />}
       </main>
     </div>
   );

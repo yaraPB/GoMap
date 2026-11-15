@@ -106,7 +106,7 @@ export default function Offices({ placeId, department }: { placeId: string; depa
 const styles = StyleSheet.create({
   header: { paddingHorizontal: 16, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: color.hairline, backgroundColor: '#fff' },
   search: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 12, height: 42, paddingHorizontal: 14, borderRadius: 12, backgroundColor: color.surface2 },
-  input: { flex: 1, fontSize: 14, fontFamily: font.regular, color: color.ink, paddingVertical: 0 },
+  input: { flex: 1, minWidth: 0, fontSize: 14, fontFamily: font.regular, color: color.ink, paddingVertical: 0 },
   floor: { paddingHorizontal: 16, paddingTop: 14, paddingBottom: 6, fontSize: 11, letterSpacing: 0.6, color: color.muted, backgroundColor: color.page },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: '#F1F1EE' },
   badge: { height: 22, paddingHorizontal: 8, borderRadius: 999, justifyContent: 'center' },

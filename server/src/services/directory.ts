@@ -151,7 +151,11 @@ export class Directory {
   officeTime(days = 7, now = new Date()) {
     const since = new Date(now.getTime() - days * 86400000).toISOString();
     const logs = this.db.prepare('SELECT person_id, status, started_at, ended_at FROM presence_log WHERE started_at >= ? OR ended_at IS NULL OR ended_at >= ?').all(since, since) as { person_id: string; status: string; started_at: string; ended_at: string | null }[];
-    const byPerson = new Map<string, { in: number; busy: number; sessions: number; days: Record<string, number> }>();
+    const byPerson = new Map<string, { in: number; busy: number; sessions: number; days: Record<string, number>; heat: number[][] }>();
+    const heat = Array.from({ length: 7 }, () => new Array(24).fill(0)); // weekday (Mon = 0) × campus hour, minutes in office
+    const addHeat = (grid: number[][], from: number, to: number) => {
+      for (let t = from; t < to; t += 60000 * 5) { const d = new Date(t + 3600000); grid[(d.getUTCDay() + 6) % 7][d.getUTCHours()] += 5; } // campus ≈ UTC+1, 5-minute steps
+    };
     for (const l of logs) {
       const start = new Date(Math.max(Date.parse(l.started_at), Date.parse(since)));
       const reset = new Date(start); // same local day, 18:30 campus time (≈ UTC+1)
@@ -159,12 +163,12 @@ export class Directory {
       const endCap = Math.min(now.getTime(), reset.getTime() > start.getTime() ? reset.getTime() : start.getTime());
       const end = l.ended_at ? Math.min(Date.parse(l.ended_at), endCap) : endCap;
       const minutes = Math.max(0, Math.round((end - start.getTime()) / 60000));
-      const e = byPerson.get(l.person_id) ?? { in: 0, busy: 0, sessions: 0, days: {} };
-      if (l.status === 'in') { e.in += minutes; const d = l.started_at.slice(0, 10); e.days[d] = (e.days[d] ?? 0) + minutes; }
+      const e = byPerson.get(l.person_id) ?? { in: 0, busy: 0, sessions: 0, days: {} as Record<string, number>, heat: Array.from({ length: 7 }, () => new Array(24).fill(0)) };
+      if (l.status === 'in') { e.in += minutes; const d = l.started_at.slice(0, 10); e.days[d] = (e.days[d] ?? 0) + minutes; addHeat(heat, start.getTime(), end); addHeat(e.heat, start.getTime(), end); }
       if (l.status === 'busy') e.busy += minutes;
       e.sessions++;
       byPerson.set(l.person_id, e);
     }
-    return byPerson;
+    return Object.assign(byPerson, { heat });
   }
 }

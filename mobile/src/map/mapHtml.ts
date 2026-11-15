@@ -57,6 +57,9 @@ body.z17 .label{opacity:1;max-height:30px}
 body.nolabels .label{display:none}
 body.night .pin.dark{filter:saturate(.4) brightness(.8)}
 .cluster.appear{animation:appear 260ms ease-out backwards}
+/* golden hour: warm the whole map, lit buildings glow on top */
+#map canvas{transition:filter .8s ease}
+body.evening #map canvas{filter:sepia(.42) saturate(1.45) hue-rotate(-14deg) brightness(.93) contrast(1.04)}
 @media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
 </style></head><body><div id="map" role="application" aria-label="Campus map"></div>
 <script>
@@ -68,7 +71,20 @@ if(!window.mapboxgl||!mapboxgl.supported()){send('error','This device couldn’t
 mapboxgl.accessToken=TOKEN;
 var state={places:[],filter:{category:'all',school:'all'},selected:null,route:null,routeMode:'walk',crossings:[],walkways:null,crowding:null,closures:[],
   layers:{threeD:true,labels:true,cars:false,crowding:false},style:'default',skin:'auto',buildings:null,user:null,heading:null,follow:false,pick:false,dest:null,highlight:null,dim:false};
-var STYLES={default:'mapbox://styles/mapbox/standard',satellite:'mapbox://styles/mapbox/standard-satellite',contrast:'mapbox://styles/mapbox/standard'};
+// One style for all three looks: satellite is a photo layer under the roads and labels, contrast a theme.
+// No style reload when switching, so nothing has to be rebuilt.
+var STYLES={default:'mapbox://styles/mapbox/standard',satellite:'mapbox://styles/mapbox/standard',contrast:'mapbox://styles/mapbox/standard'};
+var IMAGERY={mapbox:{url:'mapbox://mapbox.satellite',tileSize:256},
+  // fallback when the Mapbox account refuses satellite tiles (HTTP 429/403)
+  esri:{tiles:['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],tileSize:256,maxzoom:19,
+    attribution:'Imagery © Esri — Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community'}};
+var imagery='mapbox';
+function addImagery(){
+  if(map.getLayer('imagery'))map.removeLayer('imagery');
+  if(map.getSource('imagery'))map.removeSource('imagery');
+  map.addSource('imagery',Object.assign({type:'raster'},IMAGERY[imagery]));
+  map.addLayer({id:'imagery',type:'raster',source:'imagery',slot:'bottom',layout:{visibility:state.style==='satellite'?'visible':'none'},paint:{'raster-fade-duration':200}});
+}
 var reduce=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 var arriving=FLY&&!reduce,arrivalTimer=null,arrivalDone=false;
 document.body.classList.toggle('arriving',arriving);
@@ -115,7 +131,9 @@ function clockSkin(){
   return t>=6.5&&t<17.5?'day':t>=17.5&&t<19.5?'evening':'night';
 }
 function skinNow(){return state.skin==='auto'?clockSkin():state.skin;}
-function campusLight(){var k=skinNow();return k==='evening'?'dusk':k==='night'?'night':'day';}
+// evening is the day light warmed to golden hour (Mapbox's own dusk preset is dark purple)
+// satellite photos and high contrast stay in daylight: a night preset turns them nearly black
+function campusLight(){var k=skinNow();return state.style!=='default'?'day':k==='night'?'night':'day';}
 function isDark(){return skinNow()!=='day';}
 var FOG={day:{color:'#DFE9EE','high-color':'#7399BF'},evening:{color:'#F6C38E','high-color':'#D9773F'},night:{color:'#1B2433','high-color':'#0E1827'}};
 function applyLight(){
@@ -123,6 +141,9 @@ function applyLight(){
   config('lightPreset',campusLight());
   try{map.setFog(Object.assign({'space-color':'#0E1827','horizon-blend':0.08,'star-intensity':k==='night'?0.35:0.1},FOG[k]));}catch(e){}
   document.body.classList.toggle('night',k!=='day');
+  document.body.classList.toggle('evening',k==='evening'&&state.style==='default');
+  document.body.classList.toggle('contrast',state.style==='contrast');
+  if(map.getLayer('paths')){map.setPaintProperty('paths','line-color',state.style==='contrast'?'#000000':state.style==='satellite'?'#FFFFFF':'#5B6B60');map.setPaintProperty('paths','line-opacity',state.style==='contrast'?1:0.75);map.setPaintProperty('paths','line-width',state.style==='contrast'?['interpolate',['linear'],['zoom'],15,2,18,4]:['interpolate',['linear'],['zoom'],15,1.2,18,2.6]);}
   // open buildings switch their lights on after dark: the building itself glows, no boxes
   if(map.getLayer('buildings-lit')){
     map.setLayoutProperty('buildings-lit','visibility',k!=='day'?'visible':'none');
@@ -146,6 +167,7 @@ function addLayers(){
   try{if(map.setWorldview)map.setWorldview('MA');}catch(e){}
   if(light)config('colorBuildings','#C4C1BA');
   if(state.style==='contrast')config('theme','monochrome');
+  try{addImagery();}catch(e){send('log','imagery: '+String(e&&e.message||e));}
   map.addSource('walkways',{type:'geojson',data:state.walkways||emptyFC()});
   map.addSource('crowding',{type:'geojson',data:state.crowding||emptyFC(),lineMetrics:true});
   map.addSource('route',{type:'geojson',data:routeFC(),lineMetrics:true});
@@ -276,7 +298,7 @@ var handlers={
     document.body.classList.toggle('nolabels',!state.layers.labels);},
   style:function(d){if(d.style===state.style||!STYLES[d.style])return;var prev=state.style;state.style=d.style;
     // default and contrast are the same style: switch the theme in place, no reload
-    if(STYLES[prev]===STYLES[d.style]){config('theme',d.style==='contrast'?'monochrome':'default');return;}
+    if(STYLES[prev]===STYLES[d.style]){config('theme',d.style==='contrast'?'monochrome':'default');vis('imagery',d.style==='satellite');if(ready)applyLight();return;}
     ready=false;resetPins(false);stopDash();map.setStyle(STYLES[d.style],{diff:false});},
   pick:function(d){state.pick=!!d.on;if(!d.on&&pickMarker){pickMarker.remove();pickMarker=null;}},
   flyIn:function(){flyIn();},
@@ -302,6 +324,11 @@ map.on('click',function(e){
   send('tapMap',[e.lngLat.lng,e.lngLat.lat]);});
 map.on('dragstart',function(){if(state.follow){state.follow=false;send('followOff');}});
 map.on('error',function(e){
+  // satellite tiles refused by the Mapbox account: use Esri World Imagery instead
+  var st=e&&e.error&&e.error.status;
+  if(imagery==='mapbox'&&(e.sourceId==='imagery'||/mapbox\.satellite/.test(String(e&&e.error&&e.error.url||'')))&&(st===429||st===403||st===401)){
+    imagery='esri';try{addImagery();}catch(x){}send('log','satellite: switched to Esri imagery ('+st+')');return;
+  }
   // satellite unavailable for this token/region: fall back to classic satellite imagery
   if(!ready&&state.style==='satellite'&&STYLES.satellite.indexOf('standard')>=0){STYLES.satellite='mapbox://styles/mapbox/satellite-streets-v12';map.setStyle(STYLES.satellite,{diff:false});return;}
   if(!ready)send('error','The map could not load. Check your connection and reopen GoMap.');});

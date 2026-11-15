@@ -1,4 +1,4 @@
-*# GoMap TODO
+# GoMap TODO
 
 * [ ] display the arrows and I sadi for the AR you can whatever technogology I just want it to be as good as possible.
 * [ ] The keyboard, esp on phone when I make an action and end it pls make it disappear.

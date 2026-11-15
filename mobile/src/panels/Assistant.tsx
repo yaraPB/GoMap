@@ -296,5 +296,5 @@ const styles = StyleSheet.create({
   speaking: { flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 12, marginBottom: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, backgroundColor: '#EEF4FF' },
   composer: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingTop: 8, borderTopWidth: 1, borderTopColor: color.hairline, backgroundColor: '#fff' },
   talk: { height: 44, paddingHorizontal: 10, borderRadius: 22, backgroundColor: color.surface, alignItems: 'center', justifyContent: 'center', gap: 1 },
-  input: { flex: 1, height: 44, borderRadius: 22, paddingHorizontal: 16, backgroundColor: color.surface2, fontSize: 15, color: color.ink },
+  input: { flex: 1, minWidth: 0, height: 44, borderRadius: 22, paddingHorizontal: 16, backgroundColor: color.surface2, fontSize: 15, color: color.ink },
 });

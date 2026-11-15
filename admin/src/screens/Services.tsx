@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api, fmtDate, SERVICE_CATEGORIES, type CampusHours, type Service } from '../api';
-import { HoursField, Notice, Tags, useLoad } from '../ui';
+import { CampusMap, HoursField, Notice, Tags, TimeField, useLoad, type MapPoint } from '../ui';
+import { BadgeCheck, Save, Trash2, X } from 'lucide-react';
 
 const EMPTY: Service = {
   id: 'new', name: '', short_name: '', category: 'service', handles: [], keywords: [], places: [], location_text: '', room: null, email: '', extension: '', phone: '',
@@ -11,6 +12,18 @@ const EMPTY: Service = {
 export default function Services({ selected, select }: { selected?: string; select: (id: string) => void }) {
   const list = useLoad(api.services);
   const campus = useLoad(api.campus);
+  const placesAll = useLoad(api.places);
+  // offices share buildings: fan them out a little around the building pin
+  const points: MapPoint[] = (list.data ?? []).flatMap((s, i) => {
+    const c = placesAll.data?.find(p => p.id === s.places[0]?.id)?.coordinates;
+    if (!c) return [];
+    const same = (list.data ?? []).filter(x => x.places[0]?.id === s.places[0]?.id);
+    const k = same.findIndex(x => x.id === s.id), n = same.length, a = (k / Math.max(1, n)) * Math.PI * 2;
+    const r = n > 1 ? 0.00012 : 0;
+    return [{ id: s.id, coord: [c[0] + Math.cos(a) * r, c[1] + Math.sin(a) * r * 0.85] as [number, number], label: s.short_name, text: s.short_name.slice(0, 2).toUpperCase(),
+      color: s.open.state === 'open' ? '#0B7A47' : s.open.state === 'closed' ? '#94A3B8' : '#E0841F', size: 28 }];
+  });
+
   const [q, setQ] = useState('');
   const [cat, setCat] = useState('all');
   const shown = useMemo(() => (list.data ?? []).filter(s => (cat === 'all' || s.category === cat)
@@ -21,6 +34,9 @@ export default function Services({ selected, select }: { selected?: string; sele
         <div><h1>Offices & services</h1><p className="sub">Each office, where it is, its hours and what it handles. The assistant answers student problems from this list.</p></div>
         <button className="btn dark" onClick={() => select('new')}>New office</button>
       </div>
+      <CampusMap points={points} selected={selected} onSelect={id => select(id)} height={360}>
+        <div className="glass"><div className="legend"><span><i className="dot" style={{ background: '#0B7A47' }} />Open now</span><span><i className="dot" style={{ background: '#94A3B8' }} />Closed</span><span><i className="dot" style={{ background: '#E0841F' }} />No hours</span></div></div>
+      </CampusMap>
       {campus.data && <CampusHoursCard value={campus.data} onSaved={() => { campus.reload(); list.reload(); }} />}
       <div className="split" style={{ marginTop: 16 }}>
         <div className="card" style={{ padding: 10 }}>
@@ -60,10 +76,10 @@ function CampusHoursCard({ value, onSaved }: { value: CampusHours; onSaved: () =
       <div className="toolbar" style={{ justifyContent: 'space-between' }}>
         <div><p className="label" style={{ margin: 0 }}>Campus working hours</p><p className="sub" style={{ margin: 0 }}>Applies to every office that does not list its own hours.</p></div>
         <div className="toolbar">
-          <label className="f">Open<input className="i" type="time" value={f.open} onChange={e => setF({ ...f, open: e.target.value })} /></label>
-          <label className="f">Close<input className="i" type="time" value={f.close} onChange={e => setF({ ...f, close: e.target.value })} /></label>
-          <label className="f">Lunch from<input className="i" type="time" value={f.lunch[0]} onChange={e => setF({ ...f, lunch: [e.target.value, f.lunch[1]] })} /></label>
-          <label className="f">to<input className="i" type="time" value={f.lunch[1]} onChange={e => setF({ ...f, lunch: [f.lunch[0], e.target.value] })} /></label>
+          <TimeField label="Open" value={f.open} onChange={v => setF({ ...f, open: v })} presets={['08:00', '08:30', '09:00']} />
+          <TimeField label="Close" value={f.close} onChange={v => setF({ ...f, close: v })} presets={['17:00', '17:30', '18:00']} />
+          <TimeField label="Lunch from" value={f.lunch[0]} onChange={v => setF({ ...f, lunch: [v, f.lunch[1]] })} presets={['12:00', '12:30', '13:00']} />
+          <TimeField label="to" value={f.lunch[1]} onChange={v => setF({ ...f, lunch: [f.lunch[0], v] })} presets={['13:00', '13:30', '14:00']} />
           <label className="f" style={{ minWidth: 260 }}>Emergencies<input className="i" value={f.emergencies ?? ''} onChange={e => setF({ ...f, emergencies: e.target.value })} /></label>
           <button className="btn primary" style={{ alignSelf: 'flex-end' }} onClick={save}>Save</button>
         </div>
@@ -106,12 +122,18 @@ function Editor({ initial, lunch, onSaved, onDeleted }: { initial: Service | nul
           <div><h2 style={{ fontSize: 20 }}>{f.id === 'new' ? 'New office' : f.name}</h2>
             <p className="sub">{f.verified_at ? `Verified ${fmtDate(f.verified_at)}` : 'Not verified'}{f.admin_edited ? ' · edited here (the JSON import will not overwrite it)' : ` · from ${f.source}`}</p></div>
           <div className="toolbar">
-            {f.id !== 'new' && <button className="btn danger" onClick={remove}>Delete</button>}
-            <button className="btn green" onClick={() => save({ verify: true })}>Save and verify</button>
-            <button className="btn primary" onClick={() => save()}>Save</button>
+            {f.id !== 'new' && <button className="btn danger" onClick={remove}><Trash2 size={15} />Delete</button>}
+            <button className="btn green" onClick={() => save({ verify: true })}><BadgeCheck size={15} />Save and verify</button>
+            <button className="btn primary" onClick={() => save()}><Save size={15} />Save</button>
           </div>
         </div>
         {msg && <Notice tone={msg.tone}>{msg.text}</Notice>}
+        <p className="label" style={{ margin: 0 }}>Opening hours</p>
+        {f.hours_raw && <p className="sub" style={{ margin: 0 }}>Published as: “{f.hours_raw}”</p>}
+        <HoursField value={f.hours} lunch={lunch} onChange={hours => setF({ ...f, hours })} />
+      </div>
+      <div className="card stack">
+        <p className="label" style={{ margin: 0 }}>Details</p>
         <div className="grid2">
           <label className="f">Full name<input className="i" value={f.name} onChange={e => setF({ ...f, name: e.target.value })} /></label>
           <label className="f">Short name (said by the assistant)<input className="i" value={f.short_name} onChange={e => setF({ ...f, short_name: e.target.value })} /></label>
@@ -127,7 +149,7 @@ function Editor({ initial, lunch, onSaved, onDeleted }: { initial: Service | nul
         <div className="f" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           <span className="label" style={{ margin: 0 }}>Map pins (first = main desk, where “guide me” goes)</span>
           <div className="chips">
-            {f.places.map((p, i) => <span key={p.id} className="chip">{i === 0 ? '★ ' : ''}{p.name}{!p.known && ' (not on the map)'}<button aria-label={`Remove ${p.name}`} onClick={() => setF({ ...f, places: f.places.filter(x => x.id !== p.id) })}>✕</button></span>)}
+            {f.places.map((p, i) => <span key={p.id} className="chip">{i === 0 ? '★ ' : ''}{p.name}{!p.known && ' (not on the map)'}<button aria-label={`Remove ${p.name}`} onClick={() => setF({ ...f, places: f.places.filter(x => x.id !== p.id) })}><X size={12} /></button></span>)}
           </div>
           <select className="i" value="" onChange={e => { const p = places.data?.find(x => x.id === e.target.value); if (p) setF({ ...f, places: [...f.places, { id: p.id, name: p.name, known: true }] }); }} aria-label="Add a map pin">
             <option value="">Add a building…</option>{placeOptions.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
@@ -141,11 +163,6 @@ function Editor({ initial, lunch, onSaved, onDeleted }: { initial: Service | nul
           <Tags value={f.keywords} onChange={keywords => setF({ ...f, keywords })} placeholder="e.g. lost my card, frais, منحة — press Enter" />
         </div>
         <label className="f">Note shown with the hours<textarea className="i" value={f.notes ?? ''} onChange={e => setF({ ...f, notes: e.target.value })} placeholder="By appointment only, doctor on call 24/7…" /></label>
-      </div>
-      <div className="card stack">
-        <p className="label" style={{ margin: 0 }}>Opening hours</p>
-        {f.hours_raw && <p className="sub" style={{ margin: 0 }}>Published as: “{f.hours_raw}”</p>}
-        <HoursField value={f.hours} lunch={lunch} onChange={hours => setF({ ...f, hours })} />
       </div>
       {f.id !== 'new' && (
         <div className="card stack">

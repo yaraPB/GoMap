@@ -49,7 +49,7 @@ export type Service = {
 export type Issue = { id: string; issue: string; go_to: string; service_id: string | null; location_text: string | null; place: { id: string; name: string; known: boolean } | null; notes: string | null; keywords: string[]; sort: number; admin_edited: boolean };
 export type CampusHours = { open: string; close: string; lunch: [string, string]; weekend_working: boolean; emergencies: string | null; exceptions: string[] };
 export type OfficeTimeRow = { id: string; name: string; department: string | null; place: { id: string; name: string } | null; office_number: string | null; hours: Hours | null; hours_text: string | null;
-  published_min: number; in_min: number; busy_min: number; sessions: number; by_day: Record<string, number>; ratio: number | null; availability: Person['availability']; note: string | null; note_kind: NoteKind | null; lunch: [string, string] };
+  published_min: number; in_min: number; busy_min: number; sessions: number; by_day: Record<string, number>; ratio: number | null; heat: number[][] | null };
 export type Procedure = { id: string; title: string; summary: string; owner_office: string; place_id: string | null; contact_email: string | null;
   steps: { title: string; body: string }[]; match_phrases: string[]; source: string | null; status: 'draft' | 'review' | 'live'; verified_at: string | null; unverified: boolean };
 export type ReportCluster = {
@@ -94,7 +94,7 @@ export const api = {
   deleteIssue: (id: string) => del(`/api/admin/issues/${id}`),
   campus: () => req<CampusHours>('/api/campus'),
   saveCampus: (b: Partial<CampusHours>) => put<CampusHours>('/api/admin/campus-hours', b),
-  officeTime: (days: number, department?: string) => req<{ days: number; people: OfficeTimeRow[] }>(`/api/admin/office-time?days=${days}${department ? `&department=${department}` : ''}`),
+  officeTime: (days: number, department?: string) => req<{ days: number; heat: number[][]; people: OfficeTimeRow[] }>(`/api/admin/office-time?days=${days}${department ? `&department=${department}` : ''}`),
   ask: (question: string) => post<{ intent: string; text: string; service?: Service; issue?: { go_to: string }; alert?: { text: string }; answered_by: string }>('/api/admin/procedures/preview', { question }),
   log: () => req<{ id: string; question: string; lang: string; intent: string; answered_by: string; created_at: string }[]>('/api/admin/assistant-log'),
   changes: () => req<{ id: string; entity: string; entity_id: string; action: string; detail: unknown; actor: string; created_at: string }[]>('/api/admin/changes'),

@@ -67,6 +67,6 @@ export default function People() {
 const styles = StyleSheet.create({
   header: { paddingHorizontal: 16, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: color.hairline },
   search: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 12, height: 42, paddingHorizontal: 14, borderRadius: 12, backgroundColor: color.surface2 },
-  input: { flex: 1, fontSize: 14, fontFamily: font.regular, color: color.ink, paddingVertical: 0 },
+  input: { flex: 1, minWidth: 0, fontSize: 14, fontFamily: font.regular, color: color.ink, paddingVertical: 0 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: '#F1F1EE' },
 });
