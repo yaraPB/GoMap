@@ -46,6 +46,8 @@ export function modeFrom(text: string): Match['mode'] {
 }
 
 type Doc = { id: string; keys: string[] };
+/** Surnames that are also everyday words: 'I would love to…' is not Professor Love. */
+const COMMON_WORDS = new Set(['love', 'park', 'king', 'white', 'black', 'brown', 'green', 'young', 'hall', 'may', 'rose', 'will', 'mark', 'page', 'rich', 'long', 'best', 'hope', 'joy', 'grace', 'faith', 'bell', 'stone', 'wood', 'ward', 'cook', 'baker', 'hill', 'lane', 'field', 'little', 'small', 'short', 'west', 'north', 'south', 'east', 'day', 'law', 'money', 'price', 'cash', 'gold', 'silver', 'snow', 'frost', 'rain', 'sun', 'star', 'ali', 'said', 'amine', 'hassan', 'salam', 'nour', 'amal', 'karim']);
 const stripFiller = (k: string) => k.split(' ').filter(w => !FILLER.has(w)).join(' ');
 
 export class IntentRouter {
@@ -141,7 +143,8 @@ export class IntentRouter {
     if (place) cands.push({ intent: 'place', id: place.id, score: place.score + 0.0006 - (CUES.place.test(t) ? 0.08 : 0), mode });
     // a full name said exactly ("harit satt") is far stronger evidence than any one-word fuzzy hit
     const fullName = !!person?.exact && person.w.includes(' ');
-    if (person) cands.push({ intent: 'person', id: person.id, score: person.score + 0.0008 - (CUES.person.test(t) ? 0.1 : 0) - (fullName ? 0.12 : 0), mode });
+    const everydayWord = !!person && !fullName && COMMON_WORDS.has(person.w) && !CUES.person.test(t) && !new RegExp(`\\b${person.w[0].toUpperCase()}${person.w.slice(1)}\\b`).test(text);
+    if (person) cands.push({ intent: 'person', id: person.id, score: person.score + 0.0008 - (CUES.person.test(t) ? 0.1 : 0) - (fullName ? 0.12 : 0) + (everydayWord ? 0.3 : 0), mode });
     if (proc) cands.push({ intent: 'procedure', id: proc.id, score: proc.score - (CUES.procedure.test(t) ? 0.15 : 0), mode });
     // an office is a place you go to, and its card says more than the building's: it wins ties
     if (service) cands.push({ intent: 'service', id: service.id, score: service.score + 0.0002 - (CUES.place.test(t) ? 0.08 : 0), mode });

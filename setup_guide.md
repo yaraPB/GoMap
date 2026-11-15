@@ -8,8 +8,8 @@ key in a chat or an issue.** When a step says "tell me", send the *result* (e.g.
 
 | Service | Unlocks | Where the key goes | Cost |
 | --- | --- | --- | --- |
-| **Claude** (Anthropic) — recommended | Best answers to open questions ("I lost my card and my exam is tomorrow") | `server/.env` `ANTHROPIC_API_KEY` | Pay per use |
-| Gemini (Google AI Studio) | Open questions if no Claude key; voice transcription fallback | `server/.env` `GEMINI_API_KEY` | Free tier |
+| Gemini (Google AI Studio) — **your current setup** | Open questions the local router can't answer; voice fallback | `server/.env` `GEMINI_API_KEY` | Free tier |
+| Claude (Anthropic) — optional | The same, if you ever want a paid model | `server/.env` `ANTHROPIC_API_KEY` | Pay per use |
 | Soniox | Live words while you speak; best Arabic/Darija/French transcription | `server/.env` `SONIOX_API_KEY` | Pay per minute, free credit |
 | MongoDB Atlas | Map data that survives restarts (places you draw, reports) | `server/.env` `MONGODB_URI` | Free M0 |
 | Mapbox | The map, admin map, geometry import | `mobile/.env.local`, `admin/.env.local` | Free tier |
@@ -28,36 +28,45 @@ key in a chat or an issue.** When a step says "tell me", send the *result* (e.g.
 - **One example rule** (Emergency → Security 24/7) is added once. Edit or delete it in Admin → Assistant → Rules.
 - **Restart the API** after pulling (it rebuilds the routing graph; that is what fixes Building 14).
 
-## 1. The assistant model: Claude (recommended) or Gemini
+## 1. The assistant model: Gemini (what you have), Claude optional
 
 **Why the model matters less than you'd think.** Most questions never reach it: your rules, places, people, offices,
 procedures and events are answered locally, for free, in ~50 ms. The model only resolves what is left, and it can only
 *choose* one of our records through tools (`campus_rule`, `find_place`, `get_person_office`, `get_procedure`,
 `find_service`, `whats_on`, `campus_info`). The facts on screen are built by the server from that record.
 
-**Why Claude first.** On mixed Darija/French/Arabic questions it picks the right tool most reliably and says "I don't
-know" instead of improvising. The server uses `claude-opus-5-5` with prompt caching and low effort, so answers stay
-quick. Gemini stays as the free option and as the voice-transcription fallback (Claude does not take audio).
+**What was measured on your key (15 Nov 2026).** `npm run assistant:eval -- --model-only <models>` sends 16 indirect
+questions (EN/FR/Darija, plus two off-topic ones) straight to each model and scores where the answer lands:
 
-**Steps (Claude)**
-1. Create an account at <https://platform.claude.com>, add billing, and create an API key (**API keys** → *Create key*).
-2. In `server/.env`:
-   ```
-   ASSISTANT_PROVIDER=auto
-   ANTHROPIC_API_KEY=your-key
-   CLAUDE_MODEL=claude-opus-5-5
-   ```
-   `CLAUDE_MODEL` is yours to change. `claude-haiku-5-5` is much cheaper and faster, at some cost in answer quality on
-   tricky questions; try both with the test suite (step 4) and keep the one you like.
-3. Restart the API. The log prints `Assistant model: claude (claude-opus-5-5)`.
-4. Open **Admin → Assistant → Tests** and click **Run with the AI model**. **Tell me** the score and any red rows.
+| Model | Correct | Answered (rest = quota errors) | Avg time |
+| --- | --- | --- | --- |
+| **gemini-3.5-flash-lite** ✔ keep | 13/16 | 13 — every one right | 2.6 s |
+| gemini-3.1-flash-lite (fallback) | 13/16 | 15 — 2 wrong "I don't know" in French | 5.2 s |
+| gemini-3-flash-preview | 9/16 | 8 | 3.2 s |
+| gemini-3.6-flash | 5/16 | 3 | 36 s |
+| gemini-3.5-flash, 3.7/3.8-flash, 3.1-pro | — | no free quota on this key | — |
+| gemini-2.5-* | — | retired (404) | — |
 
-**Steps (Gemini, free)**
-1. <https://aistudio.google.com/apikey> → *Create API key*.
-2. In `server/.env`: `GEMINI_API_KEY=your-key` and `GEMINI_MODEL=gemini-3.5-flash-lite`.
-3. `cd server && npm run gemini:check` → **tell me** if it passes.
+Your key is on the **free tier**: the bigger models have no quota, and even the light ones allow only a few requests a
+minute. So the model you already had is the right one; what was wrong was handling the limits. The server now:
+- waits and retries once when Google says "try again in a few seconds";
+- moves to the next model in `GEMINI_FALLBACK_MODELS` when a model has no quota ("limit: 0") or was retired, and keeps
+  using the one that works (the configured model is retried every 10 minutes).
 
-Keys stay on the server. The phone never sees them.
+**Your `server/.env` (nothing to change; the second line is optional, these are the defaults):**
+```env
+GEMINI_MODEL=gemini-3.5-flash-lite
+GEMINI_FALLBACK_MODELS=gemini-3.5-flash-lite,gemini-3.1-flash-lite,gemini-flash-lite-latest
+```
+
+**If students use it a lot,** the free tier will run out (you'd see "the assistant is busy"). Enable billing on the
+Google AI Studio project: the same key then gets real quotas, and `gemini-3.5-flash` becomes worth a re-test with the
+eval. Re-run `npm run assistant:eval` after any model change and **tell me** the score.
+
+**Claude (optional).** Set `ANTHROPIC_API_KEY` (and `ASSISTANT_PROVIDER=claude` or leave `auto`) to switch; `CLAUDE_MODEL`
+defaults to `claude-opus-5-5` (`claude-haiku-5-5` is cheaper). Gemini stays the voice fallback either way.
+
+The keys stay on the server. The phone never sees them.
 
 ## 2. Teach the assistant (Admin → Assistant)
 
@@ -118,7 +127,8 @@ start fresh, stop the API and delete `server/data/gomap.sqlite*`. Postgres-safe 
 
 ## 7. Buildings missing from the map (needs someone who knows campus)
 
-The basemap lacks some buildings, and 27 outlines (from the map data and the team's satellite traces) have no name.
+The basemap lacked some buildings; they are now traced from satellite imagery and shown in 3D, but have no number
+(no open map source labels 12, 13, 16, 20, 28 or 37).
 1. Admin → **Places & POIs** → **Outlines**: amber = no name yet, blue = linked to a place.
 2. Click an amber outline → give it its number, name, category, height → **Add to the map**. Or **Draw a building**:
    switch the map to **Satellite**, click the corners on the photo, press Enter.
@@ -160,11 +170,12 @@ have a dev build on a phone and I'll add it behind a switch.
 
 ## 12. Checklist — send me the ticks
 
-- [ ] `ANTHROPIC_API_KEY` (or `GEMINI_API_KEY`) set; log shows `Assistant model: …`
-- [ ] Admin → Assistant → Tests: **Run with the AI model** score: ___ / 18
-- [ ] `SONIOX_API_KEY` set (optional); voice screen shows live words in the dev build
-- [ ] `MONGODB_URI` set, `npm run seed` run; **Atlas password from `misc.txt` rotated**
-- [ ] `ADMIN_TOKEN` changed from the default
-- [ ] Mapbox token in `mobile/.env.local`; satellite shows a photo
-- [ ] Missing buildings named in Admin → Places → Outlines (which numbers were they?)
+- [x] `GEMINI_API_KEY` set; log shows `Assistant model: gemini (gemini-3.5-flash-lite)`
+- [ ] Admin → Assistant → Tests: **Run with the AI model** score: ___ / 18 (local run: 18/18)
+- [ ] Billing on the Google AI Studio project once real students use it (free tier = a few questions a minute)
+- [x] `SONIOX_API_KEY` set; voice screen shows live words in the dev build
+- [x] `MONGODB_URI` set · [ ] **Atlas password from `misc.txt` rotated**
+- [x] `ADMIN_TOKEN` changed from the default
+- [x] Mapbox token in `mobile/.env.local`
+- [ ] Numbers given to the new outlines in Admin → Places → Outlines (the 13 satellite traces have none yet)
 - [ ] One walk on campus with the [README checklist](README.md#6-on-campus-checklist-a-real-phone-outdoors)

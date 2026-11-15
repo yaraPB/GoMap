@@ -130,10 +130,15 @@ stairs; drive refuses footpaths), and closures confirmed in the admin block edge
    - **Claude** (`claude-opus-5-5` by default, official `@anthropic-ai/sdk`) when `ANTHROPIC_API_KEY` is set: most
      reliable tool choice on mixed-language questions, prompt-cached system prompt, effort `low` (this is routing, not
      reasoning), server-side refusal fallbacks on.
-   - **Gemini** otherwise (free tier), and always as the voice-transcription fallback (Claude has no audio input).
+   - **Gemini** otherwise — the current setup. Measured on the project's free-tier key with `npm run assistant:eval`:
+     `gemini-3.5-flash-lite` got every question it answered right and was fastest; the bigger models have no free
+     quota. The client retries short rate limits and falls back along `GEMINI_FALLBACK_MODELS` instead of failing.
+     Gemini is also always the voice-transcription fallback (Claude has no audio input).
 4. **Tests** — 18 starter questions with the record they must land on, editable in Admin → Assistant → Tests and run
-   in CI (`server/test/api.test.ts`). Running them found and fixed three misroutes this round ("park my car" →
-   *Careers*, "Harit Satt's office" → *Business Office*, "World Cup" → *ITS* via "password").
+   in CI (`server/test/api.test.ts`), plus `npm run assistant:eval`: 16 indirect questions scored per model. Running
+   them found and fixed five misroutes ("park my car" → *Careers*, "Harit Satt's office" → *Business Office*,
+   "World Cup" → *ITS* via "password", "I would *love* to study in Spain" → a professor named Love, "start a student
+   club" → *Student Center*).
 
 ### Voice: three engines, best available wins
 
@@ -144,7 +149,7 @@ key never reaches the phone) → record-and-transcribe (Soniox async, else Gemin
 
 | Option | Verdict |
 | --- | --- |
-| **Camera + GPS + compass + gyro fusion** ✔ (current) | Runs in Expo Go on any phone; arrows projected on the ground plane from a fused heading; honest about accuracy |
+| **Camera + GPS + compass + gyro fusion** ✔ (current) | Runs in Expo Go on any phone, and in mobile browsers (the standard `deviceorientation` event, since expo-sensors gives no rotation on the web); arrows projected on the ground plane from a fused heading; honest about accuracy |
 | ViroReact / ARCore Geospatial / ARKit geo-anchors | Real world-locked anchors, but needs a dev build, Google Cloud VPS coverage (sparse in Ifrane), and native code we could not test without devices on campus. The upgrade path, documented in the setup guide |
 | `react-native-mapbox-ar-master` (the folder in this repo) | Mapbox's 2018 beta on `react-viro` (abandoned). It renders tabletop terrain from terrain-RGB tiles; no navigation, no anchors. Useful idea kept for later: sample terrain-RGB so arrows follow Ifrane's slopes |
 
@@ -152,7 +157,8 @@ What makes it intuitive now: one instruction in words at the top ("Turn left" / 
 green chevrons and a big arrow at your feet that always points the way; a coach that tells you to raise/lower the phone;
 a buzz and **"Turn around"** when you face away from the route; a single quiet accuracy pill (tap → calibrate);
 bottom bar like the GoCampus references (stop · time & distance left · arrival time · map); arrival card; voice
-on/off in the banner.
+on/off in the banner. The decisions live in `mobile/src/ar/guidance.ts` (unit-tested), and the whole screen was run end
+to end in a browser with a fake camera, a GPS fix and simulated sensors.
 
 ### Admin: map or calendar first, edit beside it
 
@@ -192,19 +198,22 @@ Use your computer's Wi-Fi IPv4 (`ipconfig`) for a physical phone, `http://10.0.2
 
 Footpaths, roads, stairs, building labels and footprints come from **Mapbox Streets vector tiles** (`npm run geo:import`,
 or `-- --osm` for OpenStreetMap, which must be used before a public release because Mapbox's terms limit storing tile
-data). `data/campus/traced.geojson` adds paths and footprints the team traced from satellite imagery; the app extrudes
-those footprints as 3D buildings because the basemap lacks them. `npm run graph:check` prints the network, the joined
+data). `data/campus/traced.geojson` adds paths and footprints traced from satellite imagery — the team's, plus 13
+buildings traced on Esri World Imagery after comparing the whole campus against every footprint (OpenStreetMap adds
+nothing on campus) — and the app extrudes them as 3D buildings because the basemap lacks them. `npm run graph:check` prints the network, the joined
 islands (with coordinates to check on site) and any place without a walkable entrance.
 
-**Known gaps:** buildings 12, 13, 20 and 28 have no label in the map data, and 27 footprints have no name — name them
-in Admin → Places → Outlines (only someone who knows the campus can say which number is which). Building 16 and 14
+**Known gaps:** no open source (Mapbox, OpenStreetMap) labels buildings 12, 13, 16, 20, 28 or 37, so the traced
+outlines carry no number yet — give them one in Admin → Places → Outlines (only someone who knows the campus can say
+which is which). Building 16 and 14
 pins are estimated. Entrances are estimated where the path network meets each building until confirmed in the admin.
 
 ## 5. Checks
 
 ```bash
-cd server && npm run check && npm test && npm run graph:check     # 39 tests
-cd mobile && npx tsc --noEmit && npm test && npx expo export --platform android   # 27 tests
+cd server && npm run check && npm test && npm run graph:check     # 42 tests
+cd server && npm run assistant:eval                               # real questions on your AI key (costs ~nothing)
+cd mobile && npx tsc --noEmit && npm test && npx expo export --platform android   # 31 tests
 cd admin  && npm run build
 ```
 
@@ -220,5 +229,4 @@ cd admin  && npm run build
    itself.
 7. Admin → Events → add one at a building: it appears on the phone's map and in "what's on?".
 8. Admin → Assistant → Rules: write one, ask it on the phone, in French too.
-9. Check the traced (satellite) buildings' colour next to Mapbox's own in the GoCampus scene: on a desktop software
-   renderer they looked darker than intended.
+9. Walk past the north-west residences: the traced buildings should sit on the real ones (they were traced to ~5 m).

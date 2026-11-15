@@ -13,6 +13,7 @@ import { peopleFromDirectory } from './people.js';
 import { procedureSeeds } from './procedures.js';
 import { ACCOUNT_SEEDS, campusHours, issuesFromJson, servicesFromJson, type IssueJson, type ServiceJson, type WorkingHoursJson } from './services.js';
 
+const SEED_VERSION = '2026-11-15';
 const readJson = <T>(file: string): T => JSON.parse(readFileSync(file, 'utf8')) as T;
 
 /**
@@ -102,7 +103,8 @@ type DirectoryJson = Parameters<typeof peopleFromDirectory>[0] & {
 export function seedSqlite(db: Sql, now: string, dataDir = DATA_DIR) {
   const file = join(dataDir, 'aui_departments_faculty.json');
   const raw = readFileSync(file, 'utf8');
-  const hash = createHash('sha1').update(raw).digest('hex');
+  // bump SEED_VERSION when the seeding code changes (new keywords…): rows the admin never edited are refreshed
+  const hash = createHash('sha1').update(raw).update(SEED_VERSION).digest('hex');
   const dir = JSON.parse(raw) as DirectoryJson;
   const changed = meta.get(db, 'directory_hash') !== hash;
   const campus = campusHours(dir.working_hours);

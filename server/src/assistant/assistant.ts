@@ -353,14 +353,14 @@ export class Assistant {
   }
 
   /** localOnly: live preview while someone is still speaking. No Gemini, no log. */
-  async ask(input: { text: string; lang: Lang; from: Position | null; history?: { role: 'user' | 'assistant'; text: string }[]; localOnly?: boolean; trace?: boolean; noLog?: boolean }): Promise<Answer> {
+  async ask(input: { text: string; lang: Lang; from: Position | null; history?: { role: 'user' | 'assistant'; text: string }[]; localOnly?: boolean; trace?: boolean; noLog?: boolean; skipLocal?: boolean }): Promise<Answer> {
     const started = Date.now();
     const a = await this.answer(input);
     if (!input.trace) { delete a.trace; return a; }
     return { ...a, trace: { candidates: a.trace?.candidates ?? [], tools: a.trace?.tools ?? [], ms: Date.now() - started, model: a.trace?.model ?? null } };
   }
 
-  private async answer(input: { text: string; lang: Lang; from: Position | null; history?: { role: 'user' | 'assistant'; text: string }[]; localOnly?: boolean; noLog?: boolean }): Promise<Answer> {
+  private async answer(input: { text: string; lang: Lang; from: Position | null; history?: { role: 'user' | 'assistant'; text: string }[]; localOnly?: boolean; noLog?: boolean; skipLocal?: boolean }): Promise<Answer> {
     if (!this.router) await this.refresh();
     const { text, lang, from } = input;
     const review = lang !== 'en';
@@ -369,9 +369,10 @@ export class Assistant {
     // 1–3: local router
     const all = this.router!.matchAll(text);
     const candidates = all.slice(0, 5).map(c => ({ intent: c.intent, id: c.id, score: Math.round(c.score * 1000) / 1000 }));
-    let m = all[0] ?? null;
+    // skipLocal (model evaluation only): every question goes to the AI model
+    let m = input.skipLocal ? null : all[0] ?? null;
     // "what's on tonight?": events, unless an admin rule or an exact name says otherwise
-    if (Assistant.EVENTS.test(normalise(text)) && m?.intent !== 'rule') {
+    if (!input.skipLocal && Assistant.EVENTS.test(normalise(text)) && m?.intent !== 'rule') {
       if (!input.localOnly) log(text, lang, 'events', 'local');
       return { ...this.eventsAnswer(lang, text), translation_review: review, trace: { candidates, tools: [], ms: 0, model: null } };
     }

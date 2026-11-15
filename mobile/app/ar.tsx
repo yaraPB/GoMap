@@ -11,6 +11,7 @@ import type { Position } from '../src/api/types';
 import { bearing, enu, fmtDistance, fmtMinutes, pointAlong, snapToLine } from '../src/ar/geo';
 import { chevronsAhead, labelFor, pathRibbon, turnMarker, type Pose } from '../src/ar/projection';
 import { cameraPose, HeadingFusion } from '../src/ar/orientation';
+import { fromDeviceOrientation, guideRelative, tiltState, WrongWayDetector } from '../src/ar/guidance';
 import { useApp, useLocation } from '../src/state/app';
 import { useNav } from '../src/state/navigation';
 import { ManeuverIcon } from '../src/ui/bits';
@@ -40,30 +41,41 @@ function usePose(compass: { heading: number | null; accuracy: number | null; cou
     let active = true;
     let last = 0, drawn = 0;
     let sub: { remove: () => void } | undefined;
+    const onAttitude = (r: { alpha: number; beta: number; gamma: number }) => {
+      const now = Date.now();
+      last = now;
+      const cam = cameraPose(r.alpha, r.beta, r.gamma);
+      const s = sensors.current;
+      const heading = fusion.current.update({ yaw: cam.yaw, pitchDown: cam.pitchDown, compass: s.heading, compassAccuracy: s.accuracy, course: s.course, t: now, platform: Platform.OS });
+      sm.current = { p: sm.current.p * 0.6 + Math.max(-30, Math.min(89, cam.pitchDown)) * 0.4, r: sm.current.r * 0.6 + Math.max(-40, Math.min(40, cam.roll)) * 0.4 };
+      if (now - drawn < 33) return; // ~30 fps is plenty for SVG
+      drawn = now;
+      setPose({ heading, pitchDown: sm.current.p, roll: sm.current.r, yaw: cam.yaw, ok: true, t: now });
+    };
+    // web: expo-sensors gives no rotation in browsers; the standard deviceorientation event does
+    // (absolute north when the browser offers it)
+    let offWeb: (() => void) | undefined;
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      const ev = 'ondeviceorientationabsolute' in window ? 'deviceorientationabsolute' : 'deviceorientation';
+      const h = (e: Event) => { const r = fromDeviceOrientation(e as DeviceOrientationEvent); if (r) onAttitude(r); };
+      window.addEventListener(ev, h);
+      offWeb = () => window.removeEventListener(ev, h);
+    }
     void (async () => {
       try {
-        if (!(await DeviceMotion.isAvailableAsync())) return;
+        if (Platform.OS === 'web' || !(await DeviceMotion.isAvailableAsync())) return;
         const permission = await DeviceMotion.requestPermissionsAsync();
         if (!active || !permission.granted) return;
         DeviceMotion.setUpdateInterval(33);
         sub = DeviceMotion.addListener(m => {
           const r = m.rotation;
           if (!r || !Number.isFinite(r.alpha) || !Number.isFinite(r.beta) || !Number.isFinite(r.gamma)) return;
-          const now = Date.now();
-          last = now;
-          const cam = cameraPose(r.alpha, r.beta, r.gamma);
-          const s = sensors.current;
-          const heading = fusion.current.update({ yaw: cam.yaw, pitchDown: cam.pitchDown, compass: s.heading, compassAccuracy: s.accuracy, course: s.course, t: now, platform: Platform.OS });
-          // light smoothing on tilt only: the gyro is already clean, heading is fused above
-          sm.current = { p: sm.current.p * 0.6 + Math.max(-30, Math.min(89, cam.pitchDown)) * 0.4, r: sm.current.r * 0.6 + Math.max(-40, Math.min(40, cam.roll)) * 0.4 };
-          if (now - drawn < 33) return; // ~30 fps is plenty for SVG
-          drawn = now;
-          setPose({ heading, pitchDown: sm.current.p, roll: sm.current.r, yaw: cam.yaw, ok: true, t: now });
+          onAttitude(r);
         });
       } catch { /* AR remains paused when motion data is unavailable. */ }
     })();
     const timer = setInterval(() => { if (last && Date.now() - last > 3000) setPose(p => (p.ok ? { ...p, ok: false } : p)); }, 1000);
-    return () => { active = false; sub?.remove(); clearInterval(timer); };
+    return () => { active = false; sub?.remove(); offWeb?.(); clearInterval(timer); };
   }, []);
   return { ...pose, fusion: fusion.current };
 }
@@ -121,28 +133,20 @@ export default function ARGuidance() {
   const arrived = nav.status === 'arrived';
 
   /** The way to go relative to where the camera points: drives the big arrow at your feet. */
-  const guideRel = pose && user && line.length ? (() => {
-    const sn = snapToLine(line, user);
-    const target = pointAlong(line, Math.min(sn.along + 8, sn.along + Math.max(2, nav.progress.toNext)));
-    return ((bearing(user, target) - pose.heading + 540) % 360) - 180;
-  })() : null;
+  const guideRel = pose && user ? guideRelative(line, user, pose.heading, nav.progress.toNext) : null;
 
   // how the phone is held: the arrows need the camera on the path ahead
-  const tilt: 'ok' | 'down' | 'up' = !pose ? 'ok' : pose.pitchDown > 72 ? 'down' : pose.pitchDown < -8 ? 'up' : 'ok';
+  const tilt = pose ? tiltState(pose.pitchDown) : 'ok';
   useEffect(() => { if (pose && tilt === 'ok' && !coached) { const id = setTimeout(() => setCoached(true), 1800); return () => clearTimeout(id); } }, [!!pose, tilt, coached]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // facing away from the route for a moment: one clear "turn around", with a buzz
-  const awaySince = useRef<number | null>(null);
+  const detector = useRef(new WrongWayDetector(WRONG_WAY_DEG, WRONG_WAY_MS));
   const [wrongWay, setWrongWay] = useState(false);
   useEffect(() => {
-    const away = guideRel != null && Math.abs(guideRel) > WRONG_WAY_DEG && !arrived;
-    if (!away) { awaySince.current = null; if (wrongWay) setWrongWay(false); return; }
-    awaySince.current ??= Date.now();
-    if (!wrongWay && Date.now() - awaySince.current > WRONG_WAY_MS) {
-      setWrongWay(true);
-      if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
-    }
-  }, [guideRel != null && Math.abs(guideRel) > WRONG_WAY_DEG, now]); // eslint-disable-line react-hooks/exhaustive-deps
+    const away = detector.current.update(arrived ? null : guideRel, Date.now());
+    if (away && !wrongWay && Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
+    if (away !== wrongWay) setWrongWay(away);
+  }, [guideRel != null && Math.abs(guideRel) > WRONG_WAY_DEG, now, arrived]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /** Point the phone along the path ahead and tap: the difference becomes the compass correction. */
   const alignWithPath = () => {
@@ -210,7 +214,7 @@ export default function ARGuidance() {
 
       {/* destination anchored to the building */}
       {camera?.granted && label?.visible && !needsCalibration && (
-        <View pointerEvents="none" style={[styles.label, { left: label.x - 90, top: label.y - 46 }]}>
+        <View pointerEvents="none" style={[styles.label, { left: Math.max(8, Math.min(screen.width - 188, label.x - 90)), top: Math.max(insets.top + (nextStep ? 172 : 144), label.y - 46) }]}>
           <View style={styles.labelPill}>
             <Icon name="flagEnd" size={14} stroke="#fff" />
             <T weight="semibold" style={{ color: '#fff', fontSize: 13 }} numberOfLines={1}>{nav.dest?.name ?? t('Destination')} · {fmtDistanceT(label.dist, t)}</T>

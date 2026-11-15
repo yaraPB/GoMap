@@ -83,3 +83,45 @@ test('AR projection handles a single arrow and does not steer at the destination
   assert.doesNotMatch(arrows[0].points, /NaN/);
   assert.equal(steerHint(line, line[1], 180, screen), null);
 });
+
+import { fromDeviceOrientation, guideRelative, tiltState, WrongWayDetector } from '../src/ar/guidance';
+import { cameraPose } from '../src/ar/orientation';
+
+test('tilt coach: floor → raise, sky → lower, chest height → fine', () => {
+  assert.equal(tiltState(85), 'down');
+  assert.equal(tiltState(-20), 'up');
+  assert.equal(tiltState(25), 'ok');
+});
+
+test('the arrow at your feet points along the route: ahead, right, behind', () => {
+  const north: [number, number][] = [user, offset(user, 0, 60)];
+  assert.ok(Math.abs(guideRelative(north, user, 0, 60)!) < 3, 'facing the route: straight ahead');
+  assert.ok(Math.abs(guideRelative(north, user, 270, 60)! - 90) < 3, 'facing west: turn right');
+  assert.ok(Math.abs(Math.abs(guideRelative(north, user, 180, 60)!) - 180) < 3, 'facing south: behind');
+  // a right turn 4 m ahead: the arrow aims at the corner, then swings right in the last metres
+  const corner = offset(user, 0, 4);
+  const turn: [number, number][] = [user, corner, offset(corner, 30, 0)];
+  assert.ok(Math.abs(guideRelative(turn, user, 0, 4)!) < 3, 'aims at the corner');
+  assert.ok(guideRelative(turn, offset(user, 0, 3), 0, 1)! > 20, 'leans right just before it');
+});
+
+test('"turn around" needs 1.5 s facing away, and clears as soon as you turn back', () => {
+  const d = new WrongWayDetector(120, 1500);
+  assert.equal(d.update(170, 0), false);
+  assert.equal(d.update(170, 1000), false);
+  assert.equal(d.update(-175, 1600), true);
+  assert.equal(d.update(20, 1700), false);
+  assert.equal(d.update(170, 1800), false, 'the clock restarts');
+});
+
+test('web sensors: a phone held upright facing north reads heading 0, camera level', () => {
+  // W3C: alpha 0 (north), beta 90 (upright), gamma 0
+  const r = fromDeviceOrientation({ alpha: 0, beta: 90, gamma: 0 })!;
+  const pose = cameraPose(r.alpha, r.beta, r.gamma);
+  assert.ok(Math.min(pose.yaw, 360 - pose.yaw) < 1, `yaw ${pose.yaw}`);
+  assert.ok(Math.abs(pose.pitchDown) < 1, `pitch ${pose.pitchDown}`);
+  // tipped forward 30° (top edge away from you): looking 30° down at the path
+  const r2 = fromDeviceOrientation({ alpha: 0, beta: 60, gamma: 0 })!;
+  assert.ok(Math.abs(cameraPose(r2.alpha, r2.beta, r2.gamma).pitchDown - 30) < 1);
+  assert.equal(fromDeviceOrientation({ alpha: null, beta: 1, gamma: 1 }), null);
+});

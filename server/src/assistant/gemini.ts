@@ -20,20 +20,49 @@ type Content = { role: 'user' | 'model'; parts: Part[] };
 
 export class Gemini implements Llm {
   readonly provider = 'gemini' as const;
-  constructor(private apiKey: string, readonly model: string, private fetchImpl: typeof fetch = fetch) {}
+  /** The configured model first, then fallbacks for when it has no quota (free tier) or is retired. */
+  private chain: string[];
+  private active = 0;
+  private activeSince = 0;
+  constructor(private apiKey: string, model: string, private fetchImpl: typeof fetch = fetch, fallbacks: string[] = []) {
+    this.chain = [...new Set([model, ...fallbacks].filter(Boolean))];
+  }
 
+  /** The model answering right now (the configured one unless it ran out of quota). */
+  get model() { return this.chain[this.active]; }
   get configured() { return Boolean(this.apiKey); }
 
+  /**
+   * Free-tier keys hit two kinds of 429: a short per-minute limit (wait the few seconds Google asks
+   * for, once) and "limit: 0" (this model has no free quota at all: move to the next model). A 404 means
+   * the model was retired: next model. The working model stays in use; the configured one is retried
+   * every 10 minutes.
+   */
   private async generate(body: unknown) {
     if (!this.apiKey) throw new LlmUnavailable('The AI assistant is not configured on the server (GEMINI_API_KEY).');
-    const response = await this.fetchImpl(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(this.model)}:generateContent`, {
-      method: 'POST', headers: { 'content-type': 'application/json', 'x-goog-api-key': this.apiKey },
-      body: JSON.stringify(body), signal: AbortSignal.timeout(15000),
-    });
-    if (response.status === 429) throw new LlmUnavailable('The assistant is busy right now (rate limit). Try again in a minute.');
-    if (!response.ok) throw new LlmUnavailable(`Gemini request failed (${response.status}).`);
-    const data = await response.json() as { candidates?: { content?: { parts?: Part[] } }[] };
-    return data.candidates?.[0]?.content?.parts ?? [];
+    if (this.active && Date.now() - this.activeSince > 10 * 60_000) this.active = 0;
+    for (let i = this.active; i < this.chain.length; i++) {
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const response = await this.fetchImpl(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(this.chain[i])}:generateContent`, {
+          method: 'POST', headers: { 'content-type': 'application/json', 'x-goog-api-key': this.apiKey },
+          body: JSON.stringify(body), signal: AbortSignal.timeout(20000),
+        });
+        if (response.ok) {
+          if (i !== this.active) { this.active = i; this.activeSince = Date.now(); }
+          const data = await response.json() as { candidates?: { content?: { parts?: Part[] } }[] };
+          return data.candidates?.[0]?.content?.parts ?? [];
+        }
+        const text = await response.text().catch(() => '');
+        if (response.status === 429) {
+          const wait = Number(text.match(/"retryDelay":\s*"(\d+(?:\.\d+)?)s"/)?.[1] ?? NaN);
+          if (!/limit: 0\b/.test(text) && attempt === 0 && wait <= 6) { await new Promise(r => setTimeout(r, wait * 1000 + 200)); continue; }
+          break; // no quota on this model, or a long wait: try the next model
+        }
+        if (response.status === 404) break;
+        throw new LlmUnavailable(`Gemini request failed (${response.status}).`);
+      }
+    }
+    throw new LlmUnavailable('The assistant is busy right now (rate limit). Try again in a minute.');
   }
 
   /** Runs the tool loop. Returns the model's prose and every tool call it made, with results. */

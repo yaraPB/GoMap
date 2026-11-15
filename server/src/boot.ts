@@ -25,7 +25,7 @@ export async function boot(opts: BootOptions = {}) {
   const campus = new Campus();
   await campus.rebuild();
   seedCrowding(db, campus.walkways.map(w => ({ id: w.properties.id, coords: w.geometry.coordinates, modes: w.properties.modes })));
-  const gemini = new Gemini(opts.geminiKey ?? config.geminiKey, config.geminiModel, opts.fetchImpl);
+  const gemini = new Gemini(opts.geminiKey ?? config.geminiKey, config.geminiModel, opts.fetchImpl, config.geminiFallbacks);
   const claude = new Claude(opts.anthropicKey ?? config.anthropicKey, config.claudeModel, opts.fetchImpl);
   const provider = opts.provider ?? config.assistantProvider;
   // the model that resolves open questions; Gemini also stays the voice fallback (Claude has no audio input)
