@@ -54,7 +54,7 @@ flowchart LR
 | `mobile/` | Expo app (runs in Expo Go; a dev build adds on-device speech). One persistent map under every panel |
 | `admin/` | Vite + React: the admin dashboard (`index.html`) and the dev dashboard for roles (`dev.html`) |
 | `data/` | Faculty directory JSON, imported campus geometry (`data/campus/`), satellite traces, hand-drawn fallbacks |
-| `e2e/` | End-to-end tests: the real apps in a real browser, with a fake Microsoft sign-in, fake camera and sensors |
+| `e2e/` | End-to-end tests: the real apps in a real browser, with the test accounts, a fake camera and sensors |
 
 ### How a question is answered
 
@@ -108,7 +108,7 @@ scene "did nothing"), *Dark* (open buildings glow). Satellite always stays in da
 | Store | Holds | Why |
 | --- | --- | --- |
 | **MongoDB** | places, entrances, walkways, report pins | GeoJSON + `2dsphere` indexes: "nearest place to this pin" and "reports within 20 m" are one query each. In-memory when `MONGODB_URI` is empty, so the project runs with zero setup |
-| **SQLite** (`node:sqlite`) | people, presence + its log, door notes, offices, issue routing, procedures, **events, assistant rules & tests, users and their roles**, demo accounts, crowding, assistant cache/log | Built into Node, no server, one file. Declared types, ISO-8601 strings, JSON in TEXT, no AUTOINCREMENT → moves to Postgres unchanged |
+| **SQLite** (`node:sqlite`) | people, presence + its log, door notes, offices, issue routing, procedures, **events, assistant rules & tests, accounts (hashed passwords) and their roles**, demo accounts, crowding, assistant cache/log | Built into Node, no server, one file. Declared types, ISO-8601 strings, JSON in TEXT, no AUTOINCREMENT → moves to Postgres unchanged |
 | Postgres | everything in SQLite | When GoMap outgrows one server: the schema is already Postgres-safe |
 
 ### Routing: our own graph, not a directions API
@@ -141,38 +141,47 @@ stairs; drive refuses footpaths), and closures confirmed in the admin block edge
    "World Cup" → *ITS* via "password", "I would *love* to study in Spain" → a professor named Love, "start a student
    club" → *Student Center*).
 
-### Sign-in and roles: Outlook, checked by our server, roles from the dev dashboard
+### Sign-in and roles: email + password on our own server, roles from the dev dashboard
 
 ```mermaid
 sequenceDiagram
   participant P as Person
   participant A as App / dashboard
-  participant M as Microsoft (Entra ID)
   participant S as GoMap API
-  P->>A: Sign in with Outlook
-  A->>M: authorization code + PKCE (no secret on the device)
-  M-->>A: ID token (signed by Microsoft)
-  A->>S: POST /api/auth/microsoft {id_token}
-  S->>M: Microsoft's public keys (cached)
-  S->>S: check signature, issuer, audience, expiry → email
-  S->>S: role = dev-dashboard assignment › DEV_EMAILS › faculty directory › allowed domain › refused
-  S-->>A: GoMap session (30 days)
+  P->>A: Create account (email, password) or Sign in
+  A->>S: POST /api/auth/signup or /api/auth/login
+  S->>S: signup: role = dev-dashboard assignment › DEV_EMAILS › faculty directory › allowed domain › refused
+  S->>S: password → scrypt with a random salt (login: compare in constant time, 8 misses → wait a minute)
+  S-->>A: GoMap session (30 days, HS256)
   A->>S: every request: Bearer session → role read from the database
 ```
 
 | Choice | Why |
 | --- | --- |
-| Microsoft Entra ID (OpenID Connect) | AUI runs on Microsoft 365: every student and professor already has the account, with AUI's own password and MFA rules. GoMap never handles a password |
-| Authorization code + PKCE, no client secret | The standard for phones and single-page apps: nothing secret ships in the app |
-| The **server** verifies the ID token (signature against Microsoft's published keys, issuer, audience, expiry) | The apps could be tampered with; the API cannot be fooled by a hand-made token. Node's own crypto, no extra library |
+| Our own email + password accounts | AUI does not give us Outlook / Microsoft 365 sign-in, so GoMap keeps its own accounts. The email still decides the role, so the rules stay the same |
+| scrypt with a per-password salt, in Node's own crypto | A slow, memory-hard hash: a leaked database does not give the passwords away. No extra dependency |
+| A brake on guessing (8 wrong passwords → one minute) | Cheap protection against someone trying passwords on a known email |
 | Our own short session, role looked up on every request | A role changed in the dev dashboard applies at the person's next tap, no sign-out. Losing a role (e.g. a student who was admin for a project) takes effect immediately |
-| Automatic roles from the faculty directory | Professors get faculty rights and their office card on day one, with no list to maintain |
-| Demo accounts stay until the dev dashboard turns them off | The team can keep testing every role before launch; one switch removes them |
+| Automatic roles from the faculty directory | A professor who signs up with their directory email gets faculty rights and their office card on day one |
+| Roles can be assigned **before** someone signs up | The role waits; when they create the account with that email, they get it |
+| Five **test accounts**, password `123abc`, until the dev dashboard turns them off | The team can try every role in a few taps; one switch removes them before launch |
+
+| Test account | Role |
+| --- | --- |
+| `s.student@aui.ma` | student |
+| `f.faculty@aui.ma` | faculty (linked to Harit Satt's office card) |
+| `st.staff@aui.ma` | staff |
+| `a.admin@aui.ma` | admin (admin dashboard) |
+| `d.dev@aui.ma` | developer (dev dashboard) |
+
+All with the password **`123abc`**. They are created when the API starts (never overwritten, so a changed password stays
+changed) and the sign-in screens show them as one-tap buttons while they are on.
 
 **Dev dashboard** (`admin/dev.html`, developers only): assign roles by email (one at a time or a pasted list), see what
-an email would get *before* assigning ("faculty, from the faculty directory" / "cannot sign in"), link faculty accounts
-to their office card, choose the allowed domains and default role, turn demo accounts off, and read who changed what.
-It refuses to let a developer remove or demote their own account, or the last developer.
+an email would get *before* assigning ("faculty, from the faculty directory" / "cannot create an account"), set or reset
+someone's password, link faculty accounts to their office card, choose the allowed domains and default role, turn the
+test accounts off, and read who changed what. It refuses to let a developer remove or demote their own account, or the
+last developer. Anyone signed in can change their own password in the app (Your account → Change password).
 
 ### Voice: three engines, best available wins
 
@@ -245,7 +254,7 @@ pins are estimated. Entrances are estimated where the path network meets each bu
 ## 5. Checks
 
 ```bash
-cd server && npm run check && npm test && npm run graph:check     # 49 tests
+cd server && npm run check && npm test && npm run graph:check     # 52 tests
 cd server && npm run assistant:eval                               # real questions on your AI key (costs ~nothing)
 cd mobile && npx tsc --noEmit && npm test && npx expo export --platform android   # 31 tests
 cd e2e    && npm install && npm test                                # the whole stack in a browser (~15 min)
@@ -254,10 +263,10 @@ cd admin  && npm run build
 
 ### What the end-to-end suite checks
 
-`e2e/run.mjs` starts the API (throwaway database), the dashboards, the app's web build and a **fake Microsoft** that
-speaks the real protocol, then drives a headless browser with a fake camera, a GPS fix on the plaza and simulated motion
-sensors. Screenshots of every step land in `e2e/out/`. It covers: Outlook sign-in to the dev dashboard, the admin and
-the app; assigning roles and their immediate effect; refusals (student → admin, outsider); a professor publishing
+`e2e/run.mjs` starts the API (throwaway database), the dashboards and the app's web build, then drives a headless browser with a fake camera, a GPS fix on the plaza and simulated motion
+sensors. Screenshots of every step land in `e2e/out/`. It covers: signing in with the test accounts (one tap) and by typing, a
+wrong password, creating an account in the app (a professor gets faculty from the directory); assigning roles and their
+immediate effect; setting a password from the dev dashboard; refusals (student → admin, unknown email); a professor publishing
 "semester off"; Places keyboard delete + undo; satellite + outlines; creating an event; writing an assistant rule and
 the app answering with it; the starter test suite; search → route → turn-by-turn; Building 14; scenes, satellite, no
 high contrast; French and Arabic; events; and AR: the floor arrow following the phone, **calibration ("Align with the

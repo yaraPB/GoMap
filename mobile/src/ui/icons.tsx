@@ -8,7 +8,7 @@ import {
   Accessibility, ArrowUp, CalendarDays, Ticket, PencilRuler, Volume, RotateCcw, Smartphone, PartyPopper, MoveUp, ArrowUpLeft, ArrowUpRight, Backpack, Ban, BookOpen, BriefcaseBusiness, Building2, Calendar, CalendarClock,
   Camera, Car, ChartNoAxesColumnIncreasing, Check, ChevronDown, ChevronLeft, ChevronRight, Clock, Compass, CornerUpLeft, CornerUpRight,
   DoorOpen, Dumbbell, Ellipsis, Eye, FileText, Flag, FlagTriangleRight, Flame, Footprints, Globe, GraduationCap, Hourglass, House, Info,
-  Keyboard, Laptop, Layers, LayoutGrid, Lightbulb, LocateFixed, Mail, Map, MapPin, Mic, Moon, Navigation, Palmtree, Phone, Plane, Plus,
+  Keyboard, Laptop, Layers, LayoutGrid, Lightbulb, LocateFixed, Mail, LockKeyhole, Map, MapPin, Mic, Moon, Navigation, Palmtree, Phone, Plane, Plus,
   Presentation, Satellite, ScanEye, School, Search, SendHorizontal, Settings, ShieldCheck, Signpost, Soup, Sparkles, StickyNote, Sun,
   Sunrise, Sunset, Thermometer, TrafficCone, TriangleAlert, User, Users, Utensils, Volume2, VolumeX, WifiOff, Wrench, X, Contrast, Armchair,
 } from 'lucide-react-native';
@@ -16,7 +16,7 @@ import {
 export const LUCIDE = {
   all: LayoutGrid, cap: GraduationCap, home: House, fork: Utensils, gym: Dumbbell, doc: FileText, info: Info, gear: Settings,
   search: Search, back: ChevronLeft, close: X, chevron: ChevronRight, down: ChevronDown, mic: Mic, sparkle: Sparkles, layers: Layers,
-  locate: LocateFixed, flame: Flame, walk: Footprints, wheel: Accessibility, ar: ScanEye, car: Car, mail: Mail, phone: Phone,
+  locate: LocateFixed, flame: Flame, walk: Footprints, wheel: Accessibility, ar: ScanEye, car: Car, mail: Mail, lock: LockKeyhole, phone: Phone,
   clock: Clock, shield: ShieldCheck, check: Check, warn: TriangleAlert, flag: Flag, globe: Globe, send: SendHorizontal,
   building: Building2, classroom: School, pin: MapPin, arrowUp: ArrowUp, turnRight: CornerUpRight, turnLeft: CornerUpLeft,
   slightRight: ArrowUpRight, slightLeft: ArrowUpLeft, stairs: ChartNoAxesColumnIncreasing, crossing: TrafficCone, flagEnd: FlagTriangleRight,

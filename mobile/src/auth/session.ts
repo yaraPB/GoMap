@@ -1,5 +1,5 @@
 /**
- * The GoMap session after "Sign in with Outlook": kept in the phone's secure storage (Keychain /
+ * The GoMap session after signing in: kept in the phone's secure storage (Keychain /
  * Keystore), or localStorage on the web build. The API reads the role from it on every request.
  */
 import { Platform } from 'react-native';

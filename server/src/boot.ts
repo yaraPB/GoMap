@@ -33,7 +33,7 @@ export async function boot(opts: BootOptions = {}) {
   const assistant = new Assistant(db, campus, llm, gemini);
   await assistant.refresh();
   log(`Campus network from ${geoSource}`);
-  log(config.microsoftClientId ? `Sign in with Outlook: on (tenant ${config.microsoftTenant})${config.sessionSecretIsGenerated ? ' — set SESSION_SECRET or everyone signs in again after each restart' : ''}` : 'Sign in with Outlook: off (set MICROSOFT_CLIENT_ID); demo accounts only');
+  log(`Accounts: email + password${config.sessionSecretIsGenerated ? ' (set SESSION_SECRET or everyone signs in again after each restart)' : ''}; test accounts like s.student@aui.ma / 123abc while the dev dashboard keeps them on`);
   log(`Assistant model: ${llm.configured ? `${llm.provider} (${llm.model})` : 'none configured (local answers only)'}`);
   log(campus.report());
   return {

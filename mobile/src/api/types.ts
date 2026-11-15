@@ -85,7 +85,9 @@ export type CrowdingCollection = { type: 'FeatureCollection'; weekday: number; h
 export type Closure = { id: string; cluster_id: string; kind: string; coordinates: Position; place_id: string | null; reason: string; from: string; until: string | null; radius_m: number };
 export type ReportKind = 'closed' | 'broken' | 'info' | 'hazard' | 'light' | 'access';
 export type MockUser = { id: string; name: string; role: 'student' | 'faculty' | 'staff' | 'admin' | 'dev' | 'guest'; person_id?: string | null; description?: string | null;
-  /** set when this is a real Outlook sign-in, not a demo account */
+  /** set when this is a real sign-in, not a demo account */
   email?: string };
 export type SignedInUser = { id: string; email: string; name: string; role: 'student' | 'faculty' | 'staff' | 'admin' | 'dev'; person_id: string | null };
-export type AuthConfig = { microsoft: { client_id: string; tenant: string; authority: string } | null; demo_accounts: boolean };
+export type AuthConfig = { allowed_domains: string[]; min_password: number; demo_accounts: boolean;
+  /** one account per role while the dev dashboard keeps them on */
+  test_accounts: { email: string; name: string; role: SignedInUser['role'] }[]; test_password: string | null };

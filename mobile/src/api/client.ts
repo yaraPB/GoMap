@@ -1,5 +1,5 @@
 import { Platform } from 'react-native';
-import type { AuthConfig, SignedInUser, CampusEvent, Answer, CampusInfo, Service, SttSession, Closure, CrowdingCollection, Lang, MockUser, OfficeList, Person, PlaceDetail, PlaceLite, Position, Procedure, ReportKind, Route, RouteMode, WalkwayCollection } from './types';
+import type { AuthConfig, SignedInUser, CampusEvent, Answer, CampusInfo, Service, SttSession, Closure, CrowdingCollection, Lang, OfficeList, Person, PlaceDetail, PlaceLite, Position, Procedure, ReportKind, Route, RouteMode, WalkwayCollection } from './types';
 
 const local = Platform.OS === 'android' ? 'http://10.0.2.2:4000' : 'http://localhost:4000';
 export const API_URL = (process.env.EXPO_PUBLIC_API_URL || local).replace(/\/$/, '');
@@ -7,7 +7,7 @@ export const API_URL = (process.env.EXPO_PUBLIC_API_URL || local).replace(/\/$/,
 /** The mock account in use (no SSO yet). Sent on every request. TODO: replace with GoCampus SSO */
 let currentUser = 'demo-student';
 export const setApiUser = (id: string) => { currentUser = id; };
-/** Outlook sign-in session: when set, it is who you are (the demo account header is ignored by the API). */
+/** The signed-in session (email + password): when set, it is who you are (the demo account header is ignored by the API). */
 let session: string | null = null;
 export const setApiSession = (token: string | null) => { session = token; };
 
@@ -73,13 +73,14 @@ export const api = {
     return request<{ id: string; status: string; place: { id: string; name: string } | null; merged_with_existing: boolean }>('/api/reports', { method: 'POST', body: form });
   },
   myReports: () => request<{ id: string; kind: string; status: string; place_id: string | null; created_at: string; decided_at: string | null; reason: string | null }[]>('/api/reports/mine'),
-  mockUsers: () => request<MockUser[]>('/api/accounts'),
   services: (q?: string) => request<Service[]>(`/api/services${qs({ q })}`),
   service: (id: string) => request<Service>(`/api/services/${encodeURIComponent(id)}`),
   campus: () => request<CampusInfo>('/api/campus'),
   version: () => request<{ version: number }>('/api/version'),
   authConfig: () => request<AuthConfig>('/api/auth/config'),
-  signInMicrosoft: (idToken: string) => request<{ token: string; user: SignedInUser }>('/api/auth/microsoft', { method: 'POST', body: JSON.stringify({ id_token: idToken }) }),
+  login: (email: string, password: string) => request<{ token: string; user: SignedInUser }>('/api/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
+  signUp: (email: string, password: string, name?: string) => request<{ token: string; user: SignedInUser }>('/api/auth/signup', { method: 'POST', body: JSON.stringify({ email, password, name }) }),
+  changePassword: (current: string, password: string) => request<{ ok: true }>('/api/auth/password', { method: 'POST', body: JSON.stringify({ current, password }) }),
   me: () => request<SignedInUser>('/api/auth/me'),
   sttSession: () => request<SttSession>('/api/assistant/stt-session', { method: 'POST' }),
 };

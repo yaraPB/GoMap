@@ -27,6 +27,10 @@ key in a chat or an issue.** When a step says "tell me", send the *result* (e.g.
   "Sample". Delete them in Admin → Events; they never come back.
 - **One example rule** (Emergency → Security 24/7) is added once. Edit or delete it in Admin → Assistant → Rules.
 - **Restart the API** after pulling (it rebuilds the routing graph; that is what fixes Building 14).
+- **Accounts are email + password now** (no Outlook). Try any role with the test accounts: `s.student@aui.ma`,
+  `f.faculty@aui.ma`, `st.staff@aui.ma`, `a.admin@aui.ma`, `d.dev@aui.ma`, all with the password `123abc` (section 8).
+- **Atlas hiccups no longer crash the API.** A dropped connection (`ECONNRESET`) is logged and the driver reconnects
+  by itself (section 4).
 
 ## 1. The assistant model: Gemini (what you have), Claude optional
 
@@ -107,6 +111,10 @@ admin are lost on restart.** Use Atlas for anything you want to keep.
    `MONGODB_URI=mongodb+srv://USER:PASSWORD@cluster0.xxxxx.mongodb.net/gomap`
 4. `cd server && npm run seed` once (fills empty collections, leaves existing data alone).
 
+Atlas closes idle connections and Wi-Fi drops them. The API keeps going: the log says `MongoDB disconnected:
+reconnecting by itself…` then `MongoDB reconnected.`, and requests in between wait or retry. If it never reconnects,
+check **Network Access** (your IP changed?) and the password in `MONGODB_URI`.
+
 > **Security note.** A copy of an Atlas username, password and connection string sits in `misc.txt` at the repo root.
 > It is git-ignored, but it is a live credential on disk: **rotate that database user's password in Atlas** and keep
 > the new one only in `server/.env`.
@@ -135,57 +143,65 @@ The basemap lacked some buildings; they are now traced from satellite imagery an
 3. It appears as a 3D building in the app with an estimated entrance; drag the green dot to the real door.
 4. Use Atlas (section 4) first, or the buildings vanish when the API restarts.
 
-## 8. Sign in with Outlook, and the dev dashboard
+## 8. Accounts (email + password), and the dev dashboard
 
-Everyone signs in with their AUI Microsoft (Outlook) account. GoMap never sees a password: Microsoft confirms who
-the person is, the API checks Microsoft's signature, and the role comes from the **dev dashboard**
-(`http://localhost:5173/dev.html`), where developers assign student / faculty / staff / admin / dev to emails.
+People create a GoMap account in the app (**Your account → Create account**) with their email and a password. The
+password is hashed on the API (scrypt) and never stored or logged in clear. The role comes from the email and from the
+**dev dashboard** (`http://localhost:5173/dev.html`), where developers assign student / faculty / staff / admin / dev.
 
-**Who gets which role at their first sign-in** (first match wins): a role assigned in the dev dashboard → an email in
-`DEV_EMAILS` (developer) → the faculty directory knows the email (faculty / staff, linked to their office card) → an
-allowed domain (default `aui.ma`) gives the default role (student) → anyone else is refused, with a message saying who
-to ask. Roles apply at the person's next tap; nobody has to sign out.
+**Which role a new account gets** (first match wins): a role assigned in the dev dashboard → an email in `DEV_EMAILS`
+(developer) → the faculty directory knows the email (faculty / staff, linked to their office card) → an allowed domain
+(default `aui.ma`) gives the default role (student) → anyone else is refused, with a message saying who to ask. Roles
+apply at the person's next tap; nobody has to sign out.
 
-**1. Register GoMap with Microsoft** (10 minutes; if AUI's tenant needs an IT admin, send them these steps)
-1. <https://entra.microsoft.com> → **Applications → App registrations → New registration**.
-2. Name `GoMap`. **Supported account types:** *Accounts in this organizational directory only* (AUI accounts only), or
-   *Accounts in any organizational directory* while testing from another tenant.
-3. Leave the redirect URI empty for now → **Register**.
-4. **Authentication → Add a platform → Single-page application**, add:
-   - `http://localhost:5173/` and `http://localhost:5173/dev.html` (admin and dev dashboards)
-   - `http://localhost:8081/auth` (the app's web build)
-   - later, the same paths on your real admin domain
-5. **Authentication → Add a platform → Mobile and desktop applications**, add:
-   - `gomap://auth` (dev build / store build)
-   - for Expo Go: `exp://YOUR-PC-LAN-IP:8081/--/auth` (it changes when your IP changes; a dev build avoids that)
-6. **No client secret is needed** (PKCE). Under **API permissions**, the default *Microsoft Graph → User.Read* is enough
-   (it covers `openid profile email`). If AUI requires it, an admin clicks *Grant admin consent*.
-7. From **Overview**, copy the *Application (client) ID* and the *Directory (tenant) ID*.
+**Test accounts** (all with the password `123abc`), created when the API starts:
 
-**2. `server/.env`**
+| Email | Role |
+| --- | --- |
+| `s.student@aui.ma` | student |
+| `f.faculty@aui.ma` | faculty (Harit Satt's office card) |
+| `st.staff@aui.ma` | staff |
+| `a.admin@aui.ma` | admin → `http://localhost:5173` |
+| `d.dev@aui.ma` | developer → `http://localhost:5173/dev.html` |
+
+The app, the admin and the dev dashboard show them as one-tap buttons on the sign-in screen.
+
+**1. `server/.env`**
 ```env
-MICROSOFT_CLIENT_ID=the-application-client-id
-MICROSOFT_TENANT=the-directory-tenant-id     # or "organizations" to accept any work/school account
 SESSION_SECRET=a-long-random-string          # node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
-DEV_EMAILS=your.name@aui.ma                  # becomes developer at first sign-in
+DEV_EMAILS=your.name@aui.ma                  # becomes developer when this email creates its account
 ```
-Restart the API: the log says `Sign in with Outlook: on`.
+Without `SESSION_SECRET` a random one is made at each start, and everyone has to sign in again after a restart.
 
-**3. Give people their roles**
-1. Open `http://localhost:5173/dev.html` → **Sign in with Outlook** with the `DEV_EMAILS` account.
+**2. Give people their roles**
+1. Open `http://localhost:5173/dev.html` → tap **d.dev@aui.ma** (or sign in with your `DEV_EMAILS` account).
 2. Type an email: the page says what they would get today (e.g. "faculty, from the faculty directory"). Pick a role →
-   **Assign**. **Many at once** takes one email per line (`name@aui.ma, staff`).
-3. Faculty / staff not in the directory: **Link office card** in their row, so they can post their status.
-4. **Before launch:** untick *Demo accounts in the app*. From then on the app's demo accounts disappear and unsigned
-   visitors are just visitors.
+   **Assign**. **Many at once** takes one email per line (`name@aui.ma, staff`). The role waits until they sign up.
+3. Forgotten password: the key button in their row sets a new one (tell them; they can change it in the app).
+4. Faculty / staff not in the directory: **Link office card** in their row, so they can post their status.
+5. **Before launch:** untick *Test accounts*. From then on the five test accounts can no longer sign in and unsigned
+   visitors are just visitors. Give your real developer account the dev role first.
 
 You cannot remove or demote your own account, and the last developer cannot be removed: GoMap always keeps a way in.
-`DEV_TOKEN` (optional) opens the dev dashboard before anyone has signed in; `ADMIN_TOKEN` keeps working for the admin.
+`DEV_TOKEN` (optional) opens the dev dashboard without an account; `ADMIN_TOKEN` keeps working for the admin.
 
 ## 9. Admin dashboard token
 
-`server/.env`: `ADMIN_TOKEN=a-long-random-string`. It still opens the admin next to Outlook sign-in (setup, scripts).
+`server/.env`: `ADMIN_TOKEN=a-long-random-string`. It still opens the admin next to admin accounts (setup, scripts).
 Local default `dev-admin-token`.
+
+### Installing dependencies (`npm ci`)
+
+Run it in each folder (`server`, `mobile`, `admin`, `e2e`) with **Node 22.13 or newer** (`node -v`; Node 24 is what we test on).
+If it fails on Windows with `EPERM`, `EBUSY` or "operation not permitted" / "resource busy":
+1. Stop everything that runs from that folder: the API (`npm start`), Expo, the e2e suite, and the admin's Vite server.
+   (`npm ci` deletes `node_modules` first, and Windows refuses to delete files a running program holds.)
+2. If it still fails, reload the editor window (its TypeScript server keeps files open) and run `npm ci` again.
+3. A half-finished `npm ci` can leave `node_modules` broken (for example "tsc is not the command you are looking
+   for"): run `npm ci` once more with everything stopped.
+
+The server's in-memory MongoDB binary is **not** downloaded during install (only the first time the API runs without
+`MONGODB_URI`), so an install never waits on a several-hundred-MB download.
 
 ## 10. Running on your phone
 
@@ -224,7 +240,7 @@ have a dev build on a phone and I'll add it behind a switch.
 - [x] `MONGODB_URI` set · [ ] **Atlas password from `misc.txt` rotated**
 - [x] `ADMIN_TOKEN` changed from the default
 - [x] Mapbox token in `mobile/.env.local`
-- [ ] Entra app registered; `MICROSOFT_CLIENT_ID`, `MICROSOFT_TENANT`, `SESSION_SECRET`, `DEV_EMAILS` set; log says `Sign in with Outlook: on`
-- [ ] Roles assigned in the dev dashboard; **demo accounts turned off** before launch
+- [ ] `SESSION_SECRET` and `DEV_EMAILS` set in `server/.env`; log says `Accounts: email + password`
+- [ ] Roles assigned in the dev dashboard; **test accounts (password 123abc) turned off** before launch
 - [ ] Numbers given to the new outlines in Admin → Places → Outlines (the 13 satellite traces have none yet)
 - [ ] One walk on campus with the [README checklist](README.md#6-on-campus-checklist-a-real-phone-outdoors)

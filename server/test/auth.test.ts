@@ -1,45 +1,26 @@
 /**
- * Sign in with Outlook, end to end against a stand-in for Microsoft: our own RSA key plays
- * Microsoft's signing key, served as its JWKS. Everything the server does with a real token runs.
+ * Accounts end to end: email + password sign-up and sign-in, the seeded test accounts, roles,
+ * the dev dashboard, and the sessions the apps carry.
  */
 import test, { after, before } from 'node:test';
 import assert from 'node:assert/strict';
-import { generateKeyPairSync, sign } from 'node:crypto';
 import type { AddressInfo } from 'node:net';
 import type { Server } from 'node:http';
 import { boot } from '../src/boot.js';
 import { createApp } from '../src/app.js';
-import { signSession, verifyMicrosoftIdToken, verifySession } from '../src/auth/tokens.js';
-
-const AUTHORITY = 'https://login.example-microsoft.test';
-const CLIENT = '11111111-2222-3333-4444-555555555555';
-const TID = 'aui-tenant-id';
-const { privateKey, publicKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
-const jwk = { ...publicKey.export({ format: 'jwk' }), kid: 'test-key', use: 'sig', alg: 'RS256' };
-const other = generateKeyPairSync('rsa', { modulusLength: 2048 }).privateKey;
+import { checkPassword, hashPassword, LoginThrottle, signSession, verifySession } from '../src/auth/tokens.js';
 
 const b64 = (o: unknown) => Buffer.from(JSON.stringify(o)).toString('base64url');
-function idToken(claims: Record<string, unknown> = {}, key = privateKey, kid = 'test-key') {
-  const t = Math.floor(Date.now() / 1000);
-  const head = b64({ alg: 'RS256', typ: 'JWT', kid });
-  const body = b64({ iss: `${AUTHORITY}/${TID}/v2.0`, aud: CLIENT, tid: TID, oid: 'oid-1', name: 'Test Person', preferred_username: 'someone@aui.ma', iat: t, nbf: t, exp: t + 3600, ...claims });
-  return `${head}.${body}.${sign('RSA-SHA256', Buffer.from(`${head}.${body}`), key).toString('base64url')}`;
-}
-const fakeMicrosoft = (async (url: string | URL | Request) => {
-  if (String(url).startsWith(AUTHORITY) && String(url).endsWith('/discovery/v2.0/keys')) return Response.json({ keys: [jwk] });
-  return new Response('not found', { status: 404 });
-}) as typeof fetch;
-const cfg = { clientId: CLIENT, tenant: 'organizations', authority: AUTHORITY, fetchImpl: fakeMicrosoft };
 
-test('a genuine Microsoft ID token is accepted; forged, foreign or expired ones are not', async () => {
-  const me = await verifyMicrosoftIdToken(idToken({ preferred_username: 'A.Student@AUI.ma' }), cfg);
-  assert.equal(me.email, 'a.student@aui.ma');
-  await assert.rejects(verifyMicrosoftIdToken(idToken({}, other), cfg), /signature/);
-  await assert.rejects(verifyMicrosoftIdToken(idToken({ aud: 'another-app' }), cfg), /another app/);
-  await assert.rejects(verifyMicrosoftIdToken(idToken({ iss: 'https://evil.test/x/v2.0' }), cfg), /issuer/);
-  await assert.rejects(verifyMicrosoftIdToken(idToken({ exp: Math.floor(Date.now() / 1000) - 3600 }), cfg), /expired/);
-  await assert.rejects(verifyMicrosoftIdToken(idToken({}, privateKey, 'unknown-kid'), cfg), /Unknown signing key/);
-  await assert.rejects(verifyMicrosoftIdToken(idToken(), { ...cfg, tenant: 'real-aui-tenant' }), /issuer|Al Akhawayn/);
+test('passwords are salted scrypt hashes, never the password itself', () => {
+  const a = hashPassword('123abc');
+  const b = hashPassword('123abc');
+  assert.notEqual(a, b, 'a fresh salt each time');
+  assert.ok(!a.includes('123abc'));
+  assert.ok(checkPassword('123abc', a));
+  assert.ok(!checkPassword('123abd', a));
+  assert.ok(!checkPassword('123abc', null));
+  assert.ok(!checkPassword('123abc', 'garbage'));
 });
 
 test('GoMap sessions: valid, tampered, expired', () => {
@@ -51,15 +32,22 @@ test('GoMap sessions: valid, tampered, expired', () => {
   assert.throws(() => verifySession(`${h}.${b64({ sub: 'admin', email: 'x', iss: 'gomap', exp: 9e9 })}.${sig}`, 'secret'), /signature/);
 });
 
+test('the login throttle: 8 wrong passwords, then a minute of waiting', () => {
+  const t = new LoginThrottle();
+  for (let i = 0; i < 8; i++) { t.check('x', 1000); t.failed('x', 1000); }
+  assert.throws(() => t.check('x', 2000), /Too many/);
+  assert.doesNotThrow(() => t.check('x', 62_000));
+});
+
 let server: Server;
 let base = '';
 let ctx: Awaited<ReturnType<typeof boot>>;
-const env = { MICROSOFT_CLIENT_ID: CLIENT, MICROSOFT_AUTHORITY: AUTHORITY, MICROSOFT_TENANT: 'organizations', SESSION_SECRET: 'test-secret', DEV_EMAILS: 'boss@aui.ma', DEV_TOKEN: '' };
+const env = { SESSION_SECRET: 'test-secret', DEV_EMAILS: 'boss@aui.ma', DEV_TOKEN: '' };
 const saved: Record<string, string | undefined> = {};
 before(async () => {
   for (const [k, v] of Object.entries(env)) { saved[k] = process.env[k]; process.env[k] = v; }
   ctx = await boot({ mongoUri: '', sqliteFile: ':memory:', geminiKey: '', provider: 'gemini', quiet: true });
-  server = createApp({ ...ctx, fetchImpl: fakeMicrosoft }).listen(0, '127.0.0.1');
+  server = createApp(ctx).listen(0, '127.0.0.1');
   await new Promise<void>(r => server.once('listening', r));
   base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 });
@@ -72,20 +60,45 @@ const call = async (path: string, opts: { token?: string; method?: string; body?
   const r = await fetch(base + path, { method: opts.method ?? (opts.body ? 'POST' : 'GET'), headers: { 'content-type': 'application/json', ...(opts.token ? { authorization: `Bearer ${opts.token}` } : {}) }, body: opts.body ? JSON.stringify(opts.body) : undefined });
   return { status: r.status, body: await r.json() as any };
 };
-const signIn = async (email: string) => call('/api/auth/microsoft', { body: { id_token: idToken({ preferred_username: email, oid: `oid-${email}` }) } });
+const login = (email: string, password = '123abc') => call('/api/auth/login', { body: { email, password } });
+/** Signs in, creating the account the first time. */
+const account = async (email: string, password = 'pass123') => {
+  const r = await login(email, password);
+  return r.status === 200 ? r : call('/api/auth/signup', { body: { email, password } });
+};
 
-test('the apps learn how to start a Microsoft sign-in', async () => {
+test('the sign-in screens learn the domains and the test accounts', async () => {
   const { body } = await call('/api/auth/config');
-  assert.deepEqual(body.microsoft, { client_id: CLIENT, tenant: 'organizations', authority: AUTHORITY });
+  assert.deepEqual(body.allowed_domains, ['aui.ma']);
+  assert.equal(body.test_password, '123abc');
+  assert.deepEqual(body.test_accounts.map((a: { email: string }) => a.email), ['s.student@aui.ma', 'f.faculty@aui.ma', 'st.staff@aui.ma', 'a.admin@aui.ma', 'd.dev@aui.ma']);
 });
 
-test('roles on first sign-in: aui.ma → student, directory → faculty with their office card, outsiders refused', async () => {
-  const student = await signIn('new.student@aui.ma');
-  assert.equal(student.status, 200, JSON.stringify(student.body));
-  assert.equal(student.body.user.role, 'student');
-  assert.equal((await call('/api/auth/me', { token: student.body.token })).body.email, 'new.student@aui.ma');
+test('every test account signs in with 123abc and gets its role', async () => {
+  const want: Record<string, string> = { 's.student@aui.ma': 'student', 'f.faculty@aui.ma': 'faculty', 'st.staff@aui.ma': 'staff', 'a.admin@aui.ma': 'admin', 'd.dev@aui.ma': 'dev' };
+  for (const [email, role] of Object.entries(want)) {
+    const r = await login(email);
+    assert.equal(r.status, 200, `${email}: ${JSON.stringify(r.body)}`);
+    assert.equal(r.body.user.role, role);
+    assert.equal((await call('/api/auth/me', { token: r.body.token })).body.email, email);
+  }
+  assert.equal((await login('F.Faculty@AUI.ma')).body.user.person_id, 'harit-satt', 'email case does not matter; faculty is linked to an office card');
+  const wrong = await login('s.student@aui.ma', 'nope');
+  assert.equal(wrong.status, 401);
+  assert.match(wrong.body.error, /Wrong password/);
+  assert.match((await login('nobody@aui.ma')).body.error, /No GoMap account/);
+});
 
-  const prof = await signIn('h.satt@aui.ma');
+test('sign-up: aui.ma → student, directory → faculty with their office card, outsiders refused, no duplicates', async () => {
+  const student = await call('/api/auth/signup', { body: { email: 'New.Student@aui.ma', password: 'pass123', name: 'New Student' } });
+  assert.equal(student.status, 201, JSON.stringify(student.body));
+  assert.equal(student.body.user.role, 'student');
+  assert.equal(student.body.user.name, 'New Student');
+  assert.equal((await call('/api/auth/signup', { body: { email: 'new.student@aui.ma', password: 'other1' } })).status, 409);
+  assert.equal((await login('new.student@aui.ma', 'pass123')).status, 200);
+  assert.equal((await call('/api/auth/signup', { body: { email: 'short@aui.ma', password: '123' } })).status, 400);
+
+  const prof = await account('h.satt@aui.ma');
   assert.equal(prof.body.user.role, 'faculty');
   assert.equal(prof.body.user.person_id, 'harit-satt');
   // signed-in faculty set their own status; a student cannot set it for them
@@ -93,22 +106,31 @@ test('roles on first sign-in: aui.ma → student, directory → faculty with the
   assert.equal(own.status, 200, JSON.stringify(own.body));
   assert.equal((await call('/api/people/harit-satt/presence', { token: student.body.token, method: 'PUT', body: { status: 'out' } })).status, 403);
 
-  const outsider = await signIn('someone@gmail.com');
+  const outsider = await call('/api/auth/signup', { body: { email: 'someone@gmail.com', password: 'pass123' } });
   assert.equal(outsider.status, 403);
-  assert.match(outsider.body.error, /not allowed/);
-  assert.equal((await call('/api/auth/microsoft', { body: { id_token: idToken({ aud: 'other' }) } })).status, 401);
+  assert.match(outsider.body.error, /cannot have a GoMap account/);
+});
+
+test('change your own password', async () => {
+  const me = await account('changer@aui.ma', 'first1');
+  assert.equal((await call('/api/auth/password', { token: me.body.token, body: { current: 'wrong', password: 'second2' } })).status, 401);
+  assert.equal((await call('/api/auth/password', { token: me.body.token, body: { current: 'first1', password: 'second2' } })).status, 200);
+  assert.equal((await login('changer@aui.ma', 'first1')).status, 401);
+  assert.equal((await login('changer@aui.ma', 'second2')).status, 200);
 });
 
 test('dev dashboard: only developers; they assign roles to emails and the change applies at once', async () => {
-  const student = await signIn('new.student@aui.ma');
+  const student = await account('new.student@aui.ma');
   assert.equal((await call('/api/dev/users', { token: student.body.token })).status, 403);
   assert.equal((await call('/api/admin/overview', { token: student.body.token })).status, 403);
 
-  const boss = await signIn('boss@aui.ma'); // DEV_EMAILS
+  const boss = await account('boss@aui.ma'); // DEV_EMAILS
   assert.equal(boss.body.user.role, 'dev');
   const list = await call('/api/dev/users', { token: boss.body.token });
   assert.equal(list.status, 200);
   assert.ok(list.body.roles.some((r: { id: string }) => r.id === 'admin'));
+  assert.ok(list.body.users.every((u: Record<string, unknown>) => !('password_hash' in u)), 'hashes never leave the server');
+  assert.ok(list.body.users.find((u: { email: string }) => u.email === 'd.dev@aui.ma').test);
 
   // promote the student to admin: their next request already has admin rights
   const assigned = await call('/api/dev/users', { token: boss.body.token, body: { email: 'NEW.student@aui.ma', role: 'admin' } });
@@ -116,10 +138,18 @@ test('dev dashboard: only developers; they assign roles to emails and the change
   assert.equal((await call('/api/admin/overview', { token: student.body.token })).status, 200);
   assert.equal((await call('/api/dev/users', { token: student.body.token })).status, 403, 'admin is not dev');
 
-  // an outsider let in by name, and a preview of what a new email would get
+  // an outsider let in by name claims the role when they create the account
   await call('/api/dev/users', { token: boss.body.token, body: { email: 'visiting.prof@gmail.com', role: 'faculty' } });
-  assert.equal((await signIn('visiting.prof@gmail.com')).body.user.role, 'faculty');
+  assert.match((await login('visiting.prof@gmail.com', 'pass123')).body.error, /no password yet/);
+  assert.equal((await call('/api/auth/signup', { body: { email: 'visiting.prof@gmail.com', password: 'pass123' } })).body.user.role, 'faculty');
   assert.deepEqual((await call('/api/dev/check?email=h.satt@aui.ma', { token: boss.body.token })).body.role, 'faculty');
+
+  // a developer sets someone's password
+  const row = (await call('/api/dev/users', { token: boss.body.token })).body.users.find((u: { email: string }) => u.email === 'visiting.prof@gmail.com');
+  const reset = await call(`/api/dev/users/${row.id}/password`, { token: boss.body.token, method: 'PUT', body: { password: 'reset99' } });
+  assert.equal(reset.status, 200, JSON.stringify(reset.body));
+  assert.equal(reset.body.has_password, true);
+  assert.equal((await login('visiting.prof@gmail.com', 'reset99')).status, 200);
 
   // bulk: one per line, bad lines reported
   const bulk = await call('/api/dev/users/bulk', { token: boss.body.token, body: { text: 'a@aui.ma\nb@aui.ma, staff\nnot-an-email', role: 'student' } });
@@ -128,21 +158,24 @@ test('dev dashboard: only developers; they assign roles to emails and the change
 
   // settings: open the gate to another domain
   await call('/api/dev/settings', { token: boss.body.token, method: 'PUT', body: { allowed_domains: ['aui.ma', 'alumni.aui.ma'] } });
-  assert.equal((await signIn('old.grad@alumni.aui.ma')).body.user.role, 'student');
+  assert.equal((await account('old.grad@alumni.aui.ma')).body.user.role, 'student');
   assert.equal((await call('/api/dev/settings', { token: boss.body.token, method: 'PUT', body: { default_role: 'admin' } })).status, 400, 'nobody becomes admin by default');
 });
 
-test('demo accounts can be switched off: then unsigned requests are visitors', async () => {
-  const boss = await signIn('boss@aui.ma');
+test('test accounts can be switched off: they no longer sign in, and unsigned requests are visitors', async () => {
+  const boss = await account('boss@aui.ma');
   await call('/api/dev/settings', { token: boss.body.token, method: 'PUT', body: { demo_accounts: false } });
+  assert.deepEqual((await call('/api/auth/config')).body.test_accounts, []);
+  assert.equal((await login('a.admin@aui.ma')).status, 403);
   assert.deepEqual((await call('/api/accounts')).body, []);
   const r = await fetch(`${base}/api/people/harit-satt/presence`, { method: 'PUT', headers: { 'content-type': 'application/json', 'x-gomap-user': 'harit-satt' }, body: JSON.stringify({ status: 'out' }) });
   assert.equal(r.status, 403, 'the demo faculty account no longer works');
   await call('/api/dev/settings', { token: boss.body.token, method: 'PUT', body: { demo_accounts: true } });
+  assert.equal((await login('a.admin@aui.ma')).status, 200);
 });
 
 test('a developer cannot remove or demote their own account (their session would break)', async () => {
-  const boss = await signIn('boss@aui.ma');
+  const boss = await account('boss@aui.ma');
   const meRow = (await call('/api/dev/users', { token: boss.body.token })).body.users.find((u: { email: string }) => u.email === 'boss@aui.ma');
   const del = await call(`/api/dev/users/${meRow.id}`, { token: boss.body.token, method: 'DELETE' });
   assert.equal(del.status, 400);

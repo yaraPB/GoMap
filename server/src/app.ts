@@ -20,8 +20,8 @@ import * as turf from '@turf/turf';
 import { loadGeo } from './seed/seed.js';
 import { AUDIENCES, EVENT_KINDS, Events, type PlaceRef } from './services/events.js';
 import { newId, ruleView, runTest, testView, type RuleRow, type TestRow } from './services/assistantAdmin.js';
-import { AuthError, signSession, verifyMicrosoftIdToken, verifySession, type MicrosoftConfig } from './auth/tokens.js';
-import { migrateUsers, publicUser, ROLE_INFO, ROLES, Users, type Role, type UserRow } from './auth/users.js';
+import { AuthError, checkPassword, LoginThrottle, signSession, verifySession } from './auth/tokens.js';
+import { MIN_PASSWORD, migrateUsers, publicUser, ROLE_INFO, ROLES, safeUser, SignInError, TEST_ACCOUNTS, TEST_PASSWORD, Users, type Role, type UserRow } from './auth/users.js';
 import type { CampusHours } from './seed/services.js';
 
 export type AppContext = { db: Sql; campus: Campus; assistant: Assistant; uploadsDir?: string; fetchImpl?: typeof fetch };
@@ -79,6 +79,7 @@ export function createApp(ctx: AppContext) {
   const events = new Events(db);
   migrateUsers(db);
   const users = new Users(db, () => config.devEmails);
+  users.seedTestAccounts();
   // Bumped on every edit; the app polls /api/version and refetches when it moves.
   let version = Date.now();
   const bump = () => { version = Math.max(Date.now(), version + 1); };
@@ -98,7 +99,7 @@ export function createApp(ctx: AppContext) {
     const rows = db.prepare('SELECT id, name, role, person_id, description FROM accounts ORDER BY sort, name').all() as Account[];
     return rows.length ? rows : [...MOCK_USERS];
   };
-  /** The signed-in person (Outlook sign-in), from the session token. Their role comes from the database on every request. */
+  /** The signed-in person (email + password), from the session token. Their role comes from the database on every request. */
   const sessionUser = (req: Request): UserRow | null => {
     const h = req.header('authorization');
     if (!h?.startsWith('Bearer ') || h === `Bearer ${config.adminToken}` || (config.devToken && h === `Bearer ${config.devToken}`)) return null;
@@ -131,30 +132,56 @@ export function createApp(ctx: AppContext) {
   app.get('/api/accounts', (_req, res) => { res.json(users.settings().demo_accounts ? accounts() : []); });
   app.get('/api/version', (_req, res) => { res.set('Cache-Control', 'no-store'); res.json({ version }); });
 
-  // ── sign in with Outlook ──────────────────────────────────────────────────
+  // ── accounts: email + password ────────────────────────────────────────────
 
-  const microsoft = (): MicrosoftConfig | null => (config.microsoftClientId
-    ? { clientId: config.microsoftClientId, tenant: config.microsoftTenant, authority: config.microsoftAuthority, fetchImpl: ctx.fetchImpl } : null);
+  const throttle = new LoginThrottle();
+  const session = (u: UserRow) => ({ token: signSession({ sub: u.id, email: u.email }, config.sessionSecret), user: publicUser(u) });
+  const signInFail = (e: unknown) => (e instanceof SignInError ? new HttpError(e.status, e.message) : e instanceof AuthError ? new HttpError(429, e.message) : e);
 
-  /** What the apps need to start a Microsoft sign-in (all public values). */
+  /** What the sign-in screens show: the allowed domains, and the test accounts while they are on (all public). */
   app.get('/api/auth/config', (_req, res) => {
-    const m = microsoft();
-    res.json({ microsoft: m ? { client_id: m.clientId, tenant: m.tenant, authority: m.authority } : null, demo_accounts: users.settings().demo_accounts });
+    const s = users.settings();
+    res.json({
+      allowed_domains: s.allowed_domains, min_password: MIN_PASSWORD, demo_accounts: s.demo_accounts,
+      test_accounts: s.demo_accounts ? TEST_ACCOUNTS.map(a => ({ email: a.email, name: a.name, role: a.role })) : [],
+      test_password: s.demo_accounts ? TEST_PASSWORD : null,
+    });
   });
 
-  /** The app hands over Microsoft's ID token; we check it with Microsoft's keys and open a GoMap session. */
-  app.post('/api/auth/microsoft', wrap(async (req, res) => {
-    const m = microsoft();
-    if (!m) throw new HttpError(404, 'Sign-in with Outlook is not configured on the server (MICROSOFT_CLIENT_ID).');
-    const idToken = str(req.body?.id_token, 20000);
-    if (!idToken) throw bad('id_token is required');
-    let identity;
-    try { identity = await verifyMicrosoftIdToken(idToken, m); } catch (e) { throw new HttpError(401, e instanceof AuthError ? e.message : 'Could not verify the Microsoft sign-in.'); }
-    let u;
-    try { u = users.signIn(identity); } catch (e) { throw new HttpError(403, (e as Error).message); }
-    changeLog('user', u.id, 'sign-in', { email: u.email, role: u.role, source: u.source }, u.email);
-    res.json({ token: signSession({ sub: u.id, email: u.email }, config.sessionSecret), user: publicUser(u) });
-  }));
+  app.post('/api/auth/signup', (req, res) => {
+    const email = str(req.body?.email, 200) ?? '';
+    const password = typeof req.body?.password === 'string' ? req.body.password.slice(0, 200) : '';
+    let u: UserRow;
+    try { u = users.signUp({ email, password, name: str(req.body?.name, 120) ?? null }); } catch (e) { throw signInFail(e); }
+    changeLog('user', u.id, 'sign-up', { email: u.email, role: u.role, source: u.source }, u.email);
+    res.status(201).json(session(u));
+  });
+
+  app.post('/api/auth/login', (req, res) => {
+    const email = (str(req.body?.email, 200) ?? '').toLowerCase();
+    const password = typeof req.body?.password === 'string' ? req.body.password.slice(0, 200) : '';
+    if (!email || !password) throw bad('Enter your email and password.');
+    let u: UserRow;
+    try {
+      throttle.check(email);
+      try { u = users.logIn(email, password); } catch (e) { if (e instanceof SignInError && e.status === 401) throttle.failed(email); throw e; }
+    } catch (e) { throw signInFail(e); }
+    throttle.ok(email);
+    changeLog('user', u.id, 'sign-in', { email: u.email, role: u.role }, u.email);
+    res.json(session(u));
+  });
+
+  /** Change your own password (needs the current one). */
+  app.post('/api/auth/password', (req, res) => {
+    const u = sessionUser(req);
+    if (!u) throw new HttpError(401, 'Not signed in');
+    const current = typeof req.body?.current === 'string' ? req.body.current : '';
+    const next = typeof req.body?.password === 'string' ? req.body.password.slice(0, 200) : '';
+    if (u.password_hash && !checkPassword(current, u.password_hash)) throw new HttpError(401, 'Your current password is not right.');
+    try { users.setPassword(u.id, next); } catch (e) { throw signInFail(e); }
+    changeLog('user', u.id, 'password', { email: u.email }, u.email);
+    res.json({ ok: true });
+  });
 
   app.get('/api/auth/me', (req, res) => {
     const u = sessionUser(req);
@@ -1023,7 +1050,7 @@ export function createApp(ctx: AppContext) {
       throw bad('This is the last developer account. Add another developer first (or set DEV_EMAILS / DEV_TOKEN in server/.env).');
     }
   };
-  const userView = (u: UserRow) => ({ ...u, person: u.person_id ? (db.prepare('SELECT id, name, department FROM people WHERE id = ?').get(u.person_id) ?? null) : null });
+  const userView = (u: UserRow) => ({ ...safeUser(u), person: u.person_id ? (db.prepare('SELECT id, name, department FROM people WHERE id = ?').get(u.person_id) ?? null) : null });
 
   dev.get('/users', (_req, res) => { res.json({ users: users.list().map(userView), roles: ROLES.map(r => ({ id: r, can: ROLE_INFO[r] })), settings: users.settings() }); });
   dev.post('/users', (req, res) => {
@@ -1065,6 +1092,15 @@ export function createApp(ctx: AppContext) {
     users.remove(u.id);
     changeLog('user', u.id, 'delete', { email: u.email, role: u.role }, actor(req));
     res.json({ ok: true, removed: u.email });
+  });
+  /** Set or reset someone's password (they can change it later from the app). */
+  dev.put('/users/:id/password', (req, res) => {
+    const u = users.byId(String(req.params.id));
+    if (!u) throw new HttpError(404, 'User not found');
+    const password = typeof req.body?.password === 'string' ? req.body.password.slice(0, 200) : '';
+    try { users.setPassword(u.id, password); } catch (e) { throw signInFail(e); }
+    changeLog('user', u.id, 'password', { email: u.email, by: 'dev dashboard' }, actor(req));
+    res.json(userView(users.byId(u.id)!));
   });
   /** "What would this person get if they signed in now?" */
   dev.get('/check', (req, res) => {

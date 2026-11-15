@@ -19,13 +19,39 @@ export async function connectMongo(uri: string) {
     console.log('MongoDB: in-memory (set MONGODB_URI to keep data between restarts)');
   }
   mongoose.set('strictQuery', true);
-  await mongoose.connect(target, { serverSelectionTimeoutMS: 8000 });
+  // Indexes are built once, explicitly, below. Mongoose's automatic background build runs in a promise
+  // nobody awaits: when Atlas resets the connection mid-build, that rejection crashed the whole server.
+  mongoose.set('autoIndex', false);
+  watchConnection();
+  await mongoose.connect(target, {
+    serverSelectionTimeoutMS: 15000,
+    // Windows + Atlas: an IPv6 route that resets connections is a known cause of ECONNRESET; use IPv4
+    family: 4,
+    // Atlas closes idle connections after a while; drop ours first instead of writing into a dead socket
+    maxIdleTimeMS: 60_000,
+    socketTimeoutMS: 45_000,
+    heartbeatFrequencyMS: 10_000,
+    retryWrites: true,
+    retryReads: true,
+  });
   await Promise.all([Place, Entrance, Walkway, Report].map(m => m.syncIndexes()));
   return mongoose.connection;
 }
 
+let watched = false;
+let closing = false;
+/** Say what happens to the database connection instead of crashing on it. */
+function watchConnection() {
+  if (watched) return;
+  watched = true;
+  mongoose.connection.on('error', e => console.error(`MongoDB connection error: ${e instanceof Error ? e.message : e}`));
+  mongoose.connection.on('disconnected', () => { if (!closing) console.warn('MongoDB disconnected: reconnecting by itself…'); });
+  mongoose.connection.on('reconnected', () => console.log('MongoDB reconnected.'));
+}
+
 export async function disconnectMongo() {
-  await mongoose.disconnect();
+  closing = true;
+  try { await mongoose.disconnect(); } finally { closing = false; }
   if (memoryServer) { await memoryServer.stop(); memoryServer = null; }
 }
 

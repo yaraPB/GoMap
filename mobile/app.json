@@ -52,7 +52,6 @@
       ],
       "expo-font",
       "expo-status-bar",
-      "expo-web-browser",
       "expo-secure-store"
     ],
     "ios": {

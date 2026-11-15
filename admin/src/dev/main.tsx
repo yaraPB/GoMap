@@ -1,6 +1,6 @@
 import { StrictMode, useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { BriefcaseBusiness, Code2, GraduationCap, LogOut, Presentation, Search, ShieldCheck, Trash2, UserPlus, Users, type LucideIcon } from 'lucide-react';
+import { BriefcaseBusiness, Code2, GraduationCap, KeyRound, LogOut, Presentation, Search, ShieldCheck, Trash2, UserPlus, Users, type LucideIcon } from 'lucide-react';
 import '../styles.css';
 import { API_URL, ago } from '../api';
 import { clearSession, type SessionUser } from '../auth';
@@ -16,7 +16,7 @@ const LOOK: Record<Role, { name: string; icon: LucideIcon; color: string; bg: st
   dev: { name: 'Developer', icon: Code2, color: '#B91C1C', bg: '#FEECEC' },
 };
 const ROLES = Object.keys(LOOK) as Role[];
-const SOURCE: Record<string, string> = { dev: 'assigned here', directory: 'from the faculty directory', domain: 'allowed domain', bootstrap: 'DEV_EMAILS' };
+const SOURCE: Record<string, string> = { dev: 'assigned here', directory: 'from the faculty directory', domain: 'allowed domain', bootstrap: 'DEV_EMAILS', test: 'test account' };
 
 function RolePill({ role }: { role: Role }) {
   const l = LOOK[role]; const Icon = l.icon;
@@ -76,7 +76,7 @@ function Dashboard({ who, onOut }: { who: SessionUser | null; onOut: () => void 
         </div>
       </header>
       <main className="main" style={{ margin: '0 auto' }}>
-        <div className="head"><div><h1>Roles</h1><p className="sub">Everyone signs in with their AUI Outlook account. A role assigned here wins over every automatic rule, and applies at their next tap, no sign-out needed.</p></div></div>
+        <div className="head"><div><h1>Roles</h1><p className="sub">People create their account in the app with their email and a password. A role assigned here wins over every automatic rule, and applies at their next tap, no sign-out needed. Assign an email before they sign up and the role is waiting for them.</p></div></div>
         {data.error && <Notice tone="miss">{data.error}</Notice>}
         {msg && <div style={{ marginBottom: 12 }}><Notice tone={msg.tone}>{msg.text}</Notice></div>}
 
@@ -100,8 +100,8 @@ function Dashboard({ who, onOut }: { who: SessionUser | null; onOut: () => void 
             </div>
             {check && check.email === email.trim() && (
               'refused' in check.r
-                ? <p className="sub" style={{ margin: 0, fontSize: 12.5 }}>Today this email <b>cannot sign in</b>. Assigning a role lets them in.</p>
-                : <p className="sub" style={{ margin: 0, fontSize: 12.5 }}>Today they would sign in as <RolePill role={check.r.role} /> ({SOURCE[check.r.source] ?? check.r.source}{check.r.name ? ` · ${check.r.name}` : ''}).</p>
+                ? <p className="sub" style={{ margin: 0, fontSize: 12.5 }}>Today this email <b>cannot create an account</b>. Assigning a role lets them in.</p>
+                : <p className="sub" style={{ margin: 0, fontSize: 12.5 }}>Today their account would be <RolePill role={check.r.role} /> ({SOURCE[check.r.source] ?? check.r.source}{check.r.name ? ` · ${check.r.name}` : ''}).</p>
             )}
             <details>
               <summary className="sub" style={{ cursor: 'pointer' }}>Many at once</summary>
@@ -112,7 +112,7 @@ function Dashboard({ who, onOut }: { who: SessionUser | null; onOut: () => void 
 
           {s && (
             <div className="card stack" style={{ gap: 12 }}>
-              <h2 style={{ margin: 0 }}><Users size={16} style={{ verticalAlign: -3 }} /> Who may sign in without being listed</h2>
+              <h2 style={{ margin: 0 }}><Users size={16} style={{ verticalAlign: -3 }} /> Who may create an account without being listed</h2>
               <div className="f" style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12, fontWeight: 600, color: 'var(--muted)' }}>Email domains let in automatically
                 <Tags value={s.allowed_domains} onChange={allowed_domains => void run(() => dev.saveSettings({ allowed_domains }), 'Domains saved.')} placeholder="e.g. alumni.aui.ma — press Enter" />
               </div>
@@ -122,7 +122,7 @@ function Dashboard({ who, onOut }: { who: SessionUser | null; onOut: () => void 
                 </select>
               </label>
               <p className="sub" style={{ margin: 0, fontSize: 12.5 }}>Faculty and staff found in the directory get their role and office card automatically.</p>
-              <label className="toolbar" style={{ fontSize: 13 }}><input type="checkbox" checked={s.demo_accounts} onChange={e => void run(() => dev.saveSettings({ demo_accounts: e.target.checked }), e.target.checked ? 'Demo accounts on.' : 'Demo accounts off: only signed-in people get their role.')} />Demo accounts in the app (turn off before launch)</label>
+              <label className="toolbar" style={{ fontSize: 13 }}><input type="checkbox" checked={s.demo_accounts} onChange={e => void run(() => dev.saveSettings({ demo_accounts: e.target.checked }), e.target.checked ? 'Test accounts on.' : 'Test accounts off: s.student@aui.ma and the others can no longer sign in.')} />Test accounts (s.student@aui.ma, f.faculty@aui.ma, st.staff@aui.ma, a.admin@aui.ma, d.dev@aui.ma · password 123abc). Turn off before launch</label>
             </div>
           )}
         </div>
@@ -143,12 +143,14 @@ function Dashboard({ who, onOut }: { who: SessionUser | null; onOut: () => void 
                   {ROLES.map(r => <option key={r} value={r}>{LOOK[r].name}</option>)}</select></td>
                 <td>{u.role === 'faculty' || u.role === 'staff' ? <PersonPicker value={u.person} onPick={id => void run(() => dev.update(u.id, { person_id: id }), id ? 'Office card linked.' : 'Office card unlinked.')} /> : <span className="sub">—</span>}</td>
                 <td className="sub">{SOURCE[u.source] ?? u.source}{u.assigned_by ? ` · by ${u.assigned_by}` : ''}</td>
-                <td className="sub">{u.last_login_at ? `${ago(u.last_login_at)} · ${u.logins}×` : 'never'}</td>
-                <td><button className="btn sm ghost" aria-label={`Remove ${u.email}`} title="Remove: they fall back to the automatic rules"
+                <td className="sub">{!u.has_password ? 'no account yet (role waiting)' : u.last_login_at ? `${ago(u.last_login_at)} · ${u.logins}×` : 'never'}</td>
+                <td style={{ whiteSpace: 'nowrap' }}><button className="btn sm ghost" aria-label={`Set a password for ${u.email}`} title="Set or reset their password"
+                  onClick={() => { const p = prompt(`New password for ${u.email} (at least 6 characters). Tell them; they can change it in the app.`); if (p) void run(() => dev.setPassword(u.id, p), `Password set for ${u.email}.`); }}><KeyRound size={14} /></button>
+                <button className="btn sm ghost" aria-label={`Remove ${u.email}`} title="Remove: they fall back to the automatic rules"
                   onClick={() => { if (confirm(`Remove ${u.email}? They fall back to the automatic rules (domain / directory).`)) void run(() => dev.remove(u.id), `${u.email} removed.`); }}><Trash2 size={14} /></button></td>
               </tr>
             ))}
-          </tbody></table>{!shown.length && <p className="empty">{users.length ? 'Nobody matches.' : 'Nobody yet. People appear here when they sign in or when you assign them.'}</p>}</div>
+          </tbody></table>{!shown.length && <p className="empty">{users.length ? 'Nobody matches.' : 'Nobody yet. People appear here when they create an account or when you assign them.'}</p>}</div>
         </div>
 
         <div className="card" style={{ marginTop: 16 }}>
@@ -171,7 +173,7 @@ function App() {
   const [state, setState] = useState<{ in: boolean; who: SessionUser | null }>({ in: false, who: null });
   if (!state.in) return (
     <SignIn title="GoMap Dev" subtitle="Roles and access" allowed={['dev']} onIn={who => setState({ in: true, who })}
-      tokenLabel="Dev token" tokenHint={<>API: {API_URL}. The token is DEV_TOKEN in server/.env (only needed before any developer has signed in).</>}
+      tokenLabel="Dev token" tokenHint={<>API: {API_URL}. The token is DEV_TOKEN in server/.env (setup and scripts; d.dev@aui.ma / 123abc works while test accounts are on).</>}
       tryToken={async t => { setDevToken(t); try { await dev.users(); } catch (err) { clearDevToken(); throw err; } }}
       resume={async () => { if (!sessionStorage.getItem('gomap-dev-token')) return false; try { await dev.users(); return true; } catch { return false; } }} />
   );

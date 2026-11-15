@@ -50,7 +50,6 @@ export const useCrowding = (weekday: number, hour: number, enabled: boolean) => 
 export const useMyReports = (enabled: boolean) => useQuery({ queryKey: ['myReports'], queryFn: api.myReports, enabled, refetchInterval: enabled ? 60_000 : false });
 export const useServices = (q = '') => useQuery({ queryKey: ['services', q], queryFn: () => api.services(q || undefined) });
 export const useCampus = () => useQuery({ queryKey: ['campus'], queryFn: api.campus, staleTime: 5 * 60_000 });
-export const useAccounts = () => useQuery({ queryKey: ['accounts'], queryFn: api.mockUsers, staleTime: 10 * 60_000 });
 export const useBuildings = () => useQuery({ queryKey: ['buildings'], queryFn: api.buildings, refetchInterval: 5 * 60_000 });
 export const useExtraBuildings = () => useQuery({ queryKey: ['extraBuildings'], queryFn: api.extraBuildings, staleTime: 10 * 60_000 });
 /** Campus events for this role, refreshed every minute so "on now" stays true. */

@@ -211,8 +211,9 @@ kbd { font: 600 10.5px Inter, system-ui; padding: 1px 5px; border-radius: 5px; b
 
 /* sign-in and dev dashboard */
 .signin { width: 400px; display: flex; flex-direction: column; gap: 14px; }
-.btn.ms { height: 44px; justify-content: center; gap: 10px; background: #fff; border: 1px solid #8C8C8C; color: #5E5E5E; font-weight: 600; font-size: 15px; }
-.btn.ms:hover { background: #F5F5F5; }
+.btn.testacct { height: 40px; justify-content: flex-start; font-weight: 500; font-size: 13.5px; }
+.btn.testacct .pill { min-width: 64px; justify-content: center; text-transform: capitalize; }
+.role-student { background: #EEF3FF; color: #2563EB; } .role-faculty { background: #E5F5EC; color: #0B7A47; } .role-staff { background: #FFF4DC; color: #8A5A00; } .role-admin { background: #F1E8FF; color: #6D28D9; } .role-dev { background: #FEECEC; color: #B91C1C; }
 .whoami { padding: 8px 10px; margin-bottom: 6px; border-radius: 10px; background: var(--surface); } .whoami small { display: block; color: var(--muted); font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; }
 a.nav { text-decoration: none; }
 .devshell { min-height: 100vh; } .devhead { display: flex; justify-content: space-between; align-items: center; padding: 14px 30px; background: #fff; border-bottom: 1px solid var(--hair); position: sticky; top: 0; z-index: 5; }

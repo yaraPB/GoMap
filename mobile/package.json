@@ -11,11 +11,9 @@
     "@tanstack/react-query": "^5.107.1",
     "expo": "~58.0.25",
     "expo-audio": "~58.0.12",
-    "expo-auth-session": "~58.0.18",
     "expo-blur": "~58.0.6",
     "expo-camera": "~58.0.14",
     "expo-constants": "~58.0.16",
-    "expo-crypto": "~58.0.8",
     "expo-font": "~58.0.12",
     "expo-haptics": "~58.0.8",
     "expo-image-picker": "~58.0.10",
@@ -27,7 +25,6 @@
     "expo-speech": "~58.0.4",
     "expo-speech-recognition": "^58.0.1",
     "expo-status-bar": "~58.0.4",
-    "expo-web-browser": "~58.0.8",
     "lucide-react-native": "1.65.0",
     "react": "19.3.0",
     "react-dom": "19.3.0",
@@ -45,6 +42,9 @@
     "@types/react": "~19.3.0",
     "tsx": "^4.23.15",
     "typescript": "~6.0.3"
+  },
+  "engines": {
+    "node": ">=22.13.0"
   },
   "scripts": {
     "start": "expo start",

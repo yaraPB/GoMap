@@ -4,7 +4,8 @@
  *   cd e2e && npm install && npm test            (all)        npm test -- ar admin   (only some groups)
  *
  * Starts everything itself, on a throwaway database:
- *   fake Microsoft (4100) · API (4000, in-memory Mongo + temp SQLite) · admin (5173) · mobile web (8081)
+ *   API (4000, in-memory Mongo + temp SQLite) · admin (5173) · mobile web (8081)
+ * Accounts: the seeded test accounts (s.student@aui.ma … d.dev@aui.ma, password 123abc) and new sign-ups.
  * Then drives Edge/Chrome headless through each scenario, with a fake camera, a GPS fix on the plaza
  * and simulated motion sensors. Screenshots of every step go to e2e/out/. Exit code 1 if anything fails.
  * Ports must be free (stop your own dev servers first).
@@ -16,7 +17,6 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import net from 'node:net';
 import { chromium } from 'playwright-core';
-import { startFakeMicrosoft } from './fake-microsoft.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, '..');
@@ -61,19 +61,19 @@ async function check(group, name, page, fn) {
 const assert = (cond, msg) => { if (!cond) throw new Error(msg); };
 const api = async (path, opts = {}) => { const r = await fetch(API + path, { ...opts, headers: { 'content-type': 'application/json', ...(opts.headers ?? {}) } }); return { status: r.status, body: await r.json().catch(() => ({})) }; };
 
-/** Through the fake Microsoft page, like a person would. Works for a full-page redirect or a popup. */
-async function microsoftLogin(page, email) {
+/** The dashboards' sign-in form, like a person would type it. */
+async function dashLogin(page, email, password) {
   await page.getByLabel('Email').fill(email);
-  await page.getByRole('button', { name: 'Sign in' }).click();
+  await page.getByLabel('Password').fill(password);
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
 }
 
 // ── main ────────────────────────────────────────────────────────────────────
 console.log('Starting the stack…');
-for (const port of [4000, 4100, 5173, 8081]) if (!(await portFree(port))) { console.error(`Port ${port} is busy: stop the dev server using it first.`); process.exit(2); }
-await startFakeMicrosoft(4100);
+for (const port of [4000, 5173, 8081]) if (!(await portFree(port))) { console.error(`Port ${port} is busy: stop the dev server using it first.`); process.exit(2); }
 const db = join(tmpdir(), `gomap-e2e-${Date.now()}.sqlite`);
 const serverEnv = { MONGODB_URI: '', GOMAP_DB: db, PORT: '4000', ADMIN_TOKEN: 'e2e-admin', SESSION_SECRET: 'e2e-secret', DEV_TOKEN: '',
-  MICROSOFT_CLIENT_ID: 'e2e-client', MICROSOFT_AUTHORITY: 'http://localhost:4100', MICROSOFT_TENANT: 'organizations', DEV_EMAILS: 'dev@aui.ma',
+  DEV_EMAILS: '',
   GEMINI_API_KEY: '', ANTHROPIC_API_KEY: '', SONIOX_API_KEY: '' };
 start('api', 'npx', ['tsx', 'src/server.ts'], join(root, 'server'), serverEnv);
 if (want('admin') || want('dev')) start('admin', 'npx', ['vite', '--port', '5173', '--strictPort'], join(root, 'admin'), { VITE_API_URL: API });
@@ -91,24 +91,28 @@ const desktop = () => browser.newContext({ viewport: { width: 1440, height: 950 
 const phone = () => browser.newContext({ viewport: { width: 400, height: 860 }, deviceScaleFactor: 2, reducedMotion: 'reduce', geolocation: { ...PLAZA, accuracy: 5 }, permissions: ['geolocation', 'camera'] });
 const appReady = async page => { await page.goto(APP, { timeout: 180_000 }); await page.getByLabel('Ask GoMap').first().waitFor({ timeout: 120_000 }); await sleep(6000); };
 
-// ── dev dashboard & admin (Outlook sign-in) ─────────────────────────────────
+// ── dev dashboard & admin (email + password) ────────────────────────────────
 if (want('dev') || want('admin')) {
   console.log('\nDev dashboard and admin');
   const ctx = await desktop(); const page = await ctx.newPage();
-  await check('dev', 'a developer signs in to the dev dashboard with Outlook', page, async () => {
+  await check('dev', 'a wrong password is refused, with a clear message', page, async () => {
     await page.goto(`${ADMIN}/dev.html`);
-    await page.getByRole('button', { name: 'Sign in with Outlook' }).click();
-    await microsoftLogin(page, 'dev@aui.ma');
+    await dashLogin(page, 'd.dev@aui.ma', 'not-it');
+    await page.getByText('Wrong password.').waitFor({ timeout: 10_000 });
+  });
+  await check('dev', 'the developer test account signs in with one tap (password 123abc)', page, async () => {
+    assert(await page.getByText('Test accounts · password').isVisible(), 'test accounts not listed');
+    await page.getByRole('button', { name: /d\.dev@aui\.ma/ }).click();
     await page.getByRole('heading', { name: 'Roles' }).waitFor({ timeout: 20_000 });
-    assert(await page.getByText('dev@aui.ma').first().isVisible(), 'signed-in email not shown');
+    assert(await page.getByText('d.dev@aui.ma').first().isVisible(), 'signed-in email not shown');
     await shot(page, 'dev-dashboard');
   });
   await check('dev', 'the email preview says what a new person would get', page, async () => {
     await page.getByLabel('Email', { exact: true }).fill('h.satt@aui.ma');
-    await page.getByText('Today they would sign in as').waitFor({ timeout: 5000 });
+    await page.getByText('Today their account would be').waitFor({ timeout: 5000 });
     assert(await page.getByText('from the faculty directory').isVisible(), 'directory source not shown');
     await page.getByLabel('Email', { exact: true }).fill('someone@gmail.com');
-    await page.getByText('cannot sign in').waitFor({ timeout: 5000 });
+    await page.getByText('cannot create an account').waitFor({ timeout: 5000 });
   });
   await check('dev', 'assign admin and staff roles to emails', page, async () => {
     await page.getByLabel('Email', { exact: true }).fill('new.admin@aui.ma');
@@ -125,21 +129,26 @@ if (want('dev') || want('admin')) {
     await page.getByLabel('Role of new.admin@aui.ma').selectOption('admin');
     await page.getByText('new.admin@aui.ma is now admin.').waitFor({ timeout: 5000 });
   });
+  await check('dev', 'set a password for the new admin from the table', page, async () => {
+    assert(await page.getByText('no account yet (role waiting)').first().isVisible(), 'pending account not marked');
+    page.once('dialog', d => d.accept('welcome1'));
+    await page.getByLabel('Set a password for new.admin@aui.ma').click();
+    await page.getByText('Password set for new.admin@aui.ma.').waitFor({ timeout: 5000 });
+  });
   await check('dev', 'a developer cannot remove or demote their own account', page, async () => {
     page.once('dialog', d => d.accept());
-    await page.getByLabel('Remove dev@aui.ma').click();
+    await page.getByLabel('Remove d.dev@aui.ma').click();
     await page.getByText('You cannot remove your own account').waitFor({ timeout: 5000 });
-    await page.getByLabel('Role of dev@aui.ma').selectOption('student');
+    await page.getByLabel('Role of d.dev@aui.ma').selectOption('student');
     await page.getByText('You cannot demote your own account').waitFor({ timeout: 5000 });
     assert((await page.evaluate(() => fetch('http://localhost:4000/api/auth/me', { headers: { authorization: `Bearer ${localStorage.getItem('gomap-session')}` } }).then(r => r.json()))).role === 'dev', 'still dev');
   });
   await ctx.close();
 
   const a = await desktop(); const ap = await a.newPage();
-  await check('admin', 'the new admin signs in to the admin with Outlook', ap, async () => {
+  await check('admin', 'the new admin signs in to the admin with their email and password', ap, async () => {
     await ap.goto(ADMIN);
-    await ap.getByRole('button', { name: 'Sign in with Outlook' }).click();
-    await microsoftLogin(ap, 'new.admin@aui.ma');
+    await dashLogin(ap, 'new.admin@aui.ma', 'welcome1');
     await ap.getByRole('heading', { name: 'What needs you today' }).waitFor({ timeout: 20_000 });
     assert(await ap.getByText('new.admin@aui.ma · admin').isVisible(), 'role not shown in the sidebar');
     await shot(ap, 'admin-signed-in');
@@ -203,15 +212,15 @@ if (want('dev') || want('admin')) {
   const s = await desktop(); const sp = await s.newPage();
   await check('admin', 'a student account is refused by the admin, with a clear message', sp, async () => {
     await sp.goto(ADMIN);
-    await sp.getByRole('button', { name: 'Sign in with Outlook' }).click();
-    await microsoftLogin(sp, 'plain.student@aui.ma');
+    await sp.getByText('Test accounts · password').waitFor({ timeout: 10_000 });
+    assert(!(await sp.getByRole('button', { name: /s\.student@aui\.ma/ }).count()), 'the student test account should not be offered on the admin');
+    await dashLogin(sp, 's.student@aui.ma', '123abc');
     await sp.getByText(/This dashboard is for admin or dev accounts/).waitFor({ timeout: 20_000 });
   });
-  await check('admin', 'an outsider is refused at sign-in', sp, async () => {
+  await check('admin', 'an unknown email is told to create an account first', sp, async () => {
     await sp.evaluate(() => localStorage.clear()); await sp.goto(`${ADMIN}/dev.html`);
-    await sp.getByRole('button', { name: 'Sign in with Outlook' }).click();
-    await microsoftLogin(sp, 'stranger@gmail.com');
-    await sp.getByText(/not allowed to sign in/).waitFor({ timeout: 20_000 });
+    await dashLogin(sp, 'stranger@gmail.com', 'whatever1');
+    await sp.getByText(/No GoMap account for stranger@gmail.com/).waitFor({ timeout: 20_000 });
   });
   await s.close();
 }
@@ -236,14 +245,16 @@ if (want('signin') || want('app')) {
   console.log('\nApp: sign-in and roles');
   const ctx = await phone(); const page = await ctx.newPage();
   await check('signin', 'the app loads on campus with the GoCampus map', page, async () => { await appReady(page); await shot(page, 'app-home'); });
-  await check('signin', 'a professor signs in with Outlook and gets the faculty view', page, async () => {
+  await check('signin', 'a professor creates an account with their AUI email and gets the faculty view', page, async () => {
     await page.getByLabel(/^View: /).click();
-    const popup = ctx.waitForEvent('page');
-    await page.getByLabel('Sign in with Outlook').click();
-    const p = await popup;
-    await microsoftLogin(p, 'h.satt@aui.ma');
+    await page.getByRole('tab', { name: 'Create account' }).click();
+    await page.getByLabel('Your name (optional)').fill('Harit Satt');
+    await page.getByLabel('Email').fill('h.satt@aui.ma');
+    await page.getByLabel('Password').fill('prof123');
+    await shot(page, 'app-create-account');
+    await page.getByRole('button', { name: 'Create account', exact: true }).click();
     // the sheet closes itself once signed in; reopen it to see who we are
-    await page.getByLabel('Sign in with Outlook').waitFor({ state: 'detached', timeout: 20_000 });
+    await page.getByLabel('Email').waitFor({ state: 'detached', timeout: 20_000 });
     await sleep(1500);
     await page.getByLabel(/^View: /).click();
     await page.getByText('h.satt@aui.ma').waitFor({ timeout: 10_000 });
@@ -260,11 +271,27 @@ if (want('signin') || want('app')) {
     assert(me.note_kind === 'semester_off' && me.presence?.status === 'out', `server: note ${me.note_kind}, presence ${me.presence?.status}`);
     await shot(page, 'app-faculty-status');
   });
-  await check('signin', 'signing out returns to the demo student', page, async () => {
+  await check('signin', 'signing out shows the sign-in form again', page, async () => {
     await page.goto(APP); await page.getByLabel('Ask GoMap').first().waitFor({ timeout: 60_000 }); await sleep(3000);
     await page.getByLabel(/^View: /).click();
     await page.getByText('Sign out').click();
-    await page.getByLabel('Sign in with Outlook').waitFor();
+    await page.getByLabel('Password').waitFor();
+  });
+  await check('signin', 'a wrong password says so; a test account signs in with one tap', page, async () => {
+    await page.getByLabel('Email').fill('h.satt@aui.ma');
+    await page.getByLabel('Password').fill('wrong-one');
+    await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+    await page.getByText('Wrong password.').waitFor({ timeout: 10_000 });
+    await page.getByText(/Test accounts · password 123abc/).waitFor();
+    await shot(page, 'app-sign-in');
+    await page.getByLabel('Staff st.staff@aui.ma').click();
+    await page.getByLabel('Email').waitFor({ state: 'detached', timeout: 20_000 });
+    await sleep(1000);
+    await page.getByLabel(/^View: /).click();
+    await page.getByText('st.staff@aui.ma').waitFor({ timeout: 10_000 });
+    assert(await page.getByText(/Staff ·/).first().isVisible(), 'not shown as staff');
+    await page.getByText('Sign out').click();
+    await page.getByLabel('Password').waitFor();
   });
   await ctx.close();
 }

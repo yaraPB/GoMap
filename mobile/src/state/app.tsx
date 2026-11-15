@@ -11,7 +11,7 @@ import { CAMPUS_CENTER } from '../map/mapHtml';
 import { snapToNetwork, WalkFilter } from '../location/kalman';
 import { useWalkways } from '../api/hooks';
 
-/** Mock accounts until GoCampus SSO. TODO: replace with GoCampus SSO */
+/** Who you are before signing in: the student view (visitors see the same map). Signed in, the account replaces it. */
 export const USERS: MockUser[] = [
   { id: 'demo-student', name: 'Student', role: 'student' },
   { id: 'harit-satt', name: 'Harit Satt', role: 'faculty', person_id: 'harit-satt' },
@@ -21,11 +21,11 @@ export const USERS: MockUser[] = [
 
 type AppCtx = {
   lang: Lang; setLang: (l: Lang) => void;
-  user: MockUser; setUser: (u: MockUser) => void;
+  user: MockUser;
   online: boolean;
   reduceMotion: boolean;
   firstSession: boolean; finishOnboarding: () => void;
-  /** Outlook sign-in: who you really are. Null while using a demo account. */
+  /** Email + password sign-in: who you really are. Null when not signed in. */
   signedIn: SignedInUser | null;
   signIn: (token: string, user: SignedInUser) => Promise<void>;
   signOut: () => Promise<void>;
@@ -61,12 +61,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       catch (e) { if (e instanceof ApiError && e.status === 401) { await saveSession(null); setApiSession(null); } }
     });
   }, []);
-  /** picking a demo account ends a real sign-in (the API would keep using the session otherwise) */
-  const setUser = useCallback((u: MockUser) => {
-    if (signedIn) { void saveSession(null); setApiSession(null); setSignedIn(null); }
-    setApiUser(u.id); setUserState(u);
-  }, [signedIn]);
-  const value = useMemo(() => ({ lang, setLang, user, setUser, online, reduceMotion, firstSession, finishOnboarding: () => setFirstSession(false), signedIn, signIn, signOut }), [lang, user, online, reduceMotion, firstSession, setUser, signedIn, signIn, signOut]);
+  const value = useMemo(() => ({ lang, setLang, user, online, reduceMotion, firstSession, finishOnboarding: () => setFirstSession(false), signedIn, signIn, signOut }), [lang, user, online, reduceMotion, firstSession, signedIn, signIn, signOut]);
   // Arabic mirrors the whole layout from here down (Yoga 'direction' is inherited), no reload needed
   return (
     <App.Provider value={value}>
