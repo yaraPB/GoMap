@@ -1,38 +1,57 @@
 import React from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAccounts } from '../api/hooks';
 import type { MockUser } from '../api/types';
+import OutlookSignIn from '../auth/OutlookSignIn';
 import { useT } from '../i18n';
 import { chat } from '../state/chat';
 import { USERS, useApp } from '../state/app';
 import { usePanels } from '../state/panels';
-import { Icon, Sheet, T } from '../ui/kit';
+import { Btn, Icon, Label, Sheet, T } from '../ui/kit';
 import { color, type IconName } from '../ui/theme';
 
 export const ROLE_LOOK: Record<string, { icon: IconName; title: string; tint: string; ink: string; blurb: string }> = {
   student: { icon: 'student', title: 'Student', tint: '#EEF4FF', ink: '#2563EB', blurb: 'Find classes, offices and services' },
   faculty: { icon: 'faculty', title: 'Faculty', tint: '#E6F4EC', ink: '#0B6B3F', blurb: 'Post your status and a note on your door' },
   staff: { icon: 'staff', title: 'Staff', tint: '#FFF3DB', ink: '#8A5A00', blurb: 'Office hours, lunch and service desks' },
+  admin: { icon: 'shield', title: 'Admin', tint: '#F1E8FF', ink: '#6D28D9', blurb: 'Keeps the campus data true (admin dashboard)' },
+  dev: { icon: 'shield', title: 'Developer', tint: '#FEECEC', ink: '#B91C1C', blurb: 'Assigns roles (dev dashboard)' },
   guest: { icon: 'visitor', title: 'Visitor', tint: '#EAF6F8', ink: '#0E7490', blurb: 'Explore the campus, no account needed' },
 };
 
-/** Demo accounts from SQLite, one tap each. The admin dashboard is a separate web app. TODO: GoCampus SSO */
+/** Your account: sign in with Outlook (AUI Microsoft account), or try the app with a demo account. */
 export default function Views() {
   const { pop } = usePanels();
-  const { user, setUser } = useApp();
+  const { user, setUser, signedIn, signOut } = useApp();
   const t = useT();
   const accounts = useAccounts();
   const qc = useQueryClient();
-  const list: MockUser[] = accounts.data?.length ? accounts.data : USERS;
-  const pick = (u: MockUser) => { setUser(u); chat.clear(); qc.invalidateQueries(); pop(); };
+  // the server decides whether demo accounts exist (dev dashboard); offline, fall back to the built-in list
+  const list: MockUser[] = accounts.data ?? (accounts.isError ? USERS : []);
+  const fresh = () => { chat.clear(); qc.invalidateQueries(); };
+  const pick = (u: MockUser) => { setUser(u); fresh(); pop(); };
+  const me = signedIn ? ROLE_LOOK[signedIn.role] ?? ROLE_LOOK.student : null;
   return (
-    <Sheet snaps={[0.62]} onClose={pop} header={<View style={styles.head}><T weight="bold" style={{ fontSize: 18 }}>{t('Choose a view')}</T><T style={{ fontSize: 12.5, color: color.muted }}>{t('Demo accounts until GoCampus sign-in')}</T></View>}>
-      <View style={{ padding: 16, gap: 10 }}>
+    <Sheet snaps={[0.7, 0.92]} onClose={pop} header={<View style={styles.head}><T weight="bold" style={{ fontSize: 18 }}>{t('Your account')}</T><T style={{ fontSize: 12.5, color: color.muted }}>{t('Sign in with your AUI Outlook account to get your own view')}</T></View>}>
+      <ScrollView contentContainerStyle={{ padding: 16, gap: 10, paddingBottom: 30 }}>
+        {signedIn && me ? (
+          <View style={[styles.card, { borderColor: me.ink }]}>
+            <View style={[styles.badge, { backgroundColor: me.tint }]}><Icon name={me.icon} size={22} stroke={me.ink} /></View>
+            <View style={{ flex: 1 }}>
+              <T weight="bold" style={{ fontSize: 16 }}>{signedIn.name}</T>
+              <T style={{ fontSize: 12.5, color: color.ink2 }} numberOfLines={1}>{signedIn.email}</T>
+              <T weight="semibold" style={{ fontSize: 12.5, color: me.ink, marginTop: 2 }}>{t(me.title)} · {t(me.blurb)}</T>
+            </View>
+          </View>
+        ) : <OutlookSignIn onDone={() => { fresh(); pop(); }} />}
+        {signedIn && <Btn title={t('Sign out')} kind="ghost" small onPress={() => { void signOut(); fresh(); }} />}
+
+        {!!list.length && <Label style={{ marginTop: 10 }}>{t('Or try a demo account')}</Label>}
         {list.map((u, i) => {
           const look = ROLE_LOOK[u.role] ?? ROLE_LOOK.student;
-          const on = user.id === u.id;
+          const on = !signedIn && user.id === u.id;
           return (
             <Animated.View key={u.id} entering={FadeInDown.delay(i * 50).duration(260)}>
               <Pressable accessibilityRole="radio" accessibilityState={{ selected: on }} onPress={() => pick(u)}
@@ -47,7 +66,7 @@ export default function Views() {
             </Animated.View>
           );
         })}
-      </View>
+      </ScrollView>
     </Sheet>
   );
 }

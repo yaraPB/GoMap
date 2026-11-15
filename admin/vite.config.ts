@@ -12,5 +12,7 @@ export default defineConfig(({ mode }) => {
       __API_URL__: JSON.stringify(own.VITE_API_URL || 'http://localhost:4000'),
     },
     server: { port: 5173 },
+    // two pages: the admin dashboard (index.html) and the dev dashboard (dev.html)
+    build: { rollupOptions: { input: { admin: 'index.html', dev: 'dev.html' } } },
   };
 });

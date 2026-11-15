@@ -34,7 +34,8 @@ const VISITOR_SPOTS: { id: string; name: string; icon: IconName }[] = [
   { id: 'car-park-a', name: 'Parking', icon: 'car' },
 ];
 
-export default function Home({ chipsDelay }: { chipsDelay: number }) {
+/** raised: a card sits at the bottom (the first-visit welcome), so the round buttons move above it */
+export default function Home({ chipsDelay, raised = 0 }: { chipsDelay: number; raised?: number }) {
   const insets = useSafeAreaInsets();
   const { push } = usePanels();
   const map = useMap();
@@ -165,7 +166,7 @@ export default function Home({ chipsDelay }: { chipsDelay: number }) {
       <RoleWidget bottom={insets.bottom + 88} />
 
       {/* FAB stack */}
-      <View style={[styles.fabs, { bottom: insets.bottom + 96 }, guest && { bottom: insets.bottom + (upcoming[0] ? 392 : 330) }]} pointerEvents="box-none">
+      <View style={[styles.fabs, { bottom: insets.bottom + 96 + raised }, guest && { bottom: insets.bottom + (upcoming[0] ? 392 : 330) + raised }]} pointerEvents="box-none">
         {!guest && (
           <IconBtn icon="flame" label={density ? t('Hide busy paths') : t('Show busy paths now')} size={50}
             bg={density ? '#B45309' : undefined} stroke={density ? '#fff' : undefined} onPress={() => map.setLayers({ crowding: !density })} />

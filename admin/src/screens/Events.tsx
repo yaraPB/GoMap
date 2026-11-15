@@ -28,6 +28,8 @@ export default function Events() {
   const [msg, setMsg] = useState<{ tone: 'ok' | 'miss'; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const today = dayKey(new Date());
+  /** A new event starts at 18:00: after 17:00 that is already gone today, so offer tomorrow. */
+  const nextFreeDay = () => (new Date().getHours() >= 17 ? dayKey(new Date(Date.now() + 86400000)) : today);
   const days = useMemo(() => Array.from({ length: 14 }, (_, i) => { const d = new Date(Date.now() + i * 86400000); return { key: dayKey(d), d }; }), []);
   const events = (list.data ?? []).filter(e => e.state !== 'past');
   const points: MapPoint[] = events.filter(e => e.place).map(e => ({ id: e.id, coord: e.place!.coordinates, color: KIND_COLOR[e.kind] ?? '#4B5563', label: `${e.title} · ${hm(e.starts_at)}`, text: '★', size: 24 }));
@@ -40,7 +42,10 @@ export default function Events() {
       organizer: form.organizer || null, link: form.link || null, description: form.description || null };
     try {
       const e = form.id ? await api.saveEvent(form.id, body) : await api.createEvent(body);
-      setForm(fromEvent(e)); setMsg({ tone: 'ok', text: 'Saved. It is on the map and the assistant knows about it.' });
+      setForm(fromEvent(e));
+      setMsg(e.state === 'past'
+        ? { tone: 'miss', text: 'Saved, but this event has already ended, so the app does not show it. Check the day and times.' }
+        : { tone: 'ok', text: 'Saved. It is on the map and the assistant knows about it.' });
       list.reload();
     } catch (err) { setMsg({ tone: 'miss', text: (err as Error).message }); } finally { setBusy(false); }
   };
@@ -54,7 +59,7 @@ export default function Events() {
     <>
       <div className="head">
         <div><h1>Events</h1><p className="sub">{events.length} upcoming. They appear as badges on the app's map, in the visitor welcome and when students ask “what's on?”.</p></div>
-        <button className="btn primary" onClick={() => { setForm(blank(today)); setMsg(null); }}><CalendarPlus size={15} />New event</button>
+        <button className="btn primary" onClick={() => { setForm(blank(nextFreeDay())); setMsg(null); }}><CalendarPlus size={15} />New event</button>
       </div>
       <CampusMap points={points} selected={form?.id ?? null} onSelect={id => { const e = events.find(x => x.id === id); if (e) { setForm(fromEvent(e)); setMsg(null); } }}
         onMapClick={c => { if (!form) return; const near = (places.data ?? []).map(p => ({ p, d: Math.hypot(p.coordinates[0] - c[0], (p.coordinates[1] - c[1]) * 1.2) })).sort((a, b) => a.d - b.d)[0]; if (near && near.d < 0.0006) set({ place_id: near.p.id }); }} height={300} />

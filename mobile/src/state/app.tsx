@@ -3,8 +3,9 @@ import { AccessibilityInfo, Platform, View } from 'react-native';
 import { LangContext, isRTL } from '../i18n';
 import * as Location from 'expo-location';
 import NetInfo from '@react-native-community/netinfo';
-import { setApiUser } from '../api/client';
-import type { Lang, MockUser, Position } from '../api/types';
+import { api, ApiError, setApiSession, setApiUser } from '../api/client';
+import { loadSession, saveSession } from '../auth/session';
+import type { Lang, MockUser, Position, SignedInUser } from '../api/types';
 import { createHeadingFilter, distance } from '../ar/geo';
 import { CAMPUS_CENTER } from '../map/mapHtml';
 import { snapToNetwork, WalkFilter } from '../location/kalman';
@@ -24,6 +25,10 @@ type AppCtx = {
   online: boolean;
   reduceMotion: boolean;
   firstSession: boolean; finishOnboarding: () => void;
+  /** Outlook sign-in: who you really are. Null while using a demo account. */
+  signedIn: SignedInUser | null;
+  signIn: (token: string, user: SignedInUser) => Promise<void>;
+  signOut: () => Promise<void>;
 };
 const App = createContext<AppCtx | null>(null);
 
@@ -39,8 +44,29 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const sub = AccessibilityInfo.addEventListener('reduceMotionChanged', setReduceMotion);
     return () => sub.remove();
   }, []);
-  const setUser = useCallback((u: MockUser) => { setApiUser(u.id); setUserState(u); }, []);
-  const value = useMemo(() => ({ lang, setLang, user, setUser, online, reduceMotion, firstSession, finishOnboarding: () => setFirstSession(false) }), [lang, user, online, reduceMotion, firstSession, setUser]);
+  const [signedIn, setSignedIn] = useState<SignedInUser | null>(null);
+  const asUser = (u: SignedInUser): MockUser => ({ id: u.person_id ?? u.id, name: u.name, role: u.role, person_id: u.person_id, email: u.email });
+  const signIn = useCallback(async (token: string, u: SignedInUser) => {
+    await saveSession(token); setApiSession(token); setSignedIn(u); setUserState(asUser(u));
+  }, []);
+  const signOut = useCallback(async () => {
+    await saveSession(null); setApiSession(null); setSignedIn(null); setApiUser(USERS[0].id); setUserState(USERS[0]);
+  }, []);
+  // a session from last time: check it is still valid and pick up the current role
+  useEffect(() => {
+    void loadSession().then(async token => {
+      if (!token) return;
+      setApiSession(token);
+      try { const u = await api.me(); setSignedIn(u); setUserState(asUser(u)); }
+      catch (e) { if (e instanceof ApiError && e.status === 401) { await saveSession(null); setApiSession(null); } }
+    });
+  }, []);
+  /** picking a demo account ends a real sign-in (the API would keep using the session otherwise) */
+  const setUser = useCallback((u: MockUser) => {
+    if (signedIn) { void saveSession(null); setApiSession(null); setSignedIn(null); }
+    setApiUser(u.id); setUserState(u);
+  }, [signedIn]);
+  const value = useMemo(() => ({ lang, setLang, user, setUser, online, reduceMotion, firstSession, finishOnboarding: () => setFirstSession(false), signedIn, signIn, signOut }), [lang, user, online, reduceMotion, firstSession, setUser, signedIn, signIn, signOut]);
   // Arabic mirrors the whole layout from here down (Yoga 'direction' is inherited), no reload needed
   return (
     <App.Provider value={value}>

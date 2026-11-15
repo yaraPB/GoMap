@@ -5,9 +5,10 @@ export const MAPBOX_TOKEN = __MAPBOX_TOKEN__;
 
 // TODO: replace with GoCampus SSO
 const KEY = 'gomap-admin-token';
-export const getToken = () => sessionStorage.getItem(KEY) ?? '';
+/** The admin token if one was typed, else the Outlook session (shared with the dev dashboard). */
+export const getToken = () => sessionStorage.getItem(KEY) || (() => { try { return localStorage.getItem('gomap-session') ?? ''; } catch { return ''; } })();
 export const setToken = (t: string) => sessionStorage.setItem(KEY, t);
-export const clearToken = () => sessionStorage.removeItem(KEY);
+export const clearToken = () => { sessionStorage.removeItem(KEY); try { localStorage.removeItem('gomap-session'); } catch { /* private mode */ } };
 
 export class ApiError extends Error { constructor(public status: number, message: string) { super(message); } }
 

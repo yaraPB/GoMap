@@ -135,18 +135,65 @@ The basemap lacked some buildings; they are now traced from satellite imagery an
 3. It appears as a 3D building in the app with an estimated entrance; drag the green dot to the real door.
 4. Use Atlas (section 4) first, or the buildings vanish when the API restarts.
 
-## 8. Admin dashboard token
+## 8. Sign in with Outlook, and the dev dashboard
 
-`server/.env`: `ADMIN_TOKEN=a-long-random-string`; sign in with it at the admin. Local default `dev-admin-token`.
-Replaced by GoCampus SSO later.
+Everyone signs in with their AUI Microsoft (Outlook) account. GoMap never sees a password: Microsoft confirms who
+the person is, the API checks Microsoft's signature, and the role comes from the **dev dashboard**
+(`http://localhost:5173/dev.html`), where developers assign student / faculty / staff / admin / dev to emails.
 
-## 9. Running on your phone
+**Who gets which role at their first sign-in** (first match wins): a role assigned in the dev dashboard → an email in
+`DEV_EMAILS` (developer) → the faculty directory knows the email (faculty / staff, linked to their office card) → an
+allowed domain (default `aui.ma`) gives the default role (student) → anyone else is refused, with a message saying who
+to ask. Roles apply at the person's next tap; nobody has to sign out.
+
+**1. Register GoMap with Microsoft** (10 minutes; if AUI's tenant needs an IT admin, send them these steps)
+1. <https://entra.microsoft.com> → **Applications → App registrations → New registration**.
+2. Name `GoMap`. **Supported account types:** *Accounts in this organizational directory only* (AUI accounts only), or
+   *Accounts in any organizational directory* while testing from another tenant.
+3. Leave the redirect URI empty for now → **Register**.
+4. **Authentication → Add a platform → Single-page application**, add:
+   - `http://localhost:5173/` and `http://localhost:5173/dev.html` (admin and dev dashboards)
+   - `http://localhost:8081/auth` (the app's web build)
+   - later, the same paths on your real admin domain
+5. **Authentication → Add a platform → Mobile and desktop applications**, add:
+   - `gomap://auth` (dev build / store build)
+   - for Expo Go: `exp://YOUR-PC-LAN-IP:8081/--/auth` (it changes when your IP changes; a dev build avoids that)
+6. **No client secret is needed** (PKCE). Under **API permissions**, the default *Microsoft Graph → User.Read* is enough
+   (it covers `openid profile email`). If AUI requires it, an admin clicks *Grant admin consent*.
+7. From **Overview**, copy the *Application (client) ID* and the *Directory (tenant) ID*.
+
+**2. `server/.env`**
+```env
+MICROSOFT_CLIENT_ID=the-application-client-id
+MICROSOFT_TENANT=the-directory-tenant-id     # or "organizations" to accept any work/school account
+SESSION_SECRET=a-long-random-string          # node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+DEV_EMAILS=your.name@aui.ma                  # becomes developer at first sign-in
+```
+Restart the API: the log says `Sign in with Outlook: on`.
+
+**3. Give people their roles**
+1. Open `http://localhost:5173/dev.html` → **Sign in with Outlook** with the `DEV_EMAILS` account.
+2. Type an email: the page says what they would get today (e.g. "faculty, from the faculty directory"). Pick a role →
+   **Assign**. **Many at once** takes one email per line (`name@aui.ma, staff`).
+3. Faculty / staff not in the directory: **Link office card** in their row, so they can post their status.
+4. **Before launch:** untick *Demo accounts in the app*. From then on the app's demo accounts disappear and unsigned
+   visitors are just visitors.
+
+You cannot remove or demote your own account, and the last developer cannot be removed: GoMap always keeps a way in.
+`DEV_TOKEN` (optional) opens the dev dashboard before anyone has signed in; `ADMIN_TOKEN` keeps working for the admin.
+
+## 9. Admin dashboard token
+
+`server/.env`: `ADMIN_TOKEN=a-long-random-string`. It still opens the admin next to Outlook sign-in (setup, scripts).
+Local default `dev-admin-token`.
+
+## 10. Running on your phone
 
 1. Phone and computer on the **same Wi-Fi**; `EXPO_PUBLIC_API_URL=http://YOUR-PC-LAN-IP:4000` (`ipconfig` → IPv4).
 2. Windows: allow Node.js on private networks, or open TCP 4000.
 3. Only **one** API on port 4000 (`netstat -ano | findstr :4000`): an old one answers with old data.
 
-## 10. Dev build: native voice and live Soniox
+## 11. Dev build: native voice and live Soniox
 
 ```bash
 npm i -g eas-cli && eas login
@@ -157,7 +204,7 @@ npx expo start --dev-client
 ```
 Pin one voice engine with `EXPO_PUBLIC_SPEECH_ENGINE=soniox` (or `native` / `recorded`) in `mobile/.env.local`.
 
-## 11. AR: what to expect, and the upgrade path
+## 12. AR: what to expect, and the upgrade path
 
 **Now:** camera + GPS + compass + gyro fusion. Works in Expo Go, no ARCore/Unity. The screen tells you how to hold the
 phone, says "Turn around" when you face away, and dims the arrows when GPS is worse than ±15 m. If arrows drift, tap the
@@ -168,7 +215,7 @@ ViroReact (`@reactvision/react-viro`) plus either ARCore Geospatial (Google Clou
 Ifrane) or plane detection + our GPS route. It cannot run in Expo Go and needs on-campus testing; **tell me** when you
 have a dev build on a phone and I'll add it behind a switch.
 
-## 12. Checklist — send me the ticks
+## 13. Checklist — send me the ticks
 
 - [x] `GEMINI_API_KEY` set; log shows `Assistant model: gemini (gemini-3.5-flash-lite)`
 - [ ] Admin → Assistant → Tests: **Run with the AI model** score: ___ / 18 (local run: 18/18)
@@ -177,5 +224,7 @@ have a dev build on a phone and I'll add it behind a switch.
 - [x] `MONGODB_URI` set · [ ] **Atlas password from `misc.txt` rotated**
 - [x] `ADMIN_TOKEN` changed from the default
 - [x] Mapbox token in `mobile/.env.local`
+- [ ] Entra app registered; `MICROSOFT_CLIENT_ID`, `MICROSOFT_TENANT`, `SESSION_SECRET`, `DEV_EMAILS` set; log says `Sign in with Outlook: on`
+- [ ] Roles assigned in the dev dashboard; **demo accounts turned off** before launch
 - [ ] Numbers given to the new outlines in Admin → Places → Outlines (the 13 satellite traces have none yet)
 - [ ] One walk on campus with the [README checklist](README.md#6-on-campus-checklist-a-real-phone-outdoors)

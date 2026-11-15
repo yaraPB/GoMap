@@ -1,8 +1,10 @@
 import { StrictMode, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { Bot, CalendarClock, CalendarDays, ClipboardList, Flag, LayoutDashboard, LogOut, MapPinned, Signpost, Building2, Users, type LucideIcon } from 'lucide-react';
+import { Bot, Wrench, CalendarClock, CalendarDays, ClipboardList, Flag, LayoutDashboard, LogOut, MapPinned, Signpost, Building2, Users, type LucideIcon } from 'lucide-react';
 import './styles.css';
-import { api, API_URL, clearToken, getToken, setToken } from './api';
+import { api, API_URL, clearToken, setToken } from './api';
+import type { SessionUser } from './auth';
+import { SignIn } from './signin';
 import Overview from './screens/Overview';
 import Places from './screens/Places';
 import Offices from './screens/Offices';
@@ -13,7 +15,6 @@ import Issues from './screens/Issues';
 import OfficeTime from './screens/OfficeTime';
 import Assistant from './screens/Assistant';
 import Events from './screens/Events';
-import { Notice } from './ui';
 
 const SECTIONS: [string, string, LucideIcon][] = [
   ['overview', 'Overview', LayoutDashboard],
@@ -37,34 +38,22 @@ function useHash(): [Section, string | undefined, (s: string, id?: string) => vo
   return [state[0], state[1], (s, id) => { location.hash = id ? `${s}/${id}` : s; }];
 }
 
-function Login({ onIn }: { onIn: () => void }) {
-  const [token, setT] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setToken(token);
-    try { await api.overview(); onIn(); } catch (err) { clearToken(); setError((err as Error).message); }
-  };
+function Login({ onIn }: { onIn: (u: SessionUser | null) => void }) {
   return (
-    <div className="login">
-      <form className="card" onSubmit={submit}>
-        <div className="brand" style={{ padding: 0 }}><div className="logo">G</div><div><b>GoMap Admin</b><small>Al Akhawayn University</small></div></div>
-        {/* TODO: replace with GoCampus SSO */}
-        <label className="f">Admin token<input className="i" type="password" value={token} onChange={e => setT(e.target.value)} autoFocus placeholder="ADMIN_TOKEN from server/.env" /></label>
-        {error && <Notice tone="miss">{error}</Notice>}
-        <button className="btn dark" type="submit">Sign in</button>
-        <p className="sub" style={{ fontSize: 12 }}>API: {API_URL}. Local default token: <code>dev-admin-token</code>.</p>
-      </form>
-    </div>
+    <SignIn title="GoMap Admin" subtitle="Al Akhawayn University" allowed={['admin', 'dev']} onIn={onIn}
+      tokenLabel="Admin token" tokenHint={<>API: {API_URL}. The token is ADMIN_TOKEN in server/.env (local default <code>dev-admin-token</code>).</>}
+      tryToken={async t => { setToken(t); try { await api.overview(); } catch (err) { clearToken(); throw err; } }}
+      resume={async () => { if (!sessionStorage.getItem('gomap-admin-token')) return false; try { await api.overview(); return true; } catch { return false; } }} />
   );
 }
 
 function App() {
-  const [authed, setAuthed] = useState(!!getToken());
+  const [authed, setAuthed] = useState(false);
+  const [who, setWho] = useState<SessionUser | null>(null);
   const [section, id, go] = useHash();
   const [badges, setBadges] = useState<Record<string, number>>({});
   useEffect(() => { if (authed) api.overview().then(o => setBadges({ reports: o.counts.open_reports, offices: o.counts.conflicts, assistant: o.counts.unanswered })).catch(() => {}); }, [authed, section]);
-  if (!authed) return <Login onIn={() => setAuthed(true)} />;
+  if (!authed) return <Login onIn={u => { setWho(u); setAuthed(true); }} />;
   return (
     <div className="shell">
       <nav className="side" aria-label="Sections">
@@ -74,7 +63,11 @@ function App() {
             <Icon size={17} strokeWidth={2} aria-hidden />{name}{badges[sid] ? <span className="badge">{badges[sid]}</span> : null}
           </button>
         ))}
-        <div style={{ marginTop: 'auto' }}><button className="nav" onClick={() => { clearToken(); setAuthed(false); }}><LogOut size={17} aria-hidden />Sign out</button></div>
+        <div style={{ marginTop: 'auto' }}>
+          {who && <div className="whoami"><b>{who.name}</b><small>{who.email} · {who.role}</small></div>}
+          {who?.role === 'dev' && <a className="nav" href="dev.html"><Wrench size={17} aria-hidden />Dev dashboard</a>}
+          <button className="nav" onClick={() => { clearToken(); setAuthed(false); setWho(null); }}><LogOut size={17} aria-hidden />Sign out</button>
+        </div>
       </nav>
       <main className="main" key={section}>
         {section === 'overview' && <Overview go={go} />}

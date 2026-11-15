@@ -225,7 +225,8 @@ export default function ARGuidance() {
 
       {/* the big arrow at your feet: always visible, always points the way to go */}
       {camera?.granted && guideRel != null && !arrived && !wrongWay && (
-        <View pointerEvents="none" style={[styles.guide, { bottom: insets.bottom + (mapOpen ? 300 : 120) }]}>
+        <View pointerEvents="none" accessible accessibilityRole="image" style={[styles.guide, { bottom: insets.bottom + (mapOpen ? 300 : 120) }]}
+          accessibilityLabel={Math.abs(guideRel) < 10 ? t('Way to go: straight ahead') : t(guideRel > 0 ? 'Way to go: {n}° to the right' : 'Way to go: {n}° to the left', { n: Math.round(Math.abs(guideRel)) })}>
           <View style={{ transform: [{ perspective: 700 }, { rotateX: '58deg' }, { rotateZ: `${Math.max(-150, Math.min(150, guideRel))}deg` }] }}>
             <GuideArrow dim={gpsLost} />
           </View>

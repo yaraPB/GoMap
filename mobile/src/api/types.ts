@@ -84,4 +84,8 @@ export type WalkwayCollection = { type: 'FeatureCollection'; attribution: string
 export type CrowdingCollection = { type: 'FeatureCollection'; weekday: number; hour: number; basis: string; features: { type: 'Feature'; geometry: { type: 'LineString'; coordinates: Position[] }; properties: { id: string; load: number; delay_s: number; level: 'low' | 'medium' | 'high' } }[] };
 export type Closure = { id: string; cluster_id: string; kind: string; coordinates: Position; place_id: string | null; reason: string; from: string; until: string | null; radius_m: number };
 export type ReportKind = 'closed' | 'broken' | 'info' | 'hazard' | 'light' | 'access';
-export type MockUser = { id: string; name: string; role: 'student' | 'faculty' | 'staff' | 'admin' | 'guest'; person_id?: string | null; description?: string | null };
+export type MockUser = { id: string; name: string; role: 'student' | 'faculty' | 'staff' | 'admin' | 'dev' | 'guest'; person_id?: string | null; description?: string | null;
+  /** set when this is a real Outlook sign-in, not a demo account */
+  email?: string };
+export type SignedInUser = { id: string; email: string; name: string; role: 'student' | 'faculty' | 'staff' | 'admin' | 'dev'; person_id: string | null };
+export type AuthConfig = { microsoft: { client_id: string; tenant: string; authority: string } | null; demo_accounts: boolean };

@@ -15,7 +15,7 @@ export function wrappedStrings(): string[] {
   const keys = new Set<string>();
   const re = /\bt\(\s*(['"])((?:\\.|(?!\1).)*)\1/g;
   // labels kept in tables and passed to t() through a variable: { name: 'Dining' }, title: 'Weekend'
-  const tableRe = /\b(?:name|label|title|sub|short|blurb|line|body)\s*:\s*'([A-Z{][^']*)'/g;
+  const tableRe = /\b(?:name|label|title|sub|short|blurb|line|body)\s*:\s*'([A-Z0-9{][^']*)'/g;
   const uiFile = (f: string) => /panels|faculty-status|[\\/]ar\.tsx|StickyNote|theme\.ts/.test(f);
   for (const f of files) {
     const src = readFileSync(f, 'utf8');

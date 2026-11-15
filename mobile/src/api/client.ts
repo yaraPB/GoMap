@@ -1,5 +1,5 @@
 import { Platform } from 'react-native';
-import type { CampusEvent, Answer, CampusInfo, Service, SttSession, Closure, CrowdingCollection, Lang, MockUser, OfficeList, Person, PlaceDetail, PlaceLite, Position, Procedure, ReportKind, Route, RouteMode, WalkwayCollection } from './types';
+import type { AuthConfig, SignedInUser, CampusEvent, Answer, CampusInfo, Service, SttSession, Closure, CrowdingCollection, Lang, MockUser, OfficeList, Person, PlaceDetail, PlaceLite, Position, Procedure, ReportKind, Route, RouteMode, WalkwayCollection } from './types';
 
 const local = Platform.OS === 'android' ? 'http://10.0.2.2:4000' : 'http://localhost:4000';
 export const API_URL = (process.env.EXPO_PUBLIC_API_URL || local).replace(/\/$/, '');
@@ -7,6 +7,9 @@ export const API_URL = (process.env.EXPO_PUBLIC_API_URL || local).replace(/\/$/,
 /** The mock account in use (no SSO yet). Sent on every request. TODO: replace with GoCampus SSO */
 let currentUser = 'demo-student';
 export const setApiUser = (id: string) => { currentUser = id; };
+/** Outlook sign-in session: when set, it is who you are (the demo account header is ignored by the API). */
+let session: string | null = null;
+export const setApiSession = (token: string | null) => { session = token; };
 
 export class ApiError extends Error {
   constructor(public status: number, message: string) { super(message); }
@@ -15,7 +18,7 @@ export class ApiError extends Error {
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   let response: Response;
   try {
-    response = await fetch(`${API_URL}${path}`, { ...init, headers: { 'x-gomap-user': currentUser, ...(init.body && !(init.body instanceof FormData) ? { 'content-type': 'application/json' } : {}), ...init.headers } });
+    response = await fetch(`${API_URL}${path}`, { ...init, headers: { 'x-gomap-user': currentUser, ...(session ? { authorization: `Bearer ${session}` } : {}), ...(init.body && !(init.body instanceof FormData) ? { 'content-type': 'application/json' } : {}), ...init.headers } });
   } catch {
     throw new ApiError(0, 'offline');
   }
@@ -75,5 +78,8 @@ export const api = {
   service: (id: string) => request<Service>(`/api/services/${encodeURIComponent(id)}`),
   campus: () => request<CampusInfo>('/api/campus'),
   version: () => request<{ version: number }>('/api/version'),
+  authConfig: () => request<AuthConfig>('/api/auth/config'),
+  signInMicrosoft: (idToken: string) => request<{ token: string; user: SignedInUser }>('/api/auth/microsoft', { method: 'POST', body: JSON.stringify({ id_token: idToken }) }),
+  me: () => request<SignedInUser>('/api/auth/me'),
   sttSession: () => request<SttSession>('/api/assistant/stt-session', { method: 'POST' }),
 };

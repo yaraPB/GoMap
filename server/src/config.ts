@@ -2,6 +2,9 @@ import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadEnvFile } from 'node:process';
+import { randomBytes } from 'node:crypto';
+
+let generatedSecret: string | undefined;
 
 const here = dirname(fileURLToPath(import.meta.url));
 export const SERVER_DIR = resolve(here, '..');
@@ -40,5 +43,17 @@ export const config = {
   get sonioxRtModel() { return process.env.SONIOX_RT_MODEL || 'stt-rt-v6'; },
   // TODO: replace with GoCampus SSO
   get adminToken() { return process.env.ADMIN_TOKEN || 'dev-admin-token'; },
+  // Sign in with Outlook (Microsoft Entra ID). Empty client id = sign-in off, demo accounts only.
+  get microsoftClientId() { return process.env.MICROSOFT_CLIENT_ID || ''; },
+  /** organizations = any work/school account; set AUI's tenant id to accept only @aui.ma accounts */
+  get microsoftTenant() { return process.env.MICROSOFT_TENANT || 'organizations'; },
+  get microsoftAuthority() { return (process.env.MICROSOFT_AUTHORITY || 'https://login.microsoftonline.com').replace(/\/$/, ''); },
+  /** Signs GoMap sessions. Without it a random one is made at start (everyone signs in again after a restart). */
+  get sessionSecret() { return process.env.SESSION_SECRET || (generatedSecret ??= randomBytes(32).toString('hex')); },
+  get sessionSecretIsGenerated() { return !process.env.SESSION_SECRET; },
+  /** Emails that become dev on first sign-in, so someone can open the dev dashboard. */
+  get devEmails() { return (process.env.DEV_EMAILS || '').split(',').map(e => e.trim().toLowerCase()).filter(Boolean); },
+  /** Optional token for the dev dashboard (like ADMIN_TOKEN), for setup before anyone has signed in. */
+  get devToken() { return process.env.DEV_TOKEN || ''; },
   get timezone() { return process.env.CAMPUS_TZ || 'Africa/Casablanca'; },
 };

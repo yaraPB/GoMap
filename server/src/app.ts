@@ -20,9 +20,11 @@ import * as turf from '@turf/turf';
 import { loadGeo } from './seed/seed.js';
 import { AUDIENCES, EVENT_KINDS, Events, type PlaceRef } from './services/events.js';
 import { newId, ruleView, runTest, testView, type RuleRow, type TestRow } from './services/assistantAdmin.js';
+import { AuthError, signSession, verifyMicrosoftIdToken, verifySession, type MicrosoftConfig } from './auth/tokens.js';
+import { migrateUsers, publicUser, ROLE_INFO, ROLES, Users, type Role, type UserRow } from './auth/users.js';
 import type { CampusHours } from './seed/services.js';
 
-export type AppContext = { db: Sql; campus: Campus; assistant: Assistant; uploadsDir?: string };
+export type AppContext = { db: Sql; campus: Campus; assistant: Assistant; uploadsDir?: string; fetchImpl?: typeof fetch };
 
 /** Fallback when the accounts table is empty. Real list: SQLite `accounts`. TODO: replace with GoCampus SSO */
 export const MOCK_USERS = [
@@ -31,7 +33,7 @@ export const MOCK_USERS = [
   { id: 'demo-staff', name: 'Staff', role: 'staff' },
   { id: 'guest', name: 'Visitor', role: 'guest' },
 ] as const;
-type Account = { id: string; name: string; role: string; person_id?: string | null; description?: string | null };
+type Account = { id: string; name: string; role: string; person_id?: string | null; description?: string | null; email?: string };
 
 const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
 
@@ -75,6 +77,8 @@ export function createApp(ctx: AppContext) {
   const directory = new Directory(db);
   const offices = new Offices(db);
   const events = new Events(db);
+  migrateUsers(db);
+  const users = new Users(db, () => config.devEmails);
   // Bumped on every edit; the app polls /api/version and refetches when it moves.
   let version = Date.now();
   const bump = () => { version = Math.max(Date.now(), version + 1); };
@@ -94,7 +98,20 @@ export function createApp(ctx: AppContext) {
     const rows = db.prepare('SELECT id, name, role, person_id, description FROM accounts ORDER BY sort, name').all() as Account[];
     return rows.length ? rows : [...MOCK_USERS];
   };
-  const userOf = (req: Request) => { const list = accounts(); return list.find(u => u.id === req.header('x-gomap-user')) ?? list[0]; };
+  /** The signed-in person (Outlook sign-in), from the session token. Their role comes from the database on every request. */
+  const sessionUser = (req: Request): UserRow | null => {
+    const h = req.header('authorization');
+    if (!h?.startsWith('Bearer ') || h === `Bearer ${config.adminToken}` || (config.devToken && h === `Bearer ${config.devToken}`)) return null;
+    try { return users.byId(verifySession(h.slice(7), config.sessionSecret).sub) ?? null; } catch { return null; }
+  };
+  /** Who is asking: the signed-in user, else a demo account (while demo accounts are on), else a visitor. */
+  const userOf = (req: Request): Account => {
+    const u = sessionUser(req);
+    if (u) return { id: u.person_id ?? u.id, name: u.name ?? u.email, role: u.role, person_id: u.person_id, email: u.email };
+    const list = accounts();
+    if (!users.settings().demo_accounts) return list.find(a => a.role === 'guest') ?? { id: 'guest', name: 'Visitor', role: 'guest' };
+    return list.find(a => a.id === req.header('x-gomap-user')) ?? list[0];
+  };
   const changeLog = (entity: string, id: string, action: string, detail: unknown, actor: string) => {
     db.prepare('INSERT INTO change_log (id, entity, entity_id, action, detail, actor, created_at) VALUES (?,?,?,?,?,?,?)')
       .run(randomUUID(), entity, id, action, detail == null ? null : JSON.stringify(detail), actor, now());
@@ -111,8 +128,39 @@ export function createApp(ctx: AppContext) {
 
   app.get('/api/health', (_req, res) => { res.json({ ok: true }); });
   app.get('/api/mock-users', (_req, res) => { res.json(accounts()); });
-  app.get('/api/accounts', (_req, res) => { res.json(accounts()); });
+  app.get('/api/accounts', (_req, res) => { res.json(users.settings().demo_accounts ? accounts() : []); });
   app.get('/api/version', (_req, res) => { res.set('Cache-Control', 'no-store'); res.json({ version }); });
+
+  // ── sign in with Outlook ──────────────────────────────────────────────────
+
+  const microsoft = (): MicrosoftConfig | null => (config.microsoftClientId
+    ? { clientId: config.microsoftClientId, tenant: config.microsoftTenant, authority: config.microsoftAuthority, fetchImpl: ctx.fetchImpl } : null);
+
+  /** What the apps need to start a Microsoft sign-in (all public values). */
+  app.get('/api/auth/config', (_req, res) => {
+    const m = microsoft();
+    res.json({ microsoft: m ? { client_id: m.clientId, tenant: m.tenant, authority: m.authority } : null, demo_accounts: users.settings().demo_accounts });
+  });
+
+  /** The app hands over Microsoft's ID token; we check it with Microsoft's keys and open a GoMap session. */
+  app.post('/api/auth/microsoft', wrap(async (req, res) => {
+    const m = microsoft();
+    if (!m) throw new HttpError(404, 'Sign-in with Outlook is not configured on the server (MICROSOFT_CLIENT_ID).');
+    const idToken = str(req.body?.id_token, 20000);
+    if (!idToken) throw bad('id_token is required');
+    let identity;
+    try { identity = await verifyMicrosoftIdToken(idToken, m); } catch (e) { throw new HttpError(401, e instanceof AuthError ? e.message : 'Could not verify the Microsoft sign-in.'); }
+    let u;
+    try { u = users.signIn(identity); } catch (e) { throw new HttpError(403, (e as Error).message); }
+    changeLog('user', u.id, 'sign-in', { email: u.email, role: u.role, source: u.source }, u.email);
+    res.json({ token: signSession({ sub: u.id, email: u.email }, config.sessionSecret), user: publicUser(u) });
+  }));
+
+  app.get('/api/auth/me', (req, res) => {
+    const u = sessionUser(req);
+    if (!u) throw new HttpError(401, 'Not signed in');
+    res.json(publicUser(u));
+  });
 
   app.get('/api/campus', (_req, res) => {
     const c = offices.campus();
@@ -211,7 +259,9 @@ export function createApp(ctx: AppContext) {
     const user = userOf(req);
     const id = String(req.params.id);
     // A faculty member sets their own status; the admin can set anyone's.
-    if (!(req.header('authorization') === `Bearer ${config.adminToken}` || (user.role === 'faculty' && user.id === id))) throw new HttpError(403, 'Only this faculty member or an authenticated admin can set their status.');
+    const isAdmin = req.header('authorization') === `Bearer ${config.adminToken}` || ['admin', 'dev'].includes(sessionUser(req)?.role ?? '');
+    const isSelf = (user.role === 'faculty' || user.role === 'staff') && (user.person_id ?? user.id) === id;
+    if (!(isAdmin || isSelf)) throw new HttpError(403, 'Only this faculty member or an authenticated admin can set their status.');
     if (!directory.row(id)) throw new HttpError(404, 'Person not found');
     const status = req.body?.status;
     if (!['in', 'busy', 'out', 'clear', 'keep'].includes(status)) throw bad('status must be in, busy, out, clear or keep');
@@ -397,7 +447,11 @@ export function createApp(ctx: AppContext) {
   const admin = express.Router();
   admin.use((req, _res, next) => {
     // TODO: replace with GoCampus SSO
-    if (req.header('authorization') !== `Bearer ${config.adminToken}`) { next(new HttpError(401, 'Admin token required')); return; }
+    // the admin token, or a signed-in admin / developer
+    if (req.header('authorization') === `Bearer ${config.adminToken}`) { next(); return; }
+    const u = sessionUser(req);
+    if (u && (u.role === 'admin' || u.role === 'dev')) { next(); return; }
+    next(new HttpError(u ? 403 : 401, u ? 'Your account is not an admin. Ask the GoMap team to give you the admin role.' : 'Admin token required')); return;
     next();
   });
 
@@ -950,6 +1004,94 @@ export function createApp(ctx: AppContext) {
   admin.get('/graph', (_req, res) => { res.type('text/plain').send(campus.report()); });
 
   app.use('/api/admin', admin);
+
+  // ── dev dashboard (who gets which role) ───────────────────────────────────
+
+  const dev = express.Router();
+  dev.use((req, _res, next) => {
+    const auth = req.header('authorization');
+    if (config.devToken && auth === `Bearer ${config.devToken}`) { (req as Request & { actor?: string }).actor = 'dev-token'; next(); return; }
+    const u = sessionUser(req);
+    if (u?.role === 'dev') { (req as Request & { actor?: string }).actor = u.email; next(); return; }
+    next(new HttpError(u ? 403 : 401, u ? 'Only developers can open the dev dashboard.' : 'Sign in with a developer account.'));
+  });
+  const actor = (req: Request) => (req as Request & { actor?: string }).actor ?? 'dev';
+  const devCount = () => users.list().filter(u => u.role === 'dev').length;
+  /** Never leave GoMap without a way into this dashboard. */
+  const keepADev = (leaving: { role: string } | undefined) => {
+    if (leaving?.role === 'dev' && devCount() <= 1 && !config.devToken && !config.devEmails.length) {
+      throw bad('This is the last developer account. Add another developer first (or set DEV_EMAILS / DEV_TOKEN in server/.env).');
+    }
+  };
+  const userView = (u: UserRow) => ({ ...u, person: u.person_id ? (db.prepare('SELECT id, name, department FROM people WHERE id = ?').get(u.person_id) ?? null) : null });
+
+  dev.get('/users', (_req, res) => { res.json({ users: users.list().map(userView), roles: ROLES.map(r => ({ id: r, can: ROLE_INFO[r] })), settings: users.settings() }); });
+  dev.post('/users', (req, res) => {
+    const email = str(req.body?.email, 200);
+    if (!email) throw bad('email is required');
+    let u;
+    try { u = users.assign(email, req.body?.role, actor(req), { person_id: req.body?.person_id, note: str(req.body?.note, 300) ?? null, name: str(req.body?.name, 120) ?? null }); } catch (e) { throw bad((e as Error).message); }
+    changeLog('user', u.id, 'assign', { email: u.email, role: u.role, person_id: u.person_id }, actor(req));
+    res.status(201).json(userView(u));
+  });
+  /** Many emails at once: one per line, "email" or "email, role". */
+  dev.post('/users/bulk', (req, res) => {
+    const text = String(req.body?.text ?? '');
+    const fallback = req.body?.role as Role;
+    const done: string[] = [], failed: { line: string; error: string }[] = [];
+    for (const line of text.split(/\r?\n|;/).map(l => l.trim()).filter(Boolean)) {
+      const [email, role] = line.split(/[,\t ]+/);
+      try { const u = users.assign(email, ((role || fallback) as Role), actor(req)); done.push(u.email); } catch (e) { failed.push({ line, error: (e as Error).message }); }
+    }
+    if (done.length) changeLog('user', 'bulk', 'assign', { count: done.length }, actor(req));
+    res.json({ assigned: done.length, emails: done, failed });
+  });
+  /** Nobody removes or demotes their own account: their session would break mid-click. */
+  const notSelf = (req: Request, u: UserRow, what: string) => { if (actor(req) === u.email) throw bad(`You cannot ${what} your own account. Ask another developer.`); };
+  dev.put('/users/:id', (req, res) => {
+    const u = users.byId(String(req.params.id));
+    if (!u) throw new HttpError(404, 'User not found');
+    if (req.body?.role && req.body.role !== 'dev') { if (u.role === 'dev') notSelf(req, u, 'demote'); keepADev(u); }
+    let next;
+    try { next = users.assign(u.email, req.body?.role ?? u.role, actor(req), { person_id: req.body?.person_id !== undefined ? req.body.person_id : u.person_id, note: req.body?.note !== undefined ? str(req.body.note, 300) ?? '' : null }); } catch (e) { throw bad((e as Error).message); }
+    changeLog('user', u.id, 'update', { email: u.email, from: u.role, to: next.role }, actor(req));
+    res.json(userView(next));
+  });
+  dev.delete('/users/:id', (req, res) => {
+    const u = users.byId(String(req.params.id));
+    if (!u) throw new HttpError(404, 'User not found');
+    notSelf(req, u, 'remove');
+    keepADev(u);
+    users.remove(u.id);
+    changeLog('user', u.id, 'delete', { email: u.email, role: u.role }, actor(req));
+    res.json({ ok: true, removed: u.email });
+  });
+  /** "What would this person get if they signed in now?" */
+  dev.get('/check', (req, res) => {
+    const email = str(req.query.email, 200);
+    if (!email) throw bad('email is required');
+    res.json(users.resolve(email));
+  });
+  dev.get('/settings', (_req, res) => { res.json(users.settings()); });
+  dev.put('/settings', (req, res) => {
+    const b = req.body ?? {};
+    if (b.default_role !== undefined && !ROLES.includes(b.default_role)) throw bad('unknown role');
+    if (b.default_role === 'admin' || b.default_role === 'dev') throw bad('the default role cannot be admin or dev');
+    const s = users.saveSettings({ ...(Array.isArray(b.allowed_domains) ? { allowed_domains: strList(b.allowed_domains, 120) } : {}),
+      ...(b.default_role ? { default_role: b.default_role } : {}), ...(typeof b.demo_accounts === 'boolean' ? { demo_accounts: b.demo_accounts } : {}) });
+    changeLog('auth', 'settings', 'update', s, actor(req));
+    res.json(s);
+  });
+  /** Link a faculty/staff account to their office card. */
+  dev.get('/people', (req, res) => {
+    const q = `%${(str(req.query.q, 80) ?? '').toLowerCase()}%`;
+    res.json(db.prepare('SELECT id, name, email, role, department FROM people WHERE lower(name) LIKE ? OR lower(coalesce(email, \'\')) LIKE ? ORDER BY name LIMIT 20').all(q, q));
+  });
+  dev.get('/activity', (_req, res) => {
+    res.json((db.prepare("SELECT * FROM change_log WHERE entity IN ('user', 'auth') ORDER BY created_at DESC LIMIT 100").all() as Record<string, string>[]).map(c => ({ ...c, detail: json.parse(c.detail, null) })));
+  });
+  app.use('/api/dev', dev);
+
 
   app.use((_req, res) => { res.status(404).json({ error: 'Not found' }); });
   app.use((error: Error & { status?: number; type?: string }, _req: Request, res: Response, _next: NextFunction) => {

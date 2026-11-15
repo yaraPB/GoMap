@@ -143,7 +143,7 @@ export default function MapShell() {
     <View style={{ flex: 1, backgroundColor: color.map }}>
       <CampusMap flyIn={!reduceMotion} />
       <MapSync />
-      {showHome && !launching && top.name !== 'help' && <Home chipsDelay={0} />}
+      {showHome && !launching && top.name !== 'help' && <Home chipsDelay={0} raised={offer && firstSession && top.name === 'home' ? 200 : 0} />}
       <Panels />
       {map.error && (
         <View style={[styles.error, { top: insets.top + 70 }]}>

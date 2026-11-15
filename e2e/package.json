@@ -1,0 +1,13 @@
+{
+  "name": "gomap-e2e",
+  "private": true,
+  "type": "module",
+  "description": "End-to-end tests: the real API, admin, dev dashboard and app in a real browser, with a fake Microsoft sign-in.",
+  "scripts": {
+    "test": "node run.mjs",
+    "fake-microsoft": "node fake-microsoft.mjs"
+  },
+  "dependencies": {
+    "playwright-core": "1.49.1"
+  }
+}

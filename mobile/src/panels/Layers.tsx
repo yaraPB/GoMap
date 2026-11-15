@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pressable, ScrollView, Switch, View } from 'react-native';
+import { Platform, Pressable, ScrollView, Switch, View } from 'react-native';
 import { router } from 'expo-router';
 import { useT } from '../i18n';
 import { useMap, type MapSkin, type MapStyle } from '../map/MapContext';
@@ -79,7 +79,8 @@ export default function Layers() {
             <View key={tg.key} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: color.hairline }}>
               <Icon name={tg.icon} size={20} stroke={color.ink2} />
               <View style={{ flex: 1 }}><T weight="semibold" style={{ fontSize: 15 }}>{t(tg.label)}</T><T style={{ fontSize: 12.5, color: color.muted }}>{tg.key === 'threeD' && map.style === 'satellite' ? t('Off on satellite: the photo already shows the roofs') : t(tg.sub)}</T></View>
-              <Switch accessibilityLabel={t(tg.label)} disabled={tg.key === 'threeD' && map.style === 'satellite'} value={tg.key === 'threeD' && map.style === 'satellite' ? false : map.layers[tg.key]} onValueChange={v => map.setLayers({ [tg.key]: v })} trackColor={{ true: color.blue, false: '#D5D7D2' }} />
+              {/* react-native-web draws switches broken in right-to-left: keep them left-to-right there */}
+              <View style={Platform.OS === 'web' ? { direction: 'ltr' } : undefined}><Switch accessibilityLabel={t(tg.label)} disabled={tg.key === 'threeD' && map.style === 'satellite'} value={tg.key === 'threeD' && map.style === 'satellite' ? false : map.layers[tg.key]} onValueChange={v => map.setLayers({ [tg.key]: v })} trackColor={{ true: color.blue, false: '#D5D7D2' }} /></View>
             </View>
           ))}
           <Pressable accessibilityRole="button" onPress={() => { pop(); push({ name: 'crowding' }); }} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: color.hairline }}>
