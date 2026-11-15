@@ -5,7 +5,7 @@
 import Fuse from 'fuse.js';
 
 export type Lang = 'en' | 'fr' | 'ar';
-export type Intent = 'place' | 'person' | 'procedure' | 'service' | 'issue' | 'help';
+export type Intent = 'place' | 'person' | 'procedure' | 'service' | 'issue' | 'rule' | 'help';
 export type Match = { intent: Intent; id: string; score: number; mode: 'walk' | 'step_free' | 'ar' | null };
 
 const NUMBER_WORDS: Record<string, string> = {
@@ -32,7 +32,7 @@ const FILLER = new Set(['take', 'me', 'to', 'the', 'a', 'an', 'where', 'is', 'ar
 
 const CUES = {
   procedure: /\b(how (do|can) i|how to|declare|form|sign|signature|apply|register|request|procedure|comment (faire|declarer)|demande|internship|stage|minor)\b/,
-  person: /\b(professor|prof|dr|doctor|office hours|is .+ in|his office|her office|their office|bureau|professeur)\b|أستاذ|دكتور/,
+  person: /\b(professor|prof|dr|doctor|office hours|is .+ in|his office|her office|their office|s office|bureau|professeur)\b|أستاذ|دكتور/,
   place: /\b(where|take me|directions?|navigate|go to|get to|guide me|walk|way to|ou est|emmene|aller)\b|وين|أين|خذني|فين/,
   issue: /\b(i (have|need|lost|want|feel|am|can t)|my|problem|issue|who (do|should) i (see|ask|talk to)|where (do|should|can) i (go|ask|pay))\b|j ai|probleme|مشكلة/,
   help: /\b(how (do|does) (i )?use (this|the|gomap)|what can you do|help me use|tutorial|walkthrough|how does this (app|map) work|aide)\b/,
@@ -57,7 +57,9 @@ export class IntentRouter {
   private serviceDocs: Doc[];
   private issues: Fuse<Doc>;
   private issueDocs: Doc[];
-  constructor(places: Doc[], people: Doc[], procedures: Doc[], services: Doc[] = [], issues: Doc[] = []) {
+  private rules: Fuse<Doc>;
+  private ruleDocs: Doc[];
+  constructor(places: Doc[], people: Doc[], procedures: Doc[], services: Doc[] = [], issues: Doc[] = [], rules: Doc[] = []) {
     const opts = { keys: ['keys'], includeScore: true, includeMatches: true, ignoreLocation: true, threshold: 0.34, minMatchCharLength: 2 };
     // keys get the same treatment as questions: normalised, filler words dropped ('park my car' → 'park car')
     const prep = (docs: Doc[]) => docs.map(d => ({ ...d, keys: [...new Set(d.keys.map(normalise).flatMap(k => [k, stripFiller(k)]).filter(Boolean))] }));
@@ -69,6 +71,8 @@ export class IntentRouter {
     this.services = new Fuse(this.serviceDocs, { ...opts, threshold: 0.3 });
     this.issueDocs = prep(issues);
     this.issues = new Fuse(this.issueDocs, { ...opts, threshold: 0.32 });
+    this.ruleDocs = prep(rules);
+    this.rules = new Fuse(this.ruleDocs, { ...opts, threshold: 0.3 });
   }
 
   /** A known multi-word phrase anywhere in the sentence ("i lost my", "feel sick") counts as exact. */
@@ -80,7 +84,7 @@ export class IntentRouter {
   }
 
   private best(fuse: Fuse<Doc>, windows: string[], exactBonus: (doc: Doc, w: string) => boolean) {
-    let best: { id: string; score: number } | null = null;
+    let best: { id: string; score: number; w: string; exact: boolean } | null = null;
     for (const w of windows) {
       for (const r of fuse.search(w, { limit: 3 })) {
         let score = r.score ?? 1;
@@ -89,13 +93,17 @@ export class IntentRouter {
           // "eat" sits inside "amphitheatre": a window covering little of the matched name is weak
           const key = r.matches?.[0]?.value ?? '';
           const ratio = key ? w.length / key.length : 1;
+          // "car" inside "career": part of a word is not evidence, a whole word is
+          if (key && key.includes(w) && !(" " + key + " ").includes(" " + w + " ")) score += 0.3;
+          // "world" ≈ "password": a typo keeps its first letter, so a hit whose words all start differently is noise
+          if (key && !key.split(" ").some(kw => kw[0] === w[0])) score += 0.25;
           if (ratio < 0.5) score += (0.5 - ratio) * 1.2;
           // one word matching part of a two-word name ('campus' ≈ 'campus police') is weak evidence
           const keyWords = key.split(' ').length, winWords = w.split(' ').length;
           if (keyWords > winWords) score += 0.12 * (keyWords - winWords);
           if (w.length < 3) score += 0.25;
         }
-        if (!best || score < best.score) best = { id: r.item.id, score };
+        if (!best || score < best.score) best = { id: r.item.id, score, w, exact: exactBonus(r.item, w) };
       }
     }
     return best;
@@ -125,14 +133,21 @@ export class IntentRouter {
     const proc = procExact ? { id: procExact.id, score: 0.001 } : this.best(this.procedures, list, () => false);
     const service = this.phrase(this.serviceDocs, t) ?? this.best(this.services, list, exact);
     const issue = this.phrase(this.issueDocs, t) ?? this.best(this.issues, list, exact);
+    // the admin's hand-written answers: a trigger phrase inside the sentence counts as exact
+    const ruleHit = this.ruleDocs.find(d => d.keys.some(k => k.length > 3 && ` ${t} `.includes(` ${k} `)));
+    const rule = ruleHit ? { id: ruleHit.id, score: 0 } : this.best(this.rules, list, exact);
 
     const cands: Match[] = [];
     if (place) cands.push({ intent: 'place', id: place.id, score: place.score + 0.0006 - (CUES.place.test(t) ? 0.08 : 0), mode });
-    if (person) cands.push({ intent: 'person', id: person.id, score: person.score + 0.0008 - (CUES.person.test(t) ? 0.1 : 0), mode });
+    // a full name said exactly ("harit satt") is far stronger evidence than any one-word fuzzy hit
+    const fullName = !!person?.exact && person.w.includes(' ');
+    if (person) cands.push({ intent: 'person', id: person.id, score: person.score + 0.0008 - (CUES.person.test(t) ? 0.1 : 0) - (fullName ? 0.12 : 0), mode });
     if (proc) cands.push({ intent: 'procedure', id: proc.id, score: proc.score - (CUES.procedure.test(t) ? 0.15 : 0), mode });
     // an office is a place you go to, and its card says more than the building's: it wins ties
     if (service) cands.push({ intent: 'service', id: service.id, score: service.score + 0.0002 - (CUES.place.test(t) ? 0.08 : 0), mode });
     if (issue) cands.push({ intent: 'issue', id: issue.id, score: issue.score + 0.0004 - (CUES.issue.test(t) ? 0.06 : 0), mode });
+    // admin rules win ties: they were written for exactly this question
+    if (rule) cands.push({ intent: 'rule', id: rule.id, score: rule.score - 0.2, mode });
     // exact hits score ~0; fuzzy ones must be strong, or we would rather ask Gemini than guess
     return cands.filter(c => c.score < 0.15 && (!wanted || c.intent === wanted)).sort((a, b) => a.score - b.score);
   }

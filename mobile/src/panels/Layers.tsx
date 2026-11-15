@@ -10,12 +10,11 @@ import { color, type IconName } from '../ui/theme';
 import { ROLE_LOOK } from './Views';
 
 const STYLES: { id: MapStyle; name: string; swatch: string[]; icon: IconName }[] = [
-  { id: 'default', name: 'Default', swatch: ['#E9E5DA', '#CFE3C4'], icon: 'map' },
+  { id: 'default', name: 'Map', swatch: ['#3E4C44', '#2B3150'], icon: 'map' },
   { id: 'satellite', name: 'Satellite', swatch: ['#3E4C44', '#6B7B5E'], icon: 'satellite' },
-  { id: 'contrast', name: 'High contrast', swatch: ['#FFFFFF', '#15171A'], icon: 'contrast' },
 ];
 const SKINS: { id: MapSkin; name: string; sub: string; colors: string[]; icon: IconName }[] = [
-  { id: 'auto', name: 'Auto', sub: 'Follows the time on campus', colors: ['#CFE3F7', '#F6B26B', '#1B2433'], icon: 'clock' },
+  { id: 'campus', name: 'GoCampus', sub: 'The GoCampus look, following the campus clock', colors: ['#3E4C44', '#5B5068', '#2B3150'], icon: 'clock' },
   { id: 'day', name: 'Day', sub: 'Bright', colors: ['#EAF2FA', '#CFE3C4'], icon: 'sun' },
   { id: 'evening', name: 'Evening', sub: 'Golden hour', colors: ['#F9C78B', '#D9773F'], icon: 'sunset' },
   { id: 'night', name: 'Dark', sub: 'Lights on in open buildings', colors: ['#1B2433', '#3B4A66'], icon: 'moon' },
@@ -57,12 +56,12 @@ export default function Layers() {
         </View>
 
         <View>
-          <Label style={{ marginBottom: 8 }}>{t('Time of day')}</Label>
+          <Label style={{ marginBottom: 8 }}>{t('Scene')}</Label>
           <View style={{ flexDirection: 'row', gap: 8 }}>
             {SKINS.map(s => {
               const on = map.skin === s.id;
               return (
-                <Pressable key={s.id} accessibilityRole="radio" accessibilityState={{ selected: on }} accessibilityHint={t(s.sub)} onPress={() => map.setSkin(s.id)} style={{ flex: 1, gap: 6 }}>
+                <Pressable key={s.id} accessibilityRole="radio" accessibilityState={{ selected: on, disabled: map.style === 'satellite' }} accessibilityHint={t(s.sub)} onPress={() => map.setSkin(s.id)} style={{ flex: 1, gap: 6, opacity: map.style === 'satellite' ? 0.45 : 1 }}>
                   <View style={{ height: 52, borderRadius: 12, overflow: 'hidden', borderWidth: on ? 3 : 1, borderColor: on ? color.blue : color.line, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
                     {s.colors.map(c => <View key={c} style={{ flex: 1, alignSelf: 'stretch', backgroundColor: c }} />)}
                     <View style={{ position: 'absolute' }}><Icon name={s.icon} size={18} stroke={s.id === 'night' ? '#FFE2A8' : '#15171A'} /></View>
@@ -72,15 +71,15 @@ export default function Layers() {
               );
             })}
           </View>
-          <T style={{ fontSize: 12, color: color.muted, marginTop: 6 }}>{t(SKINS.find(s => s.id === map.skin)?.sub ?? '')}</T>
+          <T style={{ fontSize: 12, color: color.muted, marginTop: 6 }}>{map.style === 'satellite' ? t('Satellite photos are always shown in daylight.') : t(SKINS.find(s => s.id === map.skin)?.sub ?? '')}</T>
         </View>
 
         <View>
           {toggles.map(tg => (
             <View key={tg.key} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: color.hairline }}>
               <Icon name={tg.icon} size={20} stroke={color.ink2} />
-              <View style={{ flex: 1 }}><T weight="semibold" style={{ fontSize: 15 }}>{t(tg.label)}</T><T style={{ fontSize: 12.5, color: color.muted }}>{t(tg.sub)}</T></View>
-              <Switch accessibilityLabel={t(tg.label)} value={map.layers[tg.key]} onValueChange={v => map.setLayers({ [tg.key]: v })} trackColor={{ true: color.blue, false: '#D5D7D2' }} />
+              <View style={{ flex: 1 }}><T weight="semibold" style={{ fontSize: 15 }}>{t(tg.label)}</T><T style={{ fontSize: 12.5, color: color.muted }}>{tg.key === 'threeD' && map.style === 'satellite' ? t('Off on satellite: the photo already shows the roofs') : t(tg.sub)}</T></View>
+              <Switch accessibilityLabel={t(tg.label)} disabled={tg.key === 'threeD' && map.style === 'satellite'} value={tg.key === 'threeD' && map.style === 'satellite' ? false : map.layers[tg.key]} onValueChange={v => map.setLayers({ [tg.key]: v })} trackColor={{ true: color.blue, false: '#D5D7D2' }} />
             </View>
           ))}
           <Pressable accessibilityRole="button" onPress={() => { pop(); push({ name: 'crowding' }); }} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: color.hairline }}>

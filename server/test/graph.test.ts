@@ -109,3 +109,33 @@ test('intent router: places, people, procedures and number words', () => {
   assert.equal(r.match('what is the meaning of life'), null);
   assert.equal(r.match('take me to the library step free')?.mode, 'step_free');
 });
+
+test('islands are joined to the main network, so every place is reachable (Building 14)', async () => {
+  const { connectIslands } = await import('../src/routing/graph.js');
+  const g = buildGraph([
+    line('main', 'walkway', [[-5.107, 33.539], [-5.106, 33.539]]),
+    line('island', 'walkway', [[-5.1065, 33.5394], [-5.1064, 33.5396]]), // ~45 m north, touches nothing
+  ]);
+  assert.equal(components(g).sizes.length, 2);
+  const added = connectIslands(g);
+  assert.equal(added.length, 1);
+  assert.equal(components(g).sizes.length, 1);
+  const end = g.nodes.find(n => Math.abs(n.coord[1] - 33.5396) < 1e-6)!.id;
+  assert.ok(shortestPath(g, snap(g, [-5.107, 33.539], 'walk', new Set())!, [end], 'walk', new Set()), 'a route reaches the island');
+});
+
+test('real campus data: every place has a route from the main plaza', async () => {
+  const { connectIslands } = await import('../src/routing/graph.js');
+  const { loadGeo } = await import('../src/seed/seed.js');
+  const { placesFromPois } = await import('../src/seed/places.js');
+  const { nearestNode } = await import('../src/routing/route.js');
+  const geo = loadGeo();
+  const g = buildGraph(geo.walkways, [-5.1066, 33.5393]);
+  connectIslands(g, 80);
+  const start = snap(g, [-5.10655, 33.53925], 'walk', new Set())!;
+  const unreachable = placesFromPois(geo.pois, geo.buildings).filter(p => {
+    const n = nearestNode(g, p.location.coordinates, 'walk');
+    return n == null || !shortestPath(g, start, [n], 'walk', new Set());
+  }).map(p => p._id);
+  assert.deepEqual(unreachable, []);
+});

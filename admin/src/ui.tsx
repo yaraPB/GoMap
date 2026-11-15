@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
-import { Clock, Copy, Trash2, X } from 'lucide-react';
+import { Clock, Copy, Map as MapIcon, PenLine, Satellite, Trash2, X } from 'lucide-react';
 import { MAPBOX_TOKEN, type Hours } from './api';
+import { CAMPUS_MAX_BOUNDS, CAMPUS_MIN_ZOOM, CAMPUS_OUTLINE } from './campusOutline';
 
 export function useLoad<T>(fn: () => Promise<T>, deps: unknown[] = []) {
   const [data, setData] = useState<T | null>(null);
@@ -406,28 +407,142 @@ export function HoursField({ value, onChange, lunch }: { value: Hours | null; on
 
 export const CAMPUS: [number, number] = [-5.1066, 33.5393];
 export type MapPoint = { id: string; coord: [number, number]; color: string; label: string; text?: string; size?: number; dim?: boolean };
+export type Ring = [number, number][];
+export type FootprintFC = { type: 'FeatureCollection'; features: { type: 'Feature'; geometry: unknown; properties: { id: string; place_id?: string | null; place_name?: string | null; source?: string } }[] };
+
+const SAT_KEY = 'gomap-admin-satellite';
+const readSat = () => { try { return localStorage.getItem(SAT_KEY) === '1'; } catch { return false; } };
+const EMPTY = { type: 'FeatureCollection', features: [] } as const;
+/** World with a hole the shape of campus: everything outside AUI is dimmed. */
+const OUTSIDE = { type: 'FeatureCollection', features: [{ type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [[[-180, -85], [180, -85], [180, 85], [-180, 85], [-180, -85]], [...CAMPUS_OUTLINE].reverse()] } }] };
+
+/** The GoCampus map look (Mapbox Standard, dusk light), locked to campus, with the satellite photo one click away. */
+function newCampusMap(container: HTMLDivElement, center: [number, number], zoom: number, pitch: number) {
+  mapboxgl.accessToken = MAPBOX_TOKEN;
+  const m = new mapboxgl.Map({
+    container, style: 'mapbox://styles/mapbox/standard', center, zoom, pitch, bearing: -23,
+    maxBounds: CAMPUS_MAX_BOUNDS, minZoom: CAMPUS_MIN_ZOOM,
+    config: { basemap: { showPointOfInterestLabels: false, showAdminBoundaries: false, showTransitLabels: false, lightPreset: 'dusk' } } as never,
+  });
+  m.on('style.load', () => {
+    m.addSource('imagery', { type: 'raster', tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'], tileSize: 256, maxzoom: 19, attribution: 'Imagery © Esri, Maxar, Earthstar Geographics' });
+    m.addLayer({ id: 'imagery', type: 'raster', source: 'imagery', slot: 'bottom', layout: { visibility: 'none' } } as never);
+    m.addSource('outside', { type: 'geojson', data: OUTSIDE as never });
+    m.addLayer({ id: 'outside', type: 'fill', source: 'outside', paint: { 'fill-color': '#101814', 'fill-opacity': 0.4 } });
+    m.addLayer({ id: 'outline', type: 'line', source: 'outside', paint: { 'line-color': '#ffffff', 'line-opacity': 0.25, 'line-width': 1.2, 'line-dasharray': [2, 2] } });
+  });
+  return m;
+}
+/** Satellite on: photo layer visible, daylight, no 3D buildings over the photo. */
+function applySatellite(m: mapboxgl.Map, on: boolean) {
+  const go = () => {
+    if (m.getLayer('imagery')) m.setLayoutProperty('imagery', 'visibility', on ? 'visible' : 'none');
+    try { m.setConfigProperty('basemap', 'show3dObjects', !on); m.setConfigProperty('basemap', 'lightPreset', on ? 'day' : 'dusk'); } catch { /* style still loading */ }
+  };
+  if (m.isStyleLoaded()) go(); else m.once('style.load', go);
+}
+
+function SatelliteToggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <div className="maptoggle" role="radiogroup" aria-label="Map type">
+      <button role="radio" aria-checked={!on} className={!on ? 'on' : ''} onClick={() => onChange(false)}><MapIcon size={14} />Map</button>
+      <button role="radio" aria-checked={on} className={on ? 'on' : ''} onClick={() => onChange(true)}><Satellite size={14} />Satellite</button>
+    </div>
+  );
+}
 
 /**
  * The campus map every admin page opens on. Click a marker to select it; the selected marker
- * can be dragged when `onMove` is given.
+ * can be dragged when `onMove` is given. `drawing` turns clicks into the corners of a building
+ * outline (click the first corner or press Enter to finish, Backspace to undo a corner, Esc to stop).
  */
-export function CampusMap({ points, selected, onSelect, onMove, height = 400, children, flyOnSelect = true }: {
+export function CampusMap({ points, selected, onSelect, onMove, height = 400, children, flyOnSelect = true, drawing = false, onDraw, onCancelDraw, footprints, onFootprint, onMapClick, satellite: satProp }: {
   points: MapPoint[]; selected?: string | null; onSelect?: (id: string) => void; onMove?: (id: string, c: [number, number]) => void;
   height?: number; children?: React.ReactNode; flyOnSelect?: boolean;
+  drawing?: boolean; onDraw?: (ring: Ring) => void; onCancelDraw?: () => void;
+  footprints?: FootprintFC | null; onFootprint?: (f: FootprintFC['features'][number]) => void;
+  onMapClick?: (c: [number, number]) => void; satellite?: boolean;
 }) {
   const el = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const markers = useRef(new Map<string, mapboxgl.Marker>());
-  const cb = useRef({ onSelect, onMove });
-  cb.current = { onSelect, onMove };
+  const [sat, setSat] = useState(readSat);
+  const [corners, setCorners] = useState<Ring>([]);
+  const cb = useRef({ onSelect, onMove, onDraw, onFootprint, onMapClick, drawing, corners, onCancelDraw });
+  cb.current = { onSelect, onMove, onDraw, onFootprint, onMapClick, drawing, corners, onCancelDraw };
+  const satOn = satProp ?? sat;
+
   useEffect(() => {
     if (!el.current || !MAPBOX_TOKEN) return;
-    mapboxgl.accessToken = MAPBOX_TOKEN;
-    map.current = new mapboxgl.Map({ container: el.current, style: 'mapbox://styles/mapbox/standard', center: CAMPUS, zoom: 15.9, pitch: 40, bearing: -23,
-      config: { basemap: { showPointOfInterestLabels: false, showAdminBoundaries: false, showTransitLabels: false } } as never });
-    map.current.addControl(new mapboxgl.NavigationControl({ showCompass: true }), 'bottom-right');
-    return () => { map.current?.remove(); map.current = null; markers.current.clear(); };
+    const m = newCampusMap(el.current, CAMPUS, 15.9, 40);
+    map.current = m;
+    m.addControl(new mapboxgl.NavigationControl({ showCompass: true }), 'bottom-right');
+    m.on('style.load', () => {
+      m.addSource('footprints', { type: 'geojson', data: EMPTY as never, promoteId: 'id' });
+      m.addLayer({ id: 'footprints-fill', type: 'fill', source: 'footprints', paint: { 'fill-color': ['case', ['to-boolean', ['get', 'place_id']], '#2563EB', '#F59E0B'], 'fill-opacity': ['case', ['boolean', ['feature-state', 'hover'], false], 0.45, 0.22] } });
+      m.addLayer({ id: 'footprints-line', type: 'line', source: 'footprints', paint: { 'line-color': ['case', ['to-boolean', ['get', 'place_id']], '#93C5FD', '#FCD34D'], 'line-width': 1.5 } });
+      m.addSource('draft', { type: 'geojson', data: EMPTY as never });
+      m.addLayer({ id: 'draft-fill', type: 'fill', source: 'draft', filter: ['==', ['geometry-type'], 'Polygon'], paint: { 'fill-color': '#16A34A', 'fill-opacity': 0.3 } });
+      m.addLayer({ id: 'draft-line', type: 'line', source: 'draft', paint: { 'line-color': '#22C55E', 'line-width': 2.5, 'line-dasharray': [2, 1] } });
+      m.addLayer({ id: 'draft-pts', type: 'circle', source: 'draft', filter: ['==', ['geometry-type'], 'Point'], paint: { 'circle-radius': 6, 'circle-color': '#fff', 'circle-stroke-color': '#16A34A', 'circle-stroke-width': 3 } });
+    });
+    let hover: string | number | null = null;
+    m.on('mousemove', 'footprints-fill', e => {
+      if (cb.current.drawing) return;
+      const id = (e.features?.[0] as { id?: string | number } | undefined)?.id; if (id == null) return;
+      if (hover != null) m.setFeatureState({ source: 'footprints', id: hover }, { hover: false });
+      hover = id; m.setFeatureState({ source: 'footprints', id }, { hover: true }); m.getCanvas().style.cursor = 'pointer';
+    });
+    m.on('mouseleave', 'footprints-fill', () => { if (hover != null) m.setFeatureState({ source: 'footprints', id: hover }, { hover: false }); hover = null; m.getCanvas().style.cursor = cb.current.drawing ? 'crosshair' : ''; });
+    m.on('click', e => {
+      const c: [number, number] = [Number(e.lngLat.lng.toFixed(7)), Number(e.lngLat.lat.toFixed(7))];
+      if (cb.current.drawing) {
+        const cs = cb.current.corners;
+        // clicking near the first corner closes the outline
+        if (cs.length >= 3) { const p0 = m.project(cs[0]); if (Math.hypot(p0.x - e.point.x, p0.y - e.point.y) < 12) { cb.current.onDraw?.([...cs, cs[0]]); setCorners([]); return; } }
+        setCorners([...cs, c]);
+        return;
+      }
+      const f = m.getLayer('footprints-fill') ? m.queryRenderedFeatures(e.point, { layers: ['footprints-fill'] })[0] : undefined;
+      if (f && cb.current.onFootprint) { cb.current.onFootprint(f as never); return; }
+      cb.current.onMapClick?.(c);
+    });
+    return () => { m.remove(); map.current = null; markers.current.clear(); };
   }, []);
+
+  useEffect(() => { if (map.current) applySatellite(map.current, satOn); }, [satOn]);
+  useEffect(() => {
+    const m = map.current; if (!m) return;
+    const set = () => (m.getSource('footprints') as mapboxgl.GeoJSONSource | undefined)?.setData((footprints ?? EMPTY) as never);
+    if (m.isStyleLoaded() && m.getSource('footprints')) set(); else m.once('idle', set);
+  }, [footprints]);
+
+  // drawing: live outline, cursor, keyboard
+  useEffect(() => {
+    const m = map.current; if (!m) return;
+    m.getCanvas().style.cursor = drawing ? 'crosshair' : '';
+    if (!drawing) setCorners([]);
+  }, [drawing]);
+  useEffect(() => {
+    const m = map.current; if (!m) return;
+    const feats = [
+      ...corners.map(c => ({ type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: c } })),
+      ...(corners.length >= 3 ? [{ type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [[...corners, corners[0]]] } }] : corners.length === 2 ? [{ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: corners } }] : []),
+    ];
+    (m.getSource('draft') as mapboxgl.GeoJSONSource | undefined)?.setData({ type: 'FeatureCollection', features: feats } as never);
+  }, [corners]);
+  useEffect(() => {
+    if (!drawing) return;
+    const k = (e: KeyboardEvent) => {
+      if ((e.target as HTMLElement).tagName === 'INPUT' || (e.target as HTMLElement).tagName === 'TEXTAREA') return;
+      if (e.key === 'Escape') { setCorners([]); cb.current.onCancelDraw?.(); }
+      if (e.key === 'Backspace' || e.key === 'Delete') { e.preventDefault(); setCorners(cs => cs.slice(0, -1)); }
+      if (e.key === 'Enter' && cb.current.corners.length >= 3) { const cs = cb.current.corners; cb.current.onDraw?.([...cs, cs[0]]); setCorners([]); }
+    };
+    window.addEventListener('keydown', k);
+    return () => window.removeEventListener('keydown', k);
+  }, [drawing]);
+
   const key = useMemo(() => JSON.stringify(points.map(p => [p.id, p.coord, p.color, p.text, p.dim, p.size])), [points]);
   useEffect(() => {
     if (!map.current) return;
@@ -438,7 +553,7 @@ export function CampusMap({ points, selected, onSelect, onMove, height = 400, ch
       if (!m) {
         const div = document.createElement('div');
         div.className = 'mk';
-        div.addEventListener('click', e => { e.stopPropagation(); cb.current.onSelect?.(p.id); });
+        div.addEventListener('click', e => { if (cb.current.drawing) return; e.stopPropagation(); cb.current.onSelect?.(p.id); });
         m = new mapboxgl.Marker({ element: div }).setLngLat(p.coord).addTo(map.current);
         m.on('dragend', () => { const c = m!.getLngLat(); cb.current.onMove?.(p.id, [Number(c.lng.toFixed(7)), Number(c.lat.toFixed(7))]); });
         markers.current.set(p.id, m);
@@ -467,28 +582,47 @@ export function CampusMap({ points, selected, onSelect, onMove, height = 400, ch
   }, [selected, key]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!MAPBOX_TOKEN) return <Notice>Set VITE_MAPBOX_TOKEN in admin/.env.local (or EXPO_PUBLIC_MAPBOX_TOKEN in mobile/.env.local) to see the map.</Notice>;
   return (
-    <div className="hero">
+    <div className={`hero ${drawing ? 'drawing' : ''}`}>
       <div ref={el} className="map" style={{ height }} role="application" aria-label="Campus map: click a marker to select it" />
       {children && <div className="overlay">{children}</div>}
+      {satProp === undefined && <div className="overlay-br"><SatelliteToggle on={sat} onChange={v => { setSat(v); try { localStorage.setItem(SAT_KEY, v ? '1' : '0'); } catch { /* private mode */ } }} /></div>}
+      {drawing && (
+        <div className="drawbar" role="status">
+          <PenLine size={15} />
+          <span>{corners.length < 3 ? `Click the corners of the building on the photo (${corners.length} so far)` : `${corners.length} corners · click the first corner or press Enter to finish`}</span>
+          <span className="sub" style={{ margin: 0 }}>Backspace: undo a corner · Esc: stop</span>
+          {corners.length >= 3 && <button className="btn sm green" onClick={() => { cb.current.onDraw?.([...corners, corners[0]]); setCorners([]); }}>Finish</button>}
+        </div>
+      )}
     </div>
   );
 }
 
-/** Small map with draggable pins (kept for report details). */
+/** Small map with a pin (report details). */
 export function PinMap({ center, pins, height = 240, zoom = 17.6 }: {
   center: [number, number]; pins: { id: string; coord: [number, number]; color: string; label: string }[]; height?: number; zoom?: number;
 }) {
   const el = useRef<HTMLDivElement>(null);
+  const [sat, setSat] = useState(readSat);
+  const mapRef = useRef<mapboxgl.Map | null>(null);
   useEffect(() => {
     if (!el.current || !MAPBOX_TOKEN) return;
-    mapboxgl.accessToken = MAPBOX_TOKEN;
-    const m = new mapboxgl.Map({ container: el.current, style: 'mapbox://styles/mapbox/standard', center, zoom, pitch: 30, config: { basemap: { showPointOfInterestLabels: false, showAdminBoundaries: false } } as never });
+    const m = newCampusMap(el.current, center, zoom, 30);
+    mapRef.current = m;
+    applySatellite(m, sat);
     for (const p of pins) new mapboxgl.Marker({ color: p.color }).setLngLat(p.coord).setPopup(new mapboxgl.Popup({ offset: 24 }).setText(p.label)).addTo(m);
-    return () => m.remove();
+    return () => { m.remove(); mapRef.current = null; };
   }, [center[0], center[1]]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (mapRef.current) applySatellite(mapRef.current, sat); }, [sat]);
   if (!MAPBOX_TOKEN) return null;
-  return <div ref={el} className="map" style={{ height }} />;
+  return (
+    <div className="hero" style={{ marginBottom: 0 }}>
+      <div ref={el} className="map" style={{ height }} />
+      <div className="overlay-br"><SatelliteToggle on={sat} onChange={setSat} /></div>
+    </div>
+  );
 }
+
 
 // ── other bits ───────────────────────────────────────────────────────────────
 

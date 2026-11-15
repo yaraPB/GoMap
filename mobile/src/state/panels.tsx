@@ -18,7 +18,8 @@ export type Panel =
   | { name: 'layers' }
   | { name: 'report'; at?: [number, number] }
   | { name: 'help'; step?: number }
-  | { name: 'views' };
+  | { name: 'views' }
+  | { name: 'events'; id?: string };
 
 type Ctx = { stack: Panel[]; top: Panel; push: (p: Panel) => void; replace: (p: Panel) => void; pop: () => void; reset: (p?: Panel) => void };
 const PanelCtx = createContext<Ctx | null>(null);

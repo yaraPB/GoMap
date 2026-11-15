@@ -1,6 +1,6 @@
 import { StrictMode, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { CalendarClock, ClipboardList, Flag, LayoutDashboard, LogOut, MapPinned, MessageSquareText, Signpost, Building2, Users, type LucideIcon } from 'lucide-react';
+import { Bot, CalendarClock, CalendarDays, ClipboardList, Flag, LayoutDashboard, LogOut, MapPinned, Signpost, Building2, Users, type LucideIcon } from 'lucide-react';
 import './styles.css';
 import { api, API_URL, clearToken, getToken, setToken } from './api';
 import Overview from './screens/Overview';
@@ -11,25 +11,27 @@ import Reports from './screens/Reports';
 import Services from './screens/Services';
 import Issues from './screens/Issues';
 import OfficeTime from './screens/OfficeTime';
-import { AssistantLog } from './screens/Log';
+import Assistant from './screens/Assistant';
+import Events from './screens/Events';
 import { Notice } from './ui';
 
 const SECTIONS: [string, string, LucideIcon][] = [
   ['overview', 'Overview', LayoutDashboard],
   ['places', 'Places & POIs', MapPinned],
+  ['events', 'Events', CalendarDays],
   ['services', 'Offices & services', Building2],
   ['issues', 'Where to go for…', Signpost],
   ['offices', 'Faculty & staff', Users],
   ['time', 'Office time', CalendarClock],
   ['procedures', 'Procedures', ClipboardList],
   ['reports', 'Reports', Flag],
-  ['log', 'Assistant log', MessageSquareText],
+  ['assistant', 'Assistant', Bot],
 ];
 type Section = string;
 
 /** Section and selection live in the URL hash, so a link opens the same screen. */
 function useHash(): [Section, string | undefined, (s: string, id?: string) => void] {
-  const read = () => { const [s, id] = location.hash.replace('#', '').split('/'); return [(SECTIONS.some(x => x[0] === s) ? s : 'overview'), id || undefined] as const; };
+  const read = () => { const [s, id] = location.hash.replace('#', '').split('/'); return [(SECTIONS.some(x => x[0] === s) || s === 'log' ? s : 'overview'), id || undefined] as const; };
   const [state, setState] = useState(read);
   useEffect(() => { const on = () => setState(read()); addEventListener('hashchange', on); return () => removeEventListener('hashchange', on); }, []);
   return [state[0], state[1], (s, id) => { location.hash = id ? `${s}/${id}` : s; }];
@@ -61,7 +63,7 @@ function App() {
   const [authed, setAuthed] = useState(!!getToken());
   const [section, id, go] = useHash();
   const [badges, setBadges] = useState<Record<string, number>>({});
-  useEffect(() => { if (authed) api.overview().then(o => setBadges({ reports: o.counts.open_reports, offices: o.counts.conflicts, log: o.counts.unanswered })).catch(() => {}); }, [authed, section]);
+  useEffect(() => { if (authed) api.overview().then(o => setBadges({ reports: o.counts.open_reports, offices: o.counts.conflicts, assistant: o.counts.unanswered })).catch(() => {}); }, [authed, section]);
   if (!authed) return <Login onIn={() => setAuthed(true)} />;
   return (
     <div className="shell">
@@ -83,7 +85,9 @@ function App() {
         {section === 'offices' && <Offices selected={id} select={pid => go('offices', pid)} />}
         {section === 'procedures' && <Procedures selected={id} select={pid => go('procedures', pid)} />}
         {section === 'reports' && <Reports />}
-        {section === 'log' && <AssistantLog />}
+        {section === 'events' && <Events />}
+        {section === 'assistant' && <Assistant tab={id} />}
+        {section === 'log' && <Assistant tab="log" />}
       </main>
     </div>
   );

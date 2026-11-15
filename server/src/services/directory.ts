@@ -19,7 +19,28 @@ export type PersonRow = {
 };
 
 /** Sticky-note characters a professor can put on their door. */
-export const NOTE_KINDS = ['sick', 'online', 'appointment', 'email', 'back_soon', 'custom'] as const;
+export const NOTE_KINDS = ['sick', 'online', 'appointment', 'email', 'back_soon', 'teaching', 'conference', 'away_week', 'semester_off', 'hours_moved', 'custom'] as const;
+
+/** End of this campus week (Sunday 23:59 Ifrane ≈ 22:59 UTC) and of the current semester. */
+export function endOfWeek(now = new Date()) {
+  const d = new Date(now); const day = (d.getUTCDay() + 6) % 7; // Mon = 0
+  d.setUTCDate(d.getUTCDate() + (6 - day)); d.setUTCHours(22, 59, 0, 0);
+  return d.toISOString();
+}
+export function semesterEnd(now = new Date()) {
+  const y = now.getUTCFullYear(), m = now.getUTCMonth();
+  // Fall → 20 Dec, Spring → 20 May, Summer → 15 Aug (morning after, 08:00 campus time)
+  return (m >= 8 ? new Date(Date.UTC(y, 11, 21, 7)) : m <= 4 ? new Date(Date.UTC(y, 4, 21, 7)) : new Date(Date.UTC(y, 7, 16, 7))).toISOString();
+}
+/** Notes that only mean something for a while end by themselves. */
+export function noteExpiry(kind: string | null, now = new Date()): string | null {
+  if (kind === 'away_week' || kind === 'hours_moved' || kind === 'conference') return endOfWeek(now);
+  if (kind === 'semester_off') return semesterEnd(now);
+  if (kind === 'sick' || kind === 'back_soon' || kind === 'teaching' || kind === 'online') {
+    const d = new Date(now); d.setUTCHours(17, 30, 0, 0); if (d <= now) d.setUTCDate(d.getUTCDate() + 1); return d.toISOString(); // 18:30 campus time
+  }
+  return null;
+}
 type PresenceRow = { person_id: string; status: 'in' | 'busy' | 'out'; reason: string | null; until: string | null; set_by: string; set_at: string };
 
 /** Presence lasts for today only and clears itself at 18:30 campus time. */
@@ -111,7 +132,8 @@ export class Directory {
     const presence = this.presence(r.id);
     const lunch = json.parse<[string, string] | null>(r.lunch ?? null, null) ?? this.campus().lunch;
     const { availability: avail, open } = availability(hours, presence, now, lunch);
-    const noteRow = this.db.prepare('SELECT note, kind, updated_at FROM office_notes WHERE person_id = ?').get(r.id) as { note: string; kind: string | null; updated_at: string } | undefined;
+    const rawNote = this.db.prepare('SELECT note, kind, updated_at, expires_at FROM office_notes WHERE person_id = ?').get(r.id) as { note: string; kind: string | null; updated_at: string; expires_at: string | null } | undefined;
+    const noteRow = rawNote && (!rawNote.expires_at || rawNote.expires_at > now.toISOString()) ? rawNote : undefined;
     const shared = r.place_id && r.office_number
       ? (this.db.prepare('SELECT id, name FROM people WHERE place_id = ? AND office_number = ? AND id != ?').all(r.place_id, r.office_number, r.id) as { id: string; name: string }[])
       : [];
@@ -123,7 +145,7 @@ export class Directory {
       office_number: r.office_number, floor: r.floor,
       hours, hours_text: formatHours(hours), hours_raw: r.hours_raw, hours_note: parsed.note, by_appointment: parsed.byAppointment,
       open, availability: avail,
-      note: noteRow?.note ?? null, note_kind: noteRow?.kind ?? (noteRow ? 'custom' : null), note_at: noteRow?.updated_at ?? null,
+      note: noteRow?.note ?? null, note_kind: noteRow?.kind ?? (noteRow ? 'custom' : null), note_at: noteRow?.updated_at ?? null, note_until: noteRow?.expires_at ?? null,
       lunch, lunch_custom: !!r.lunch,
       presence: presence ? { status: presence.status, reason: presence.reason, until: presence.until, set_at: presence.set_at, set_by: presence.set_by, clears_at: PRESENCE_CLEARS_AT } : null,
       shared_with: shared,

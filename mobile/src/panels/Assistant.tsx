@@ -13,6 +13,7 @@ import { useApp, useLocation } from '../state/app';
 import { chat, useChat } from '../state/chat';
 import { useNav } from '../state/navigation';
 import { usePanels } from '../state/panels';
+import { whenText } from './Events';
 import { availabilityText, availabilityTone, fmtDate } from '../ui/bits';
 import { Avatar, Btn, Icon, IconBtn, Label, Notice, Sheet, StatusPill, T } from '../ui/kit';
 import { categoryColor, color, font } from '../ui/theme';
@@ -189,6 +190,22 @@ export function AnswerCard({ a, onAsk, onReplay }: { a: Answer; onAsk: (q: strin
         {onReplay && !!a.text && <Pressable accessibilityRole="button" accessibilityLabel={t('Read this answer aloud')} onPress={onReplay} hitSlop={8} style={{ paddingTop: 2 }}><Icon name="volume" size={16} stroke={color.muted} /></Pressable>}
       </View>
 
+      {a.intent === 'events' && !!a.events?.length && (
+        <View style={{ gap: 8, marginTop: 4 }}>
+          {a.events.slice(0, 4).map(e => (
+            <Pressable key={e.id} accessibilityRole="button" onPress={() => push({ name: 'events', id: e.id })} style={({ pressed }) => [styles.eventRow, pressed && { opacity: 0.8 }]}>
+              <View style={styles.eventDot}><Icon name="events" size={14} stroke="#fff" /></View>
+              <View style={{ flex: 1 }}>
+                <T weight="semibold" numberOfLines={1} style={{ fontSize: 14 }}>{e.title}</T>
+                <T numberOfLines={1} style={{ fontSize: 12, color: color.muted }}>{whenText(e, lang, t)}{e.place ? ` · ${e.place.name}` : ''}</T>
+              </View>
+              <Icon name="chevron" size={14} stroke={color.muted} />
+            </Pressable>
+          ))}
+          <Btn title={t('All events')} icon="events" small kind="secondary" onPress={() => push({ name: 'events' })} />
+        </View>
+      )}
+
       {a.intent === 'procedure' && a.procedure && (
         <View style={{ gap: 10, marginTop: 4 }}>
           {a.procedure.steps.map((st, i) => (
@@ -267,7 +284,7 @@ export function AnswerCard({ a, onAsk, onReplay }: { a: Answer; onAsk: (q: strin
       {a.source && (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
           <Icon name="shield" size={13} stroke={color.muted} />
-          <T style={{ flex: 1, fontSize: 11.5, color: color.muted }}>{a.source}{a.verified_at ? ` · ${t("verified")} ${fmtDate(a.verified_at, lang)}` : ''}{a.answered_by === 'gemini' ? ` · ${t('answered with Gemini')}` : ''}</T>
+          <T style={{ flex: 1, fontSize: 11.5, color: color.muted }}>{a.source}{a.verified_at ? ` · ${t("verified")} ${fmtDate(a.verified_at, lang)}` : ''}{a.answered_by === 'gemini' ? ` · ${t('answered with Gemini')}` : a.answered_by === 'claude' ? ` · ${t('answered with Claude')}` : ''}</T>
         </View>
       )}
       {!!a.suggestions?.length && (
@@ -280,6 +297,8 @@ export function AnswerCard({ a, onAsk, onReplay }: { a: Answer; onAsk: (q: strin
 }
 
 const styles = StyleSheet.create({
+  eventRow: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 10, borderRadius: 12, backgroundColor: '#FDF4FF', borderWidth: 1, borderColor: '#F5D0FE' },
+  eventDot: { width: 26, height: 26, borderRadius: 13, backgroundColor: '#C026D3', alignItems: 'center', justifyContent: 'center' },
   head: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: color.hairline },
   langs: { flexDirection: 'row', backgroundColor: color.surface, borderRadius: 10, padding: 3, gap: 2 },
   lang: { minWidth: 34, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6 },

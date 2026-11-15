@@ -13,9 +13,13 @@ import { json, type Sql } from './db/sqlite.js';
 import { formatHours, openState, parseHours, type Hours } from './lib/hours.js';
 import type { RouteMode } from './routing/route.js';
 import type { Campus } from './services/campus.js';
-import { DEPARTMENTS, Directory, isStale, NOTE_KINDS, REASONS, type PersonRow } from './services/directory.js';
+import { DEPARTMENTS, Directory, isStale, NOTE_KINDS, noteExpiry, REASONS, type PersonRow } from './services/directory.js';
 import { Offices, SERVICE_CATEGORIES, weeklyMinutes, type IssueRow, type ServiceRow } from './services/offices.js';
 import { meta } from './db/sqlite.js';
+import * as turf from '@turf/turf';
+import { loadGeo } from './seed/seed.js';
+import { AUDIENCES, EVENT_KINDS, Events, type PlaceRef } from './services/events.js';
+import { newId, ruleView, runTest, testView, type RuleRow, type TestRow } from './services/assistantAdmin.js';
 import type { CampusHours } from './seed/services.js';
 
 export type AppContext = { db: Sql; campus: Campus; assistant: Assistant; uploadsDir?: string };
@@ -70,6 +74,7 @@ export function createApp(ctx: AppContext) {
   const { db, campus, assistant } = ctx;
   const directory = new Directory(db);
   const offices = new Offices(db);
+  const events = new Events(db);
   // Bumped on every edit; the app polls /api/version and refetches when it moves.
   let version = Date.now();
   const bump = () => { version = Math.max(Date.now(), version + 1); };
@@ -96,6 +101,11 @@ export function createApp(ctx: AppContext) {
     bump();
   };
   const placeNames = async () => new Map((await Place.find({}, { name: 1 }).lean()).map(p => [String(p._id), p.name]));
+  const placeRefs = async () => new Map<string, PlaceRef>((await Place.find({}, { name: 1, location: 1, category: 1 }).lean()).map(p => [String(p._id), { id: String(p._id), name: p.name, coordinates: p.location!.coordinates as Position, category: p.category }]));
+  // building footprints the basemap does not draw: traced from satellite imagery by the team
+  let tracedCache: { type: 'Feature'; geometry: unknown; properties: Record<string, unknown> }[] | null = null;
+  const tracedBuildings = () => (tracedCache ??= loadGeo().buildings.filter(b => b.properties.source === 'trace')
+    .map((b, i) => ({ type: 'Feature' as const, geometry: b.geometry as unknown, properties: { id: 'trace-' + i, height: b.properties.height ?? 8, source: 'trace' } as Record<string, unknown> })));
 
   // ── public ────────────────────────────────────────────────────────────────
 
@@ -226,7 +236,7 @@ export function createApp(ctx: AppContext) {
 
   function saveNote(id: string, raw: unknown, kind: string | null) {
     const note = str(raw, 500);
-    if (note || kind) db.prepare('INSERT INTO office_notes (person_id,note,kind,updated_at) VALUES (?,?,?,?) ON CONFLICT(person_id) DO UPDATE SET note=excluded.note,kind=excluded.kind,updated_at=excluded.updated_at').run(id, note ?? '', kind, now());
+    if (note || kind) db.prepare('INSERT INTO office_notes (person_id,note,kind,updated_at,expires_at) VALUES (?,?,?,?,?) ON CONFLICT(person_id) DO UPDATE SET note=excluded.note,kind=excluded.kind,updated_at=excluded.updated_at,expires_at=excluded.expires_at').run(id, note ?? '', kind, now(), noteExpiry(kind));
     else db.prepare('DELETE FROM office_notes WHERE person_id = ?').run(id);
   }
 
@@ -263,6 +273,33 @@ export function createApp(ctx: AppContext) {
       type: 'Feature', geometry: p.footprint,
       properties: { id: String(p._id), category: p.category, height: Math.max(4, Number(p.height) || 8), open: p.status !== 'closed' && openState(p.hours as Hours | null, config.timezone).state === 'open' },
     })) });
+  }));
+
+  /** What's on: under way and coming up, with the place to walk to. */
+  app.get('/api/events', wrap(async (req, res) => {
+    const days = Math.max(1, Math.min(60, num(req.query.days) ?? 21));
+    const role = str(req.query.audience);
+    const refs = await placeRefs();
+    const list = events.list({ days }).map(e => events.view(e, refs))
+      .filter(e => !role || e.audience === 'all' || e.audience === role || (role === 'guest' && e.audience === 'visitors') || (role === 'student' && e.audience === 'students'));
+    res.set('Cache-Control', 'no-store');
+    res.json(list);
+  }));
+
+  /** Footprints the basemap lacks (traced from satellite imagery or drawn in the admin): the app extrudes them. */
+  app.get('/api/geo/extra-buildings', wrap(async (_req, res) => {
+    const drawn = await Place.find({ source: 'admin', footprint: { $ne: null } }, { name: 1, category: 1, footprint: 1, height: 1 }).lean();
+    // a traced shape that an admin-drawn building now covers is dropped
+    const traced = tracedBuildings().filter(t => {
+      const c = turf.centroid(t as never);
+      return !drawn.some(d => d.footprint?.type === 'Polygon' && turf.booleanPointInPolygon(c, d.footprint as never));
+    });
+    const features = [
+      ...drawn.map(p => ({ type: 'Feature', geometry: p.footprint, properties: { id: String(p._id), name: p.name, category: p.category, height: Math.max(4, Number(p.height) || 9), source: 'admin' } })),
+      ...traced,
+    ];
+    res.set('Cache-Control', 'public, max-age=60');
+    res.json({ type: 'FeatureCollection', features });
   }));
 
   app.get('/api/geo/closures', wrap(async (_req, res) => {
@@ -403,15 +440,206 @@ export function createApp(ctx: AppContext) {
       if (!['open', 'closed'].includes(b.status)) throw bad('status must be open or closed');
       Object.assign(changes, { status: b.status, closed_reason: b.status === 'closed' ? str(b.closed_reason) ?? null : null, closed_from: b.status === 'closed' ? str(b.closed_from) ?? now() : null, closed_until: b.status === 'closed' ? str(b.closed_until) ?? null : null });
     }
+    if (b.number !== undefined) changes.number = str(b.number, 8)?.toUpperCase() ?? null;
+    if (b.height !== undefined) changes.height = b.height === null ? null : Math.max(3, Math.min(60, num(b.height) ?? 9));
+    if (b.footprint !== undefined) {
+      if (b.footprint !== null && (b.footprint?.type !== 'Polygon' || !Array.isArray(b.footprint.coordinates?.[0]) || b.footprint.coordinates[0].length < 4)) throw bad('footprint must be a GeoJSON Polygon');
+      changes.footprint = b.footprint;
+    }
     if (b.verify === true) changes.verified_at = now();
     if (b.review_months !== undefined) changes.review_months = Math.max(1, Math.min(36, num(b.review_months) ?? 6));
     changes.updated_at = now();
     await Place.updateOne({ _id: id }, { $set: changes });
     changeLog('place', id, 'update', changes, 'admin');
     await assistant.refresh();
-    if (changes.location) await campus.rebuild();
+    if (changes.location || changes.footprint !== undefined) await campus.rebuild();
     res.json(await Place.findById(id).lean());
   }));
+
+  /** A new place, e.g. a building traced on the satellite view. Its entrance is estimated automatically. */
+  admin.post('/places', wrap(async (req, res) => {
+    const b = req.body ?? {};
+    const name = str(b.name);
+    if (!name) throw bad('name is required');
+    if (!CATEGORIES.includes(b.category)) throw bad(`category must be one of ${CATEGORIES.join(', ')}`);
+    let footprint: { type: 'Polygon'; coordinates: Position[][] } | null = null;
+    if (b.footprint != null) {
+      const ring = b.footprint?.coordinates?.[0];
+      if (b.footprint?.type !== 'Polygon' || !Array.isArray(ring) || ring.length < 4 || ring.some((c: unknown) => !Array.isArray(c) || !coord({ lng: (c as number[])[0], lat: (c as number[])[1] }))) throw bad('footprint must be a GeoJSON Polygon with at least 3 corners');
+      footprint = { type: 'Polygon', coordinates: [ring.map((c: number[]) => [Number(Number(c[0]).toFixed(7)), Number(Number(c[1]).toFixed(7))])] };
+    }
+    const at = b.coordinates ? coord({ lng: b.coordinates[0], lat: b.coordinates[1] }) : footprint ? turf.centroid(footprint as never).geometry.coordinates as Position : null;
+    if (!at) throw bad('coordinates [lng, lat] or a footprint is required');
+    const number = str(b.number, 8)?.toUpperCase() ?? null;
+    const id = number && !(await Place.exists({ _id: `building-${number.toLowerCase()}` })) ? `building-${number.toLowerCase()}` : newId('place', name);
+    const stamp = now();
+    const aliases = Array.isArray(b.aliases) ? b.aliases.map((a: unknown) => str(a, 80)).filter(Boolean) as string[] : [];
+    await Place.create({
+      _id: id, name, number, category: b.category, schools: [],
+      aliases: [...new Set([...aliases, ...(number ? [`building ${number.toLowerCase()}`, `b${number.toLowerCase()}`, number.toLowerCase()] : [])])],
+      description: str(b.description, 1000) ?? null, location: { type: 'Point', coordinates: at }, footprint, height: Math.max(3, Math.min(60, num(b.height) ?? 9)),
+      hours: null, status: 'open', position_estimated: false, source: 'admin', verified_at: stamp, created_at: stamp, updated_at: stamp,
+    });
+    changeLog('place', id, 'create', { name, category: b.category, number, footprint: !!footprint }, 'admin');
+    await campus.rebuild();
+    await assistant.refresh();
+    res.status(201).json(await Place.findById(id).lean());
+  }));
+
+  /** Removes a place, its entrances, and every link to it (people, offices, events keep their other data). */
+  admin.delete('/places/:id', wrap(async (req, res) => {
+    const id = String(req.params.id);
+    const p = await Place.findById(id).lean();
+    if (!p) throw new HttpError(404, 'Place not found');
+    await Place.deleteOne({ _id: id });
+    await Entrance.deleteMany({ place_id: id });
+    const people = db.prepare('UPDATE people SET place_id = NULL WHERE place_id = ?').run(id).changes;
+    for (const s of offices.list().filter(s => json.parse<string[]>(s.place_ids, []).includes(id))) {
+      db.prepare('UPDATE services SET place_ids = ? WHERE id = ?').run(JSON.stringify(json.parse<string[]>(s.place_ids, []).filter(x => x !== id)), s.id);
+    }
+    for (const table of ['events', 'issue_routing', 'procedures', 'assistant_rules']) db.prepare(`UPDATE ${table} SET place_id = NULL WHERE place_id = ?`).run(id);
+    changeLog('place', id, 'delete', { name: p.name, category: p.category, people_unlinked: people }, 'admin');
+    await campus.rebuild();
+    await assistant.refresh();
+    // the full record comes back so the admin can undo
+    res.json({ ok: true, deleted: p, people_unlinked: people });
+  }));
+
+  /** Every building outline we know (map data + satellite traces), and whether a named place sits in it. */
+  admin.get('/footprints', wrap(async (_req, res) => {
+    const places = await Place.find({}, { name: 1, location: 1, footprint: 1, source: 1 }).lean();
+    const features: { type: 'Feature'; geometry: unknown; properties: Record<string, unknown> }[] = loadGeo().buildings.map((b, i) => {
+      const inside = places.find(p => turf.booleanPointInPolygon(p.location!.coordinates as Position, b as never));
+      return { type: 'Feature', geometry: b.geometry, properties: { id: `fp-${i}`, source: b.properties.source, height: b.properties.height ?? null, place_id: inside ? String(inside._id) : null, place_name: inside?.name ?? null } };
+    });
+    for (const p of places.filter(x => x.source === 'admin' && x.footprint)) features.push({ type: 'Feature', geometry: p.footprint, properties: { id: `place-${p._id}`, source: 'admin', height: null, place_id: String(p._id), place_name: p.name } });
+    res.json({ type: 'FeatureCollection', features });
+  }));
+
+  // ── events ──
+  const eventInput = async (b: Record<string, unknown>) => {
+    if (b.place_id && !(await Place.exists({ _id: b.place_id }))) throw bad('unknown place_id');
+    const out: Record<string, string | null | undefined> = {};
+    if (b.title !== undefined) out.title = str(b.title, 140);
+    if (b.description !== undefined) out.description = str(b.description, 2000) ?? null;
+    if (b.kind !== undefined) out.kind = EVENT_KINDS.includes(b.kind as never) ? String(b.kind) : 'other';
+    if (b.audience !== undefined) out.audience = AUDIENCES.includes(b.audience as never) ? String(b.audience) : 'all';
+    if (b.place_id !== undefined) out.place_id = (b.place_id as string | null) || null;
+    if (b.location_text !== undefined) out.location_text = str(b.location_text, 200) ?? null;
+    if (b.starts_at !== undefined) out.starts_at = str(b.starts_at, 40);
+    if (b.ends_at !== undefined) out.ends_at = str(b.ends_at, 40);
+    if (b.organizer !== undefined) out.organizer = str(b.organizer, 120) ?? null;
+    if (b.link !== undefined) out.link = str(b.link, 300) ?? null;
+    return out as Record<string, string | null>;
+  };
+  const saveEvent = async (id: string | null, body: Record<string, unknown>) => {
+    const input = await eventInput(body);
+    try { return events.save(id, input); } catch (e) { throw bad((e as Error).message); }
+  };
+  admin.get('/events', wrap(async (_req, res) => { const refs = await placeRefs(); res.json(events.list({ includePast: true }).map(e => events.view(e, refs))); }));
+  admin.post('/events', wrap(async (req, res) => {
+    const id = await saveEvent(null, req.body ?? {});
+    changeLog('event', id, 'create', req.body, 'admin');
+    await assistant.refresh();
+    res.status(201).json(events.view(events.row(id)!, await placeRefs()));
+  }));
+  admin.put('/events/:id', wrap(async (req, res) => {
+    const id = String(req.params.id);
+    if (!events.row(id)) throw new HttpError(404, 'Event not found');
+    await saveEvent(id, req.body ?? {});
+    changeLog('event', id, 'update', req.body, 'admin');
+    await assistant.refresh();
+    res.json(events.view(events.row(id)!, await placeRefs()));
+  }));
+  admin.delete('/events/:id', wrap(async (req, res) => {
+    const id = String(req.params.id);
+    if (!events.delete(id)) throw new HttpError(404, 'Event not found');
+    changeLog('event', id, 'delete', null, 'admin');
+    res.json({ ok: true });
+  }));
+
+  // ── assistant rules, tests and playground ──
+  const ruleInput = async (b: Record<string, unknown>, e?: RuleRow) => {
+    const row = {
+      title: b.title !== undefined ? str(b.title, 120) : e?.title,
+      answer: b.answer !== undefined ? str(b.answer, 1500) : e?.answer,
+      answer_fr: b.answer_fr !== undefined ? str(b.answer_fr, 1500) ?? null : e?.answer_fr ?? null,
+      answer_ar: b.answer_ar !== undefined ? str(b.answer_ar, 1500) ?? null : e?.answer_ar ?? null,
+      triggers: b.triggers !== undefined ? JSON.stringify(strList(b.triggers, 160)) : e?.triggers ?? '[]',
+      place_id: b.place_id !== undefined ? (b.place_id ? String(b.place_id) : null) : e?.place_id ?? null,
+      service_id: b.service_id !== undefined ? (b.service_id ? String(b.service_id) : null) : e?.service_id ?? null,
+      procedure_id: b.procedure_id !== undefined ? (b.procedure_id ? String(b.procedure_id) : null) : e?.procedure_id ?? null,
+      urgent: b.urgent !== undefined ? (b.urgent ? 1 : 0) : e?.urgent ?? 0,
+      enabled: b.enabled !== undefined ? (b.enabled === false ? 0 : 1) : e?.enabled ?? 1,
+    };
+    if (!row.title || !row.answer) throw bad('title and answer are required');
+    if (row.place_id && !(await Place.exists({ _id: row.place_id }))) throw bad('unknown place_id');
+    if (row.service_id && !offices.row(row.service_id)) throw bad('unknown service_id');
+    if (row.procedure_id && !db.prepare('SELECT 1 FROM procedures WHERE id = ?').get(row.procedure_id)) throw bad('unknown procedure_id');
+    return row as typeof row & { title: string; answer: string };
+  };
+  const saveRule = (id: string, r: Awaited<ReturnType<typeof ruleInput>>) => db.prepare(`INSERT INTO assistant_rules (id,title,triggers,answer,answer_fr,answer_ar,place_id,service_id,procedure_id,urgent,enabled,updated_at)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET title=excluded.title, triggers=excluded.triggers, answer=excluded.answer, answer_fr=excluded.answer_fr,
+    answer_ar=excluded.answer_ar, place_id=excluded.place_id, service_id=excluded.service_id, procedure_id=excluded.procedure_id, urgent=excluded.urgent, enabled=excluded.enabled, updated_at=excluded.updated_at`)
+    .run(id, r.title, r.triggers, r.answer, r.answer_fr, r.answer_ar, r.place_id, r.service_id, r.procedure_id, r.urgent, r.enabled, now());
+  const ruleRow = (id: string) => db.prepare('SELECT * FROM assistant_rules WHERE id = ?').get(id) as RuleRow | undefined;
+  admin.get('/rules', (_req, res) => { res.json((db.prepare('SELECT * FROM assistant_rules ORDER BY enabled DESC, title').all() as RuleRow[]).map(ruleView)); });
+  admin.post('/rules', wrap(async (req, res) => {
+    const r = await ruleInput(req.body ?? {});
+    const id = newId('rule', r.title);
+    saveRule(id, r); changeLog('rule', id, 'create', r, 'admin'); await assistant.refresh();
+    res.status(201).json(ruleView(ruleRow(id)!));
+  }));
+  admin.put('/rules/:id', wrap(async (req, res) => {
+    const existing = ruleRow(String(req.params.id));
+    if (!existing) throw new HttpError(404, 'Rule not found');
+    const r = await ruleInput(req.body ?? {}, existing);
+    saveRule(existing.id, r); changeLog('rule', existing.id, 'update', r, 'admin'); await assistant.refresh();
+    res.json(ruleView(ruleRow(existing.id)!));
+  }));
+  admin.delete('/rules/:id', wrap(async (req, res) => {
+    const id = String(req.params.id);
+    if (!db.prepare('DELETE FROM assistant_rules WHERE id = ?').run(id).changes) throw new HttpError(404, 'Rule not found');
+    changeLog('rule', id, 'delete', null, 'admin'); await assistant.refresh();
+    res.json({ ok: true });
+  }));
+
+  const testRow = (id: string) => db.prepare('SELECT * FROM assistant_tests WHERE id = ?').get(id) as TestRow | undefined;
+  const testInput = (b: Record<string, unknown>, e?: TestRow) => {
+    const question = b.question !== undefined ? str(b.question, 300) : e?.question;
+    if (!question) throw bad('question is required');
+    return {
+      question, lang: b.lang !== undefined ? (LANGS.includes(String(b.lang)) ? String(b.lang) : 'en') : e?.lang ?? 'en',
+      expect_intent: b.expect_intent !== undefined ? str(b.expect_intent, 20) ?? null : e?.expect_intent ?? null,
+      expect_id: b.expect_id !== undefined ? str(b.expect_id, 80) ?? null : e?.expect_id ?? null,
+      expect_text: b.expect_text !== undefined ? str(b.expect_text, 120) ?? null : e?.expect_text ?? null,
+    };
+  };
+  const saveTest = (id: string, t: ReturnType<typeof testInput>) => db.prepare(`INSERT INTO assistant_tests (id,question,lang,expect_intent,expect_id,expect_text,updated_at) VALUES (?,?,?,?,?,?,?)
+    ON CONFLICT(id) DO UPDATE SET question=excluded.question, lang=excluded.lang, expect_intent=excluded.expect_intent, expect_id=excluded.expect_id, expect_text=excluded.expect_text, last_result=NULL, updated_at=excluded.updated_at`)
+    .run(id, t.question, t.lang, t.expect_intent, t.expect_id, t.expect_text, now());
+  admin.get('/assistant-tests', (_req, res) => { res.json((db.prepare('SELECT * FROM assistant_tests ORDER BY id').all() as TestRow[]).map(testView)); });
+  admin.post('/assistant-tests', wrap(async (req, res) => { const t = testInput(req.body ?? {}); const id = newId('test', t.question); saveTest(id, t); res.status(201).json(testView(testRow(id)!)); }));
+  admin.put('/assistant-tests/:id', wrap(async (req, res) => { const e = testRow(String(req.params.id)); if (!e) throw new HttpError(404, 'Test not found'); saveTest(e.id, testInput(req.body ?? {}, e)); res.json(testView(testRow(e.id)!)); }));
+  admin.delete('/assistant-tests/:id', (req, res) => { if (!db.prepare('DELETE FROM assistant_tests WHERE id = ?').run(String(req.params.id)).changes) throw new HttpError(404, 'Test not found'); res.json({ ok: true }); });
+  /** Runs every test (or one). local_only skips the AI model, so a run costs nothing. */
+  admin.post('/assistant-tests/run', wrap(async (req, res) => {
+    const only = str(req.body?.id);
+    const rows = only ? [testRow(only)].filter((x): x is TestRow => !!x) : db.prepare('SELECT * FROM assistant_tests ORDER BY id').all() as TestRow[];
+    const results = [];
+    for (const t of rows) results.push({ ...(await runTest(db, assistant, t, req.body?.local_only === true)), test: t.id });
+    res.json({ total: results.length, passed: results.filter(r => r.pass).length, results });
+  }));
+  admin.post('/assistant/try', wrap(async (req, res) => {
+    const text = str(req.body?.question, 500);
+    if (!text) throw bad('question is required');
+    const lang = (LANGS.includes(req.body?.lang) ? req.body.lang : 'en') as Lang;
+    res.json(await assistant.ask({ text, lang, from: null, trace: true, noLog: true }));
+  }));
+  admin.get('/assistant/status', (_req, res) => {
+    res.json({ model: assistant.model, rules: (db.prepare('SELECT COUNT(*) AS n FROM assistant_rules WHERE enabled = 1').get() as { n: number }).n,
+      transcription: config.sonioxKey ? 'soniox' : config.geminiKey ? 'gemini' : null });
+  });
 
   admin.put('/entrances/:id', wrap(async (req, res) => {
     const e = await Entrance.findById(req.params.id);

@@ -7,18 +7,21 @@ import type { Campus } from '../services/campus.js';
 import { Directory, isStale } from '../services/directory.js';
 import { Offices, type IssueRow } from '../services/offices.js';
 import { config } from '../config.js';
-import { Gemini, GeminiUnavailable, type ToolCall } from './gemini.js';
+import type { Gemini } from './gemini.js';
+import { LlmUnavailable, type Llm, type ToolCall } from './llm.js';
+import { Events, type PlaceRef } from '../services/events.js';
 import { transcribeSoniox } from './soniox.js';
-import { IntentRouter, modeFrom, type Lang, type Match } from './router.js';
+import { IntentRouter, modeFrom, normalise, type Lang, type Match } from './router.js';
 
 export type AnswerAction =
   | { type: 'route'; place_id: string; mode: 'walk' | 'step_free' | 'ar' }
   | { type: 'person'; person_id: string }
-  | { type: 'help'; topic: 'walkthrough' };
+  | { type: 'help'; topic: 'walkthrough' }
+  | { type: 'events' };
 
 export type Answer = {
   id: string;
-  intent: 'place' | 'person' | 'procedure' | 'service' | 'info' | 'help' | 'unknown';
+  intent: 'place' | 'person' | 'procedure' | 'service' | 'info' | 'events' | 'help' | 'unknown';
   lang: Lang;
   text: string;
   place?: { id: string; name: string; category: string; status: string; closed_reason: string | null; hours: string | null; open: string; coordinates: Position };
@@ -34,7 +37,12 @@ export type Answer = {
   verified_at?: string | null;
   unverified?: boolean;
   action?: AnswerAction;
-  answered_by: 'local' | 'gemini' | 'cache' | 'none';
+  answered_by: 'local' | 'gemini' | 'claude' | 'cache' | 'none';
+  /** set when an admin-written rule produced the answer */
+  rule?: { id: string; title: string };
+  events?: ReturnType<Events['view']>[];
+  /** admin playground only: how the answer was found */
+  trace?: { candidates: { intent: string; id: string; score: number }[]; tools: { name: string; args: Record<string, string>; found: boolean }[]; ms: number; model: string | null };
   suggestions?: string[];
   translation_review?: boolean;
 };
@@ -81,10 +89,15 @@ export class Assistant {
   private directory: Directory;
   private offices: Offices;
 
-  constructor(private db: Sql, private campus: Campus, private gemini: Gemini) {
+  private events: Events;
+  constructor(private db: Sql, private campus: Campus, private llm: Llm, private gemini: Gemini) {
     this.directory = new Directory(db);
     this.offices = new Offices(db);
+    this.events = new Events(db);
   }
+
+  /** Which model answers open questions (shown in the admin). */
+  get model() { return this.llm.configured ? { provider: this.llm.provider, model: this.llm.model } : null; }
 
   /** Rebuild the local index. Called at boot and after admin edits. */
   async refresh() {
@@ -106,6 +119,8 @@ export class Assistant {
       }),
       // 'food' alone means the cafeteria, not the dining office
       this.offices.issues().map(r => ({ id: r.id, keys: [r.issue, ...json.parse<string[]>(r.keywords, [])].filter(k => k.toLowerCase() !== 'food') })),
+      (this.db.prepare('SELECT id, title, triggers FROM assistant_rules WHERE enabled = 1').all() as { id: string; title: string; triggers: string }[])
+        .map(r => ({ id: r.id, keys: [r.title, ...json.parse<string[]>(r.triggers, [])].filter(Boolean) })),
     );
   }
 
@@ -237,7 +252,45 @@ export class Assistant {
     };
   }
 
+  /** An answer the admin wrote by hand, with the office / place / steps it points to. */
+  private ruleAnswer(id: string, lang: Lang, from: Position | null): Answer | null {
+    const r = this.db.prepare('SELECT * FROM assistant_rules WHERE id = ? AND enabled = 1').get(id) as Record<string, string | number | null> | undefined;
+    if (!r) return null;
+    this.db.prepare('UPDATE assistant_rules SET hits = hits + 1 WHERE id = ?').run(id);
+    const text = String((lang === 'fr' ? r.answer_fr : lang === 'ar' ? r.answer_ar : null) || r.answer);
+    const linked = r.procedure_id ? this.procedureAnswer(String(r.procedure_id), lang, from)
+      : r.service_id ? this.serviceAnswer(String(r.service_id), lang, from)
+      : r.place_id ? this.placeAnswer(String(r.place_id), lang, from, null) : null;
+    return {
+      ...(linked ?? {}), id: randomUUID(), intent: linked?.intent ?? 'info', lang, text, answered_by: 'local',
+      rule: { id: String(r.id), title: String(r.title) }, source: 'Written by the campus administration', unverified: false,
+      alert: r.urgent ? { tone: 'urgent', text } : linked?.alert,
+    };
+  }
+
+  private static EVENTS = /\b(events?|happening|what s on|whats on|activities|ceremony|club fair|concert|festival)\b|evenements?|activites|فعاليات|نشاطات/i;
+
+  private placeRefs(): Map<string, PlaceRef> {
+    return new Map([...this.places.values()].map(p => [p._id, { id: p._id, name: p.name, coordinates: p.location.coordinates, category: p.category }]));
+  }
+
+  private eventsAnswer(lang: Lang, question = ''): Answer {
+    const all = this.events.list({ days: 14 }).map(e => this.events.view(e, this.placeRefs()));
+    const today = /today|tonight|aujourd|ce soir|اليوم|الليلة/i.test(question);
+    const list = (today ? all.filter(e => e.state === 'now' || e.state === 'today') : all).slice(0, 6);
+    const fmt = (iso: string) => new Intl.DateTimeFormat(lang === 'fr' ? 'fr-FR' : lang === 'ar' ? 'ar-MA' : 'en-GB', { weekday: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone: config.timezone }).format(new Date(iso));
+    const first = list[0];
+    const where = (sep: string) => (first?.place ? sep + first.place.name : first?.location_text ? sep + first.location_text : '');
+    const text = !first
+      ? (lang === 'fr' ? 'Aucun événement publié pour le moment.' : lang === 'ar' ? 'لا توجد فعاليات منشورة حاليًا.' : 'No events are published right now.')
+      : lang === 'fr' ? `${first.state === 'now' ? 'En ce moment' : 'Prochain'} : ${first.title}, ${fmt(first.starts_at)}${where(', ')}.${list.length > 1 ? ` Et ${list.length - 1} autre(s) bientôt.` : ''}`
+      : lang === 'ar' ? `${first.state === 'now' ? 'الآن' : 'التالي'}: ${first.title}، ${fmt(first.starts_at)}${where('، ')}.${list.length > 1 ? ` و${list.length - 1} أخرى قريبًا.` : ''}`
+      : `${first.state === 'now' ? 'On now' : 'Next up'}: ${first.title}, ${fmt(first.starts_at)}${where(' at ')}.${list.length > 1 ? ` ${list.length - 1} more coming up.` : ''}`;
+    return { id: randomUUID(), intent: 'events', lang, text, answered_by: 'local', events: list, source: 'Campus events (Admin → Events)', action: { type: 'events' } };
+  }
+
   private fromMatch(m: Match, lang: Lang, from: Position | null, question = ''): Answer | null {
+    if (m.intent === 'rule') return this.ruleAnswer(m.id, lang, from);
     if (m.intent === 'place') return this.placeAnswer(m.id, lang, from, m.mode, question);
     if (m.intent === 'person') return this.personAnswer(m.id, lang);
     if (m.intent === 'procedure') return this.procedureAnswer(m.id, lang, from);
@@ -254,6 +307,15 @@ export class Assistant {
   /** Tools Gemini may call, run against our own data. */
   private async runTool(call: ToolCall) {
     const q = String(call.args.query ?? call.args.name ?? '');
+    if (call.name === 'campus_rule') {
+      const m = this.router!.match(q, 'rule');
+      const r = m ? this.db.prepare('SELECT id, title, answer FROM assistant_rules WHERE id = ? AND enabled = 1').get(m.id) as { id: string; title: string; answer: string } | undefined : undefined;
+      return r ? { found: true, id: `rule:${r.id}`, title: r.title, answer: r.answer } : { found: false };
+    }
+    if (call.name === 'whats_on') {
+      const list = this.events.list({ days: 14 }).map(e => this.events.view(e, this.placeRefs()));
+      return list.length ? { found: true, id: 'events:all', events: list.slice(0, 8).map(e => ({ title: e.title, starts_at: e.starts_at, ends_at: e.ends_at, place: e.place?.name ?? e.location_text, state: e.state })) } : { found: false };
+    }
     if (call.name === 'campus_info') {
       const c = this.offices.campus();
       return { found: true, info: true, office_hours: `Monday–Friday ${c.open}–${c.close}, closed for lunch ${c.lunch[0]}–${c.lunch[1]}`, weekend: c.weekend_working ? 'open' : 'closed (except dining)',
@@ -291,14 +353,28 @@ export class Assistant {
   }
 
   /** localOnly: live preview while someone is still speaking. No Gemini, no log. */
-  async ask(input: { text: string; lang: Lang; from: Position | null; history?: { role: 'user' | 'assistant'; text: string }[]; localOnly?: boolean }): Promise<Answer> {
+  async ask(input: { text: string; lang: Lang; from: Position | null; history?: { role: 'user' | 'assistant'; text: string }[]; localOnly?: boolean; trace?: boolean; noLog?: boolean }): Promise<Answer> {
+    const started = Date.now();
+    const a = await this.answer(input);
+    if (!input.trace) { delete a.trace; return a; }
+    return { ...a, trace: { candidates: a.trace?.candidates ?? [], tools: a.trace?.tools ?? [], ms: Date.now() - started, model: a.trace?.model ?? null } };
+  }
+
+  private async answer(input: { text: string; lang: Lang; from: Position | null; history?: { role: 'user' | 'assistant'; text: string }[]; localOnly?: boolean; noLog?: boolean }): Promise<Answer> {
     if (!this.router) await this.refresh();
     const { text, lang, from } = input;
     const review = lang !== 'en';
+    const log = (q: string, l: Lang, intent: string, by: string) => { if (!input.noLog) this.log(q, l, intent, by); };
 
     // 1–3: local router
     const all = this.router!.matchAll(text);
+    const candidates = all.slice(0, 5).map(c => ({ intent: c.intent, id: c.id, score: Math.round(c.score * 1000) / 1000 }));
     let m = all[0] ?? null;
+    // "what's on tonight?": events, unless an admin rule or an exact name says otherwise
+    if (Assistant.EVENTS.test(normalise(text)) && m?.intent !== 'rule') {
+      if (!input.localOnly) log(text, lang, 'events', 'local');
+      return { ...this.eventsAnswer(lang, text), translation_review: review, trace: { candidates, tools: [], ms: 0, model: null } };
+    }
     if (m?.intent === 'service') {
       const home = json.parse<string[]>(this.offices.row(m.id)?.place_ids ?? null, [])[0];
       const place = all.find(c => c.intent === 'place' && c.id === home && c.score - m!.score < 0.01);
@@ -306,17 +382,19 @@ export class Assistant {
     }
     if (m) {
       const a = this.fromMatch(m, lang, from, text);
-      if (a) { if (!input.localOnly) this.log(text, lang, a.intent, 'local'); return { ...a, translation_review: review }; }
+      if (a) { if (!input.localOnly) log(text, lang, a.intent, 'local'); return { ...a, translation_review: review, trace: { candidates, tools: [], ms: 0, model: null } }; }
     }
     if (input.localOnly) return { id: randomUUID(), intent: 'unknown', lang, text: '', answered_by: 'none' };
 
-    // 4: Gemini with function calling
-    if (!this.gemini.configured) {
-      this.log(text, lang, 'unknown', 'none');
+    // 4: the AI model (Claude or Gemini) with tool calling
+    if (!this.llm.configured) {
+      log(text, lang, 'unknown', 'none');
       return { id: randomUUID(), intent: 'unknown', lang, text: T.unknown[lang], answered_by: 'none', translation_review: review, suggestions: ['Where is the library?', 'How do I declare a minor?', 'Where do I pay my fees?'] };
     }
     try {
-      const { text: prose, calls } = await this.gemini.ask(text, lang, input.history ?? [], c => this.runTool(c));
+      const { text: prose, calls } = await this.llm.ask(text, lang, input.history ?? [], c => this.runTool(c));
+      const by = this.llm.provider;
+      const tools = calls.map(c => ({ name: c.call.name, args: c.call.args, found: (c.result as { found?: boolean })?.found === true }));
       const found = (c: { result: unknown }) => (c.result as { found?: boolean })?.found === true;
       const isInfo = (c: { result: unknown }) => (c.result as { info?: boolean })?.info === true;
       const hit = [...calls].reverse().find(c => found(c) && !isInfo(c));
@@ -327,21 +405,21 @@ export class Assistant {
         const sep = raw.indexOf(':');
         const kind = sep > 0 ? raw.slice(0, sep) : '';
         const id = sep > 0 ? raw.slice(sep + 1) : raw;
-        const intent = kind === 'service' ? 'service' : kind === 'issue' ? 'issue' : hit.call.name === 'find_place' ? 'place' : hit.call.name === 'get_person_office' ? 'person' : 'procedure';
-        const structured = this.fromMatch({ intent, id, score: 0, mode: modeFrom(text) }, lang, from, text)!;
+        const intent = kind === 'service' ? 'service' : kind === 'issue' ? 'issue' : kind === 'rule' ? 'rule' : hit.call.name === 'find_place' ? 'place' : hit.call.name === 'get_person_office' ? 'person' : 'procedure';
+        const structured = kind === 'events' ? this.eventsAnswer(lang, text) : this.fromMatch({ intent, id, score: 0, mode: modeFrom(text) }, lang, from, text);
         // The model resolves intent; factual content comes from the current campus record.
-        answer = { ...structured, answered_by: 'gemini' };
+        answer = structured ? { ...structured, answered_by: by } : { id: randomUUID(), intent: 'unknown', lang, text: T.unknown[lang], answered_by: by };
       } else if (info && prose) {
         // general campus facts: the model's sentence is grounded in campus_info only
-        answer = this.infoAnswer(lang, prose);
+        answer = { ...this.infoAnswer(lang, prose), answered_by: by };
       } else {
-        answer = { id: randomUUID(), intent: 'unknown', lang, text: T.unknown[lang], answered_by: 'gemini', suggestions: ['Where is the library?', 'How do I declare a minor?', 'I lost my student card'] };
+        answer = { id: randomUUID(), intent: 'unknown', lang, text: T.unknown[lang], answered_by: by, suggestions: ['Where is the library?', 'How do I declare a minor?', 'I lost my student card'] };
       }
-      this.log(text, lang, answer.intent, 'gemini');
-      return { ...answer, translation_review: review };
+      log(text, lang, answer.intent, by);
+      return { ...answer, translation_review: review, trace: { candidates, tools, ms: 0, model: this.llm.model } };
     } catch (error) {
-      this.log(text, lang, 'error', 'none');
-      const message = error instanceof GeminiUnavailable ? error.message : 'The assistant could not answer right now.';
+      log(text, lang, 'error', 'none');
+      const message = error instanceof LlmUnavailable ? error.message : 'The assistant could not answer right now.';
       return { id: randomUUID(), intent: 'unknown', lang, text: `${message} ${T.unknown[lang]}`, answered_by: 'none', translation_review: review };
     }
   }

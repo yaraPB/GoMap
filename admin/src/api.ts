@@ -39,7 +39,7 @@ export type Person = {
   note: string | null; note_kind: NoteKind | null; note_at: string | null; lunch: [string, string]; lunch_custom: boolean;
   presence: { status: string; reason: string | null; until: string | null; set_by: string } | null;
 };
-export type NoteKind = 'sick' | 'online' | 'appointment' | 'email' | 'back_soon' | 'custom';
+export type NoteKind = 'sick' | 'online' | 'appointment' | 'email' | 'back_soon' | 'teaching' | 'conference' | 'away_week' | 'semester_off' | 'hours_moved' | 'custom';
 export type OpenState = { state: 'open'; until: string } | { state: 'closed'; next: { day: string; time: string } | null } | { state: 'not_published' };
 export type Service = {
   id: string; name: string; short_name: string; category: string; handles: string[]; keywords: string[]; places: { id: string; name: string; known: boolean }[];
@@ -67,11 +67,40 @@ export type Overview = {
   procedures_not_live: { id: string; title: string; status: string }[];
 };
 
+export type CampusEvent = { id: string; title: string; description: string | null; kind: string; audience: string; organizer: string | null; link: string | null;
+  starts_at: string; ends_at: string; state: 'now' | 'today' | 'soon' | 'later' | 'past'; sample: boolean; place: { id: string; name: string; coordinates: [number, number] } | null; location_text: string | null };
+export type Rule = { id: string; title: string; triggers: string[]; answer: string; answer_fr: string | null; answer_ar: string | null; place_id: string | null; service_id: string | null;
+  procedure_id: string | null; urgent: boolean; enabled: boolean; hits: number; updated_at: string };
+export type Trace = { candidates: { intent: string; id: string; score: number }[]; tools: { name: string; args: Record<string, string>; found: boolean }[]; ms: number; model: string | null };
+export type TryAnswer = { intent: string; text: string; answered_by: string; rule?: { id: string; title: string }; place?: { id: string; name: string }; service?: { id: string; short_name: string };
+  procedure?: { id: string; title: string }; person?: { id: string; name: string }; events?: CampusEvent[]; alert?: { tone: string; text: string }; trace?: Trace; unverified?: boolean };
+export type TestResult = { pass: boolean; why: string[]; intent: string; id: string | null; text: string; answered_by: string; trace: Trace | null; at: string };
+export type AssistantTest = { id: string; question: string; lang: string; expect_intent: string | null; expect_id: string | null; expect_text: string | null; last_result: TestResult | null; updated_at: string };
+export type FootprintFC = { type: 'FeatureCollection'; features: { type: 'Feature'; geometry: unknown; properties: { id: string; place_id: string | null; place_name: string | null; source: string } }[] };
+
 export const api = {
   overview: () => req<Overview>('/api/admin/overview'),
   places: () => req<Place[]>('/api/places'),
   place: (id: string) => req<PlaceDetail>(`/api/places/${id}`),
   savePlace: (id: string, b: Record<string, unknown>) => put<unknown>(`/api/admin/places/${id}`, b),
+  createPlace: (b: Record<string, unknown>) => post<{ _id: string; name: string }>('/api/admin/places', b),
+  deletePlace: (id: string) => del<{ ok: true; deleted: Record<string, unknown> & { _id: string; name: string; category: string; location: { coordinates: [number, number] } }; people_unlinked: number }>(`/api/admin/places/${encodeURIComponent(id)}`),
+  footprints: () => req<FootprintFC>('/api/admin/footprints'),
+  events: () => req<CampusEvent[]>('/api/admin/events'),
+  createEvent: (b: Record<string, unknown>) => post<CampusEvent>('/api/admin/events', b),
+  saveEvent: (id: string, b: Record<string, unknown>) => put<CampusEvent>(`/api/admin/events/${id}`, b),
+  deleteEvent: (id: string) => del(`/api/admin/events/${id}`),
+  rules: () => req<Rule[]>('/api/admin/rules'),
+  createRule: (b: Record<string, unknown>) => post<Rule>('/api/admin/rules', b),
+  saveRule: (id: string, b: Record<string, unknown>) => put<Rule>(`/api/admin/rules/${id}`, b),
+  deleteRule: (id: string) => del(`/api/admin/rules/${id}`),
+  tests: () => req<AssistantTest[]>('/api/admin/assistant-tests'),
+  createTest: (b: Record<string, unknown>) => post<AssistantTest>('/api/admin/assistant-tests', b),
+  saveTest: (id: string, b: Record<string, unknown>) => put<AssistantTest>(`/api/admin/assistant-tests/${id}`, b),
+  deleteTest: (id: string) => del(`/api/admin/assistant-tests/${id}`),
+  runTests: (b: { id?: string; local_only?: boolean } = {}) => post<{ total: number; passed: number; results: (TestResult & { test: string })[] }>('/api/admin/assistant-tests/run', b),
+  tryAsk: (question: string, lang = 'en') => post<TryAnswer>('/api/admin/assistant/try', { question, lang }),
+  assistantStatus: () => req<{ model: { provider: string; model: string } | null; rules: number; transcription: string | null }>('/api/admin/assistant/status'),
   saveEntrance: (id: string, b: Record<string, unknown>) => put<unknown>(`/api/admin/entrances/${id}`, b),
   people: () => req<Person[]>('/api/people'),
   person: (id: string) => req<Person>(`/api/people/${id}`),
@@ -101,9 +130,11 @@ export const api = {
 };
 
 export const SERVICE_CATEGORIES: [string, string][] = [['academic', 'Academic'], ['money', 'Money'], ['wellbeing', 'Health & wellbeing'], ['campus_life', 'Campus life'], ['it', 'IT'], ['admin', 'Administration'], ['service', 'Other']];
-export const NOTE_KINDS: [NoteKind, string, string][] = [['sick', '🤒', 'Out sick today'], ['online', '💻', 'Online meeting'], ['appointment', '📅', 'Take an appointment'], ['email', '✉️', 'Email me'], ['back_soon', '⏳', 'Back soon'], ['custom', '📝', 'Note']];
+export const NOTE_KINDS: [NoteKind, string][] = [['sick', 'Out sick today'], ['online', 'Online meeting'], ['appointment', 'Take an appointment'], ['email', 'Email me'], ['back_soon', 'Back soon'], ['teaching', 'Teaching'], ['conference', 'At a conference'], ['away_week', 'Not here this week'], ['semester_off', 'On leave this semester'], ['hours_moved', 'Office hours moved'], ['custom', 'Note']];
 export const fmtMin = (m: number) => (m < 60 ? `${m} min` : `${Math.floor(m / 60)} h${m % 60 ? ` ${m % 60}` : ''}`);
 export const CATEGORIES = ['academic', 'residential', 'dining', 'athletics', 'admin', 'services', 'facilities'];
+export const EVENT_KINDS: [string, string][] = [['talk', 'Talk'], ['sport', 'Sport'], ['club', 'Clubs'], ['culture', 'Culture'], ['official', 'Official'], ['career', 'Careers'], ['other', 'Other']];
+export const AUDIENCES: [string, string][] = [['all', 'Everyone'], ['students', 'Students'], ['faculty', 'Faculty & staff'], ['visitors', 'Visitors']];
 export const CAT_COLOR: Record<string, string> = { academic: '#2563EB', residential: '#E0841F', dining: '#D1473F', athletics: '#11864F', admin: '#6D5BD0', services: '#0E7490', facilities: '#6B7280' };
 export const SCHOOLS = [['sba', 'Business Administration'], ['sse', 'Science & Engineering'], ['shss', 'Humanities & Social Sciences'], ['lc', 'Language Center']] as const;
 export const fmtDate = (iso: string | null | undefined) => (iso ? new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—');

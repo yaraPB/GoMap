@@ -11,6 +11,8 @@ import { usePanels } from '../state/panels';
 import { Chip, Icon, IconBtn, T, rise } from '../ui/kit';
 import { categories, color, schools, shadow, type IconName } from '../ui/theme';
 import RoleWidget from './RoleWidget';
+import { useRoleEvents, whenText } from './Events';
+import { useLang } from '../i18n';
 import { ROLE_LOOK } from './Views';
 
 const COUNT_LABEL: Record<string, string> = {
@@ -46,7 +48,12 @@ export default function Home({ chipsDelay }: { chipsDelay: number }) {
   const guest = user.role === 'guest';
   const density = map.layers.crowding;
 
-  useEffect(() => { map.send({ type: 'filter', category, school, fit: true }); }, [category, school]); // eslint-disable-line react-hooks/exhaustive-deps
+  // a filter never swings the camera: it only glides when most results are off screen
+  useEffect(() => { map.send({ type: 'filter', category, school, fit: 'gentle' }); }, [category, school]); // eslint-disable-line react-hooks/exhaustive-deps
+  const lang = useLang();
+  const events = useRoleEvents();
+  const upcoming = events.data ?? [];
+  const nextUp = upcoming.find(e => e.state === 'now' || e.state === 'today') ?? null;
   useEffect(() => { setCategory('all'); setSchool('all'); }, [guest]);
 
   const count = useMemo(() => (places.data ?? []).filter(p => (category === 'all' || p.category === category) && (category !== 'academic' || school === 'all' || p.schools.includes(school as never))).length, [places.data, category, school]);
@@ -72,6 +79,7 @@ export default function Home({ chipsDelay }: { chipsDelay: number }) {
             <Icon name={look.icon} size={21} stroke={look.ink} />
           </Pressable>
           <IconBtn icon="search" label={t('Search the campus')} onPress={() => push({ name: 'search' })} />
+          {!!upcoming.length && <Chip label={t('Events')} icon="events" activeColor="#A21CAF" onPress={() => push({ name: 'events' })} />}
           {chips.map((c, i) => (
             <Animated.View key={c.id} entering={FadeInDown.delay(chipsDelay + i * 40).duration(320)}>
               <Chip label={t(c.name)} icon={c.icon} active={category === c.id} activeColor={c.color} onPress={() => { setCategory(category === c.id ? 'all' : c.id); setSchool('all'); }} />
@@ -79,7 +87,7 @@ export default function Home({ chipsDelay }: { chipsDelay: number }) {
           ))}
         </ScrollView>
         {category === 'academic' && !guest && (
-          <Animated.View entering={rise} exiting={FadeOut.duration(150)}>
+          <Animated.View entering={FadeIn.duration(220)} exiting={FadeOut.duration(150)}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.rail, { paddingTop: 4, gap: 8 }]}>
               {schools.map(s => <Chip key={s.id} small light label={t(s.name)} active={school === s.id} onPress={() => setSchool(school === s.id ? 'all' : s.id)} />)}
             </ScrollView>
@@ -89,7 +97,7 @@ export default function Home({ chipsDelay }: { chipsDelay: number }) {
 
       {/* how many places the filter shows (clearing = tapping the chip again) */}
       {category !== 'all' && (
-        <Animated.View entering={rise} exiting={FadeOut.duration(150)} style={[styles.strip, { top: stripTop }]} pointerEvents="none">
+        <Animated.View entering={FadeIn.duration(220)} exiting={FadeOut.duration(180)} style={[styles.strip, { top: stripTop }]} pointerEvents="none">
           <Icon name={chips.find(c => c.id === category)?.icon ?? 'pin'} size={15} stroke="#fff" />
           <T weight="medium" numberOfLines={1} style={{ flex: 1, color: '#fff', fontSize: 13 }}>{t(COUNT_LABEL[category] ?? '{n} places', { n: count })}</T>
         </Animated.View>
@@ -100,6 +108,15 @@ export default function Home({ chipsDelay }: { chipsDelay: number }) {
         {!online && <Banner icon="wifiOff" tone="dark" text={t("No connection · the map works, crowding, open-now and questions don't")} />}
         {loc.reason === 'no-permission' && <Banner icon="locate" text={t('Turn on location for directions. Browsing works without it.')} action={t('Allow')} onAction={loc.request} />}
         {loc.reason === 'off-campus' && <Banner icon="locate" tone="dark" text={t("You're away from AUI · routes start from the main plaza (demo position)")} />}
+        {!guest && nextUp && category === 'all' && (
+          <Animated.View entering={FadeIn.duration(260)} exiting={FadeOut.duration(150)}>
+            <Pressable accessibilityRole="button" onPress={() => push({ name: 'events', id: nextUp.id })} style={[styles.banner, { backgroundColor: '#fff' }]}>
+              <View style={styles.evDot}><Icon name="events" size={14} stroke="#fff" /></View>
+              <T numberOfLines={1} style={{ flex: 1, fontSize: 12.5 }}><T weight="bold" style={{ fontSize: 12.5 }}>{nextUp.title}</T> · {whenText(nextUp, lang, t)}{nextUp.place ? ` · ${nextUp.place.name}` : ''}</T>
+              <Icon name="chevron" size={14} stroke={color.muted} />
+            </Pressable>
+          </Animated.View>
+        )}
         {density && (
           <Animated.View entering={rise} exiting={FadeOut.duration(150)}>
             <Pressable accessibilityRole="button" onPress={() => push({ name: 'crowding' })} style={[styles.banner, { backgroundColor: '#fff' }]}>
@@ -121,6 +138,16 @@ export default function Home({ chipsDelay }: { chipsDelay: number }) {
               <T style={{ fontSize: 12.5, color: color.muted }}>{t('Where would you like to go? We will walk you there.')}</T>
             </View>
           </View>
+          {upcoming[0] && (
+            <Pressable accessibilityRole="button" onPress={() => push({ name: 'events', id: upcoming[0].id })} style={({ pressed }) => [styles.visitorEvent, pressed && { opacity: 0.85 }]}>
+              <View style={styles.evDot}><Icon name="events" size={14} stroke="#fff" /></View>
+              <View style={{ flex: 1 }}>
+                <T weight="bold" numberOfLines={1} style={{ fontSize: 14 }}>{upcoming[0].title}</T>
+                <T numberOfLines={1} style={{ fontSize: 12, color: '#86198F' }}>{whenText(upcoming[0], lang, t)}{upcoming[0].place ? ` · ${upcoming[0].place.name}` : ''}</T>
+              </View>
+              <T weight="bold" style={{ fontSize: 12.5, color: '#A21CAF' }}>{upcoming.length > 1 ? t('+{n} more', { n: upcoming.length - 1 }) : t('Details')}</T>
+            </Pressable>
+          )}
           <View style={styles.spots}>
             {spots.map((s, i) => (
               <Animated.View key={s.id} entering={FadeInDown.delay(80 + i * 40).duration(260)} style={styles.spotWrap}>
@@ -138,7 +165,7 @@ export default function Home({ chipsDelay }: { chipsDelay: number }) {
       <RoleWidget bottom={insets.bottom + 88} />
 
       {/* FAB stack */}
-      <View style={[styles.fabs, { bottom: insets.bottom + 96 }, guest && { bottom: insets.bottom + 330 }]} pointerEvents="box-none">
+      <View style={[styles.fabs, { bottom: insets.bottom + 96 }, guest && { bottom: insets.bottom + (upcoming[0] ? 392 : 330) }]} pointerEvents="box-none">
         {!guest && (
           <IconBtn icon="flame" label={density ? t('Hide busy paths') : t('Show busy paths now')} size={50}
             bg={density ? '#B45309' : undefined} stroke={density ? '#fff' : undefined} onPress={() => map.setLayers({ crowding: !density })} />
@@ -186,6 +213,8 @@ const styles = StyleSheet.create({
   visitor: { position: 'absolute', left: 12, right: 12, padding: 14, borderRadius: 20, backgroundColor: '#fff', gap: 12, ...shadow.float },
   visitorIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#EAF6F8', alignItems: 'center', justifyContent: 'center' },
   spots: { flexDirection: 'row', flexWrap: 'wrap', marginHorizontal: -4 },
+  evDot: { width: 26, height: 26, borderRadius: 13, backgroundColor: '#C026D3', alignItems: 'center', justifyContent: 'center' },
+  visitorEvent: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 10, borderRadius: 14, backgroundColor: '#FDF4FF', borderWidth: 1, borderColor: '#F5D0FE' },
   spotWrap: { width: '50%', padding: 4 },
   spot: { flexDirection: 'row', alignItems: 'center', gap: 8, height: 44, paddingHorizontal: 12, borderRadius: 12, backgroundColor: '#F3FAFB', borderWidth: 1, borderColor: '#D6EEF2' },
 });

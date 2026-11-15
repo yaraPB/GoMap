@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import { mapHtml, CAMPUS_CENTER } from '../src/map/mapHtml';
+import { CAMPUS_MAX_BOUNDS, CAMPUS_MIN_ZOOM } from '../src/map/campusOutline';
 
 const html = mapHtml('pk.test-token', { flyIn: true });
 const scriptOf = (page: string) => page.match(/<script>\n([\s\S]*?)<\/script>/)?.[1] ?? '';
@@ -96,7 +97,9 @@ test('arrival starts at the planet, ignores initial follow reset, and ends once 
   h.emit('moveend');
   h.emit('touchstart');
   assert.equal(h.messages.filter(m => m.type === 'flyInDone').length, 1);
-  assert.equal(h.calls.filter(c => c.name === 'setMinZoom').at(-1)?.args, 14.2);
+  // from here on the camera is locked to Al Akhawayn
+  assert.equal(h.calls.filter(c => c.name === 'setMinZoom').at(-1)?.args, CAMPUS_MIN_ZOOM);
+  assert.equal(JSON.stringify(h.calls.filter(c => c.name === 'setMaxBounds').at(-1)?.args), JSON.stringify(CAMPUS_MAX_BOUNDS));
 });
 
 test('skipping before or during arrival cancels the flight without restarting it', () => {
@@ -133,18 +136,38 @@ test('tour filters real places and leaves room for its card; building tint survi
   assert.equal(h.calls.find(c => c.name === 'fitBounds')?.args.padding.bottom, 340);
   h.command({ type: 'filter', category: 'all', school: 'all' });
   assert.equal(h.sources.places.data.features.length, 2);
+  // the Day scene tints buildings, and the tint survives a style reload
+  h.command({ type: 'skin', skin: 'day' });
   h.emit('style.load');
   const tints = h.calls.filter(c => c.name === 'config' && c.args.key === 'colorBuildings');
-  assert.equal(tints.length, 2);
-  assert.equal(tints[1].args.value, '#C4C1BA');
+  assert.ok(tints.length >= 2);
+  assert.equal(tints.at(-1)!.args.value, '#C4C1BA');
 });
 
-test('contrast switches theme in place; satellite reloads the style without diffing', () => {
+test('chip filters never swing the camera; satellite drops 3D buildings; high contrast is gone', () => {
   const h = mapHarness({ flyIn: false });
   h.emit('style.load'); h.emit('load');
+  h.command({ type: 'places', places: [place, { ...place, id: 'food', category: 'dining' }] });
+  const before = h.calls.length;
+  h.command({ type: 'filter', category: 'dining', school: 'all', fit: 'gentle' });
+  assert.equal(h.sources.places.data.features.length, 1);
+  assert.equal(h.calls.slice(before).filter(c => ['fitBounds', 'flyTo', 'jumpTo'].includes(c.name)).length, 0, 'no fit, no fly');
+  h.command({ type: 'style', style: 'satellite' });
+  assert.equal(h.calls.filter(c => c.name === 'config' && c.args.key === 'show3dObjects').at(-1)?.args.value, false);
+  assert.equal(h.calls.filter(c => c.name === 'setStyle').length, 0, 'satellite switches in place');
   h.command({ type: 'style', style: 'contrast' });
-  assert.ok(h.calls.some(c => c.name === 'config' && c.args.key === 'theme' && c.args.value === 'monochrome'));
+  assert.ok(h.calls.every(c => c.name !== 'config' || c.args.key !== 'theme'), 'no monochrome theme any more');
   h.command({ type: 'style', style: 'default' });
-  assert.ok(h.calls.some(c => c.name === 'config' && c.args.key === 'theme' && c.args.value === 'default'));
+  assert.equal(h.calls.filter(c => c.name === 'config' && c.args.key === 'show3dObjects').at(-1)?.args.value, true);
   assert.ok(h.calls.every(c => c.name !== 'config' || c.args.key !== 'showAdminBoundaries' || c.args.value === false), 'country borders stay hidden');
+});
+
+test('scenes switch the real light preset: GoCampus (dusk by day), Day, Dark', () => {
+  const h = mapHarness({ flyIn: false });
+  h.emit('style.load'); h.emit('load');
+  const light = () => h.calls.filter(c => c.name === 'config' && c.args.key === 'lightPreset').at(-1)?.args.value;
+  h.command({ type: 'skin', skin: 'day' }); assert.equal(light(), 'day');
+  h.command({ type: 'skin', skin: 'night' }); assert.equal(light(), 'night');
+  h.command({ type: 'skin', skin: 'evening' }); assert.equal(light(), 'dusk');
+  h.command({ type: 'skin', skin: 'campus' }); assert.ok(['dusk', 'night'].includes(light()));
 });

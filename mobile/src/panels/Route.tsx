@@ -105,6 +105,7 @@ export function RoutePreview({ said, reply }: { said?: string; reply?: string })
               {r.crossings.length > 0 && <Fact icon="crossing" text={r.crossings.length > 1 ? t('{n} road crossings · cars', { n: r.crossings.length }) : t('1 road crossing · cars')} />}
               {!r.uses_roads && <Fact icon="walk" text={t('Walkways the whole way')} tone="green" />}
               {r.mode === 'step_free' && <Fact icon="wheel" text={t('No stairs on this route')} tone="green" />}
+              {r.approximate && <Fact icon="warn" text={t('The last stretch is not on a mapped path: walk straight to the door')} tone="blue" />}
               {r.destination.entrance && <Fact icon="door" text={`${t(r.destination.entrance)}${r.destination.entrance_estimated ? ` (${t('position estimated')})` : ''}`} tone="blue" />}
             </View>
             {nav.startedFromDemo && <Notice tone="info" icon="locate" text={loc.reason === 'no-permission' ? t('Location is off, so this starts from the main plaza.') : t('You are away from AUI, so this starts from the main plaza. Use "Simulate walk" during the trip to try it.')} />}

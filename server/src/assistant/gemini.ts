@@ -5,61 +5,39 @@
  *    steps, contact, action) is built by the server from the tool results, never by the model.
  *  - transcribe(): voice fallback for Expo Go, where on-device speech recognition is unavailable.
  */
-export class GeminiUnavailable extends Error {}
+import { LlmUnavailable, SYSTEM, TOOL_NAMES, TOOL_SPECS, type History, type Llm, type LlmResult, type ToolCall, type ToolRunner } from './llm.js';
 
-export const TOOL_NAMES = ['find_place', 'get_person_office', 'get_procedure', 'find_service', 'campus_info'] as const;
-export type ToolCall = { name: typeof TOOL_NAMES[number]; args: Record<string, string> };
-export type ToolRunner = (call: ToolCall) => Promise<unknown>;
+/** Kept for older imports: the same error every provider throws. */
+export const GeminiUnavailable = LlmUnavailable;
+export type { ToolCall };
 
-const TOOLS = [{
-  functionDeclarations: [
-    { name: 'find_place', description: 'Find a place on the Al Akhawayn University campus (building, office, café, car park, service) by name or description.',
-      parameters: { type: 'object', properties: { query: { type: 'string', description: 'What the user is looking for, e.g. "library" or "where to print"' } }, required: ['query'] } },
-    { name: 'get_person_office', description: 'Office, building, floor, office hours and whether a professor or staff member is in right now.',
-      parameters: { type: 'object', properties: { name: { type: 'string' } }, required: ['name'] } },
-    { name: 'get_procedure', description: 'How to do a university procedure (declare a minor, internship agreement, advising, account problems…): steps, owning office, where it is, contact.',
-      parameters: { type: 'object', properties: { query: { type: 'string' } }, required: ['query'] } },
-    { name: 'find_service', description: 'Which AUI office handles a student need or problem (fees, scholarships, transcripts, housing, feeling sick, stress, harassment, lost items, Wi-Fi, tutoring, internships, clubs…): office name, building, room, hours, email, phone extension.',
-      parameters: { type: 'object', properties: { query: { type: 'string', description: 'The need in a few words, e.g. "pay tuition" or "lost my wallet"' } }, required: ['query'] } },
-    { name: 'campus_info', description: 'General campus facts: standard office hours, lunch break, weekend opening, emergency numbers, and the list of offices.',
-      parameters: { type: 'object', properties: {} } },
-  ],
-}];
-
-const SYSTEM = (lang: string) => `You are GoMap, the campus assistant of Al Akhawayn University in Ifrane (AUI).
-Rules:
-- Answer ONLY from function results. Always call a function before answering a campus question.
-- Never invent a building number, room, email, phone number, hours or procedure step.
-- If the functions return nothing useful, say plainly you don't know and suggest asking the office or the AUI switchboard (+212 535-862-000).
-- Records marked unverified or draft: say they still need confirming.
-- Reply in ${lang === 'fr' ? 'French' : lang === 'ar' ? 'Arabic' : 'English'}, in at most two short sentences. No markdown, no lists. The app shows steps, maps and contacts itself.
-- A student describing a problem ("I lost my card", "I feel sick", "I can't pay"): call find_service.
-- Emergencies: always give Security's 24/7 number (ext. 2222 / 0535-86-2222) first.
-- Questions not about the campus: say you can only help with places, people, offices and procedures at AUI.`;
+const TOOLS = [{ functionDeclarations: TOOL_SPECS.map(t => ({ name: t.name, description: t.description,
+  parameters: { type: 'object', properties: t.properties, ...(t.required.length ? { required: t.required } : {}) } })) }];
 
 type Part = { text?: string; functionCall?: { name: string; args?: Record<string, string>; id?: string }; functionResponse?: unknown; thoughtSignature?: string };
 // Tool results go back with role 'user': the API rejects the older 'function' role.
 type Content = { role: 'user' | 'model'; parts: Part[] };
 
-export class Gemini {
-  constructor(private apiKey: string, private model: string, private fetchImpl: typeof fetch = fetch) {}
+export class Gemini implements Llm {
+  readonly provider = 'gemini' as const;
+  constructor(private apiKey: string, readonly model: string, private fetchImpl: typeof fetch = fetch) {}
 
   get configured() { return Boolean(this.apiKey); }
 
   private async generate(body: unknown) {
-    if (!this.apiKey) throw new GeminiUnavailable('The AI assistant is not configured on the server (GEMINI_API_KEY).');
+    if (!this.apiKey) throw new LlmUnavailable('The AI assistant is not configured on the server (GEMINI_API_KEY).');
     const response = await this.fetchImpl(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(this.model)}:generateContent`, {
       method: 'POST', headers: { 'content-type': 'application/json', 'x-goog-api-key': this.apiKey },
       body: JSON.stringify(body), signal: AbortSignal.timeout(15000),
     });
-    if (response.status === 429) throw new GeminiUnavailable('The assistant is busy right now (rate limit). Try again in a minute.');
-    if (!response.ok) throw new GeminiUnavailable(`Gemini request failed (${response.status}).`);
+    if (response.status === 429) throw new LlmUnavailable('The assistant is busy right now (rate limit). Try again in a minute.');
+    if (!response.ok) throw new LlmUnavailable(`Gemini request failed (${response.status}).`);
     const data = await response.json() as { candidates?: { content?: { parts?: Part[] } }[] };
     return data.candidates?.[0]?.content?.parts ?? [];
   }
 
   /** Runs the tool loop. Returns the model's prose and every tool call it made, with results. */
-  async ask(question: string, lang: string, history: { role: 'user' | 'assistant'; text: string }[], run: ToolRunner) {
+  async ask(question: string, lang: string, history: History, run: ToolRunner): Promise<LlmResult> {
     const contents: Content[] = [
       ...history.slice(-6).map(h => ({ role: h.role === 'assistant' ? 'model' as const : 'user' as const, parts: [{ text: h.text }] })),
       { role: 'user', parts: [{ text: question }] },

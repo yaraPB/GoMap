@@ -2,7 +2,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeOut, FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useClosures, usePlaces, useWalkways , useBuildings, useCrowding } from '../src/api/hooks';
+import { useClosures, usePlaces, useWalkways, useBuildings, useCrowding, useExtraBuildings } from '../src/api/hooks';
+import Events, { useRoleEvents } from '../src/panels/Events';
 import CampusMap from '../src/map/CampusMap';
 import { useMap, useMapEvent } from '../src/map/MapContext';
 import { useApp, useLocation } from '../src/state/app';
@@ -40,6 +41,8 @@ function MapSync() {
   const walkways = useWalkways();
   const closures = useClosures();
   const buildings = useBuildings();
+  const extra = useExtraBuildings();
+  const events = useRoleEvents();
   // path density now: the current hour, refreshed, drawn only where paths are busy
   const slot = campusSlot();
   const densityOn = map.layers.crowding;
@@ -53,6 +56,8 @@ function MapSync() {
   useEffect(() => { if (walkways.data) map.send({ type: 'walkways', data: walkways.data }); }, [walkways.data]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (closures.data) map.send({ type: 'closures', list: closures.data }); }, [closures.data]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (buildings.data) map.send({ type: 'buildings', data: buildings.data }); }, [buildings.data]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (extra.data) map.send({ type: 'extraBuildings', data: extra.data }); }, [extra.data]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (events.data) map.send({ type: 'events', list: events.data.map(e => ({ id: e.id, title: e.title, coordinates: e.place?.coordinates ?? null, state: e.state })) }); }, [events.data]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (densityOn && crowdNow.data && top.name !== 'crowding') map.send({ type: 'crowding', data: crowdNow.data }); }, [densityOn, crowdNow.data, top.name]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     const key = loc.coord ? `${loc.coord[0].toFixed(6)},${loc.coord[1].toFixed(6)},${Math.round(loc.heading ?? -1)}` : 'none';
@@ -69,6 +74,7 @@ function MapSync() {
 
   useMapEvent(e => {
     if (e.type === 'select' && ['home', 'search', 'place', 'layers'].includes(top.name)) push({ name: 'place', id: e.detail });
+    if (e.type === 'selectEvent' && ['home', 'place', 'events'].includes(top.name)) push({ name: 'events', id: e.detail });
     if (e.type === 'followOff' && nav.status === 'active') { /* the user dragged the map: stop following until they recentre */ }
   });
   return null;
@@ -92,25 +98,23 @@ function Panels() {
     case 'report': return <Report at={top.at} />;
     case 'help': return <Help step={top.step} />;
     case 'views': return <Views />;
+    case 'events': return <Events key={top.id ?? 'all'} id={top.id} />;
     default: return null;
   }
 }
 
-/** Board 01: the wordmark over the opening fly-in, world → Morocco → AUI. */
+/** Board 01: the opening fly-in, world → Morocco → AUI. Nothing over it but a quiet skip button. */
 function Launch() {
   const t = useT();
   const insets = useSafeAreaInsets();
   const map = useMap();
+  if (!map.ready) return null;
   return (
     <Animated.View exiting={FadeOut.duration(320)} style={StyleSheet.absoluteFill} pointerEvents="box-none">
-      <View style={[styles.launchTitle, { top: insets.top + 38 }]} pointerEvents="none">
-        <T style={{ fontFamily: font.display, fontSize: 36, color: '#fff', letterSpacing: -1 }}>GoMap</T>
-        <T style={{ fontSize: 14, color: '#E1EBE5', marginTop: 4 }}>{t("Your campus, a little closer.")}</T>
-      </View>
-      <View style={[styles.launchFooter, { bottom: insets.bottom + 44 }]}>
-        <T weight="medium" style={{ fontSize: 12, color: '#E1EBE5', marginBottom: 16 }}>{t("Earth · Morocco · Al Akhawayn")}</T>
-        <Btn title={map.ready ? t('Take me to campus') : t('Finding your campus…')} icon="arrowUp" kind="secondary" disabled={!map.ready} onPress={() => map.send({ type: 'skipIntro' })} />
-      </View>
+      <Pressable accessibilityRole="button" accessibilityLabel={t('Take me to campus')} onPress={() => map.send({ type: 'skipIntro' })}
+        style={[styles.skip, { bottom: insets.bottom + 40 }]} hitSlop={12}>
+        <Icon name="down" size={22} stroke="#fff" />
+      </Pressable>
     </Animated.View>
   );
 }
@@ -167,8 +171,7 @@ export default function MapShell() {
 }
 
 const styles = StyleSheet.create({
-  launchTitle: { position: 'absolute', left: 24, right: 24, alignItems: 'center', backgroundColor: 'rgba(14,24,39,0.65)', padding: 18, borderRadius: 24 },
-  launchFooter: { position: 'absolute', alignSelf: 'center', alignItems: 'center', backgroundColor: 'rgba(14,24,39,0.72)', padding: 16, borderRadius: 24 },
+  skip: { position: 'absolute', alignSelf: 'center', width: 52, height: 52, borderRadius: 26, backgroundColor: 'rgba(14,24,39,0.55)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.25)', alignItems: 'center', justifyContent: 'center' },
   error: { position: 'absolute', left: 14, right: 14 },
   offer: { position: 'absolute', left: 12, right: 12, padding: 18, borderRadius: 24, backgroundColor: '#FEFFFC', shadowColor: '#15251C', shadowOpacity: 0.18, shadowRadius: 16, elevation: 8 },
   offerIcon: { width: 48, height: 48, borderRadius: 17, backgroundColor: '#E8F3EB', alignItems: 'center', justifyContent: 'center' },

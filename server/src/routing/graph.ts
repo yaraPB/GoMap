@@ -198,6 +198,53 @@ export function buildGraph(features: WayFeature[], origin?: Position): Graph {
   return { nodes, edges, origin: o };
 }
 
+// ── connectivity ────────────────────────────────────────────────────────────
+
+/**
+ * Imported and traced paths leave small islands: a courtyard path that stops a few metres short
+ * of the main walk, a traced footway that never touches the tile data. A building whose door sits
+ * on an island had "no route" (Building 14). Every island is joined to the largest piece by one
+ * short walkway between their two closest nodes, so every place on campus is reachable.
+ * Connectors are walk-only, never cross into car-only roads, and are flagged so the admin graph
+ * report can list them for checking on site.
+ */
+export function connectIslands(graph: Graph, maxGap = Infinity) {
+  const added: { from: Position; to: Position; length: number }[] = [];
+  for (let guard = 0; guard < 500; guard++) {
+    const { comp, sizes } = components(graph);
+    if (sizes.length <= 1) break;
+    const main = sizes.indexOf(Math.max(...sizes));
+    const walkable = (n: Node) => n.edges.some(e => graph.edges[e].modes !== 'drive');
+    const mainNodes = graph.nodes.filter(n => comp[n.id] === main && walkable(n));
+    const grid = new Grid<number>(40);
+    for (const n of mainNodes) grid.insertBox(n.xy[0], n.xy[1], n.xy[0], n.xy[1], n.id);
+    // the island closest to the main piece goes first, so later islands can join through it
+    let best: { a: number; b: number; d: number } | null = null;
+    for (const n of graph.nodes) {
+      if (comp[n.id] === main || !walkable(n)) continue;
+      for (let r = 40; r <= 2560; r *= 2) {
+        const near = grid.near(n.xy[0], n.xy[1], r);
+        if (!near.length) continue;
+        for (const m of near) {
+          const d = dist(n.xy, graph.nodes[m].xy);
+          if (!best || d < best.d) best = { a: n.id, b: m, d };
+        }
+        break;
+      }
+    }
+    if (!best || best.d > maxGap) break;
+    const edge: Edge = {
+      id: `connector:${added.length}`, wayId: 'connector', a: best.a, b: best.b, length: best.d,
+      kind: 'walkway', modes: 'walk', stepFree: true, roadClass: null, name: null,
+    };
+    graph.nodes[best.a].edges.push(graph.edges.length);
+    graph.nodes[best.b].edges.push(graph.edges.length);
+    graph.edges.push(edge);
+    added.push({ from: graph.nodes[best.a].coord, to: graph.nodes[best.b].coord, length: Math.round(best.d * 10) / 10 });
+  }
+  return added;
+}
+
 // ── diagnostics (npm run graph:check) ───────────────────────────────────────
 
 export function components(graph: Graph) {
@@ -225,9 +272,11 @@ export function graphReport(graph: Graph, entranceNodes: Set<number> = new Set()
   const dangling = graph.nodes.filter(n => n.edges.length === 1 && !entranceNodes.has(n.id));
   const total = graph.edges.reduce((s, e) => s + e.length, 0);
   const largest = Math.max(0, ...sizes);
+  const connectors = graph.edges.filter(e => e.wayId === 'connector');
   return [
     `graph: ${graph.nodes.length} nodes, ${graph.edges.length} edges, ${(total / 1000).toFixed(2)} km`,
     `  connected pieces: ${sizes.length} (largest holds ${graph.nodes.length ? Math.round(largest / graph.nodes.length * 100) : 0}% of nodes)`,
+    `  joined islands: ${connectors.length}${connectors.length ? ' — check on site: ' + connectors.map(e => `${graph.nodes[e.a].coord.join(',')} ↔ ${graph.nodes[e.b].coord.join(',')} (${e.length.toFixed(0)} m)`).join('  ') : ''}`,
     `  dead ends that are not entrances: ${dangling.length}${dangling.length ? ' — e.g. ' + dangling.slice(0, 5).map(n => n.coord.join(',')).join('  ') : ''}`,
   ].join('\n');
 }

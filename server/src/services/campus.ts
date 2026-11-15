@@ -7,8 +7,8 @@ import type { Position } from 'geojson';
 import { Entrance, Place, Report, Walkway } from '../db/mongo.js';
 import type { WayFeature } from '../geo/types.js';
 import { CAMPUS_CENTER } from '../geo/types.js';
-import { buildGraph, graphReport, projector, projectOnSegment, type Graph } from '../routing/graph.js';
-import { buildRoute, haversine, nearestNode, shortestPath, snap, type RouteMode, type RouteResult } from '../routing/route.js';
+import { buildGraph, connectIslands, graphReport, projector, projectOnSegment, type Graph } from '../routing/graph.js';
+import { buildRoute, haversine, nearestNode, nearestReachable, shortestPath, snap, type RouteMode, type RouteResult } from '../routing/route.js';
 
 type EntranceInfo = { id: string; place_id: string; name: string; coord: Position; step_free: boolean; estimated: boolean; node: Record<RouteMode, number | null> };
 
@@ -17,6 +17,7 @@ export class Campus {
   closed = new Set<string>();
   entrances = new Map<string, EntranceInfo[]>();
   walkways: WayFeature[] = [];
+  connectors: ReturnType<typeof connectIslands> = [];
 
   async rebuild() {
     const docs = await Walkway.find().lean();
@@ -25,6 +26,9 @@ export class Campus {
       properties: { id: String(d._id), kind: d.kind, modes: d.modes, step_free: d.step_free ?? true, lit: d.lit ?? null, covered: d.covered ?? null, name: d.name ?? null, road_class: d.road_class ?? null, source: d.source },
     }) as WayFeature);
     this.graph = buildGraph(this.walkways, CAMPUS_CENTER);
+    // every building must be reachable: join path islands to the main network
+    // (80 m cap: a longer straight line would cut through buildings; route() falls back instead)
+    this.connectors = connectIslands(this.graph, 80);
     await this.ensureEntrances();
     await this.loadEntrances();
     await this.refreshClosures();
@@ -88,7 +92,7 @@ export class Campus {
     this.closed = closed;
   }
 
-  route(from: Position, to: { placeId?: string; coord?: Position }, mode: RouteMode): (RouteResult & { destination: { place_id: string | null; entrance: string | null; entrance_estimated: boolean; step_free: boolean } }) | { error: string; status: number } {
+  route(from: Position, to: { placeId?: string; coord?: Position }, mode: RouteMode): (RouteResult & { approximate?: boolean; destination: { place_id: string | null; entrance: string | null; entrance_estimated: boolean; step_free: boolean } }) | { error: string; status: number } {
     const start = snap(this.graph, from, mode, this.closed);
     if (!start) return { error: 'You seem to be off campus or away from any mapped path.', status: 422 };
     let targets: { node: number; entrance: EntranceInfo | null; coord: Position }[] = [];
@@ -101,19 +105,32 @@ export class Campus {
       if (n == null) return { error: 'That point is too far from any mapped path.', status: 422 };
       targets = [{ node: n, entrance: null, coord: to.coord }];
     }
-    const found = shortestPath(this.graph, start, targets.map(t => t.node), mode, this.closed);
-    if (!found) {
+    let found = shortestPath(this.graph, start, targets.map(t => t.node), mode, this.closed);
+    let target = found ? targets.find(t => t.node === found!.path.at(-1)!.node)! : null;
+    let approximate = false;
+    if (!found && !this.closed.size) {
+      // The door is on a piece of path we cannot reach (unmapped gap). Walk to the closest point we
+      // CAN reach and finish the last stretch straight to the door, flagged as approximate.
+      const goal = targets[0];
+      const near = nearestReachable(this.graph, start, goal.coord, mode, this.closed);
+      if (near != null) {
+        found = shortestPath(this.graph, start, [near], mode, this.closed);
+        target = { ...goal, node: near };
+        approximate = true;
+      }
+    }
+    if (!found || !target) {
       return { error: this.closed.size ? 'No route: a closure blocks every way there. Try another route type.' : 'No route found on the mapped paths.', status: 404 };
     }
-    const target = targets.find(t => t.node === found.path.at(-1)!.node)!;
     const endNode = this.graph.nodes[target.node].coord;
     const end = haversine(endNode, target.coord) > 1 ? target.coord : null;
     const result = buildRoute(this.graph, start, from, found.path, end, mode);
     return {
       ...result,
+      approximate,
       destination: {
         place_id: to.placeId ?? null, entrance: target.entrance?.name ?? null,
-        entrance_estimated: target.entrance?.estimated ?? false, step_free: target.entrance?.step_free ?? true,
+        entrance_estimated: (target.entrance?.estimated ?? false) || approximate, step_free: target.entrance?.step_free ?? true,
       },
     };
   }

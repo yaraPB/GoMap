@@ -1,6 +1,6 @@
 # GoMap TODO
 
-Legend: [x] done and checked here (tests or screenshots) · [~] done, needs a phone on campus to confirm
+Legend: [x] done and checked here (tests or screenshots) · [~] done, needs a phone on campus to confirm · ~~crossed out~~ = implemented
 
 ## Resources to use
 
@@ -9,22 +9,39 @@ https://www.mapbox.com/blog/snap-builds-with-mapbox-to-deliver-wearable-ar-navig
 https://www.mapbox.com/unity
 https://docs.soniox.com/llms.txt
 
-* [~] display the arrows and I sadi for the AR you can whatever technogology I just want it to be as good as possible.
+* [~] ~~display the arrows and I sadi for the AR you can whatever technogology I just want it to be as good as possible.~~
   → Arrows no longer wait for the compass (motion-sensor north first), never hide on weak GPS (they dim), and a big 3D guide arrow lies on the floor at the bottom and always turns towards the way to go. Floor ribbon + raised chevrons + turn marker stay. `mobile/app/ar.tsx`, `mobile/src/ar/orientation.ts`.
-* [ ] In the goMap, at the beginning when u zoom in, remove text it's useless.
-* [ ] The filters in the map they move very uncomfortably pls fix it it gave me nausea
-* [ ] In the admin for the filters let them also delete and show it to them by clicking the filter (whenever u click a filter, all the options show up and u can even use for example keyboard to delete or buttons).
-* [ ] Have the AR be more intuitive.
-* [ ] When u do satellite remove the 3D buildings and pls also remove high contrast from the options.
-* [ ] The map is too big pls limit it to al akhawayn pls in all the views.
-* [ ] I also like the event option pls make it better pls.
-* [ ] Also when I try to go to building 14 it says there's no path??? fix it there should be paths to everywhere right?
-* [ ] Also follow the AR code in the folder @react-native-mapbox-ar-master if it could be of any use to u
-* [ ] We will have to add the other buildings from the satellite imagery
-* [ ] Switching between scenes doesn't work pls implement it
-* [ ] Also have satellite imagery for the admin page pls
-* [ ] You didn't add the semester off, won't be here this week, etc... for the sticky notes
-* [ ] As for the AI could you please try it out more I don't know I first have to implement all the rules by hand and store them somewhere (we said the admin is the one responsible for that). Like go all
-* [ ] For the AI chatbot and AR implementation, pls I want them both to be as good as they can get, PLS IF U FEEL THE NEED TO CHANGE THE TECH STACK OR SMTH THEN PLS JUST DO SO AND AT THE END GIVE ME THE UPDATED SETUP_GUIDE WHERE I CAN CHANGE AND PROVIDE YOU WITH THE APPROPRIATE CHANGES.
-* [ ] Also when u repeat the readme pls give me the updated architecture and everything (like a really good one and the choices behind those decisions)
-* [ ] And ultimately remember I want the website to still look like the GoCampus application keep that in mind like I don't want it to look out of place just a more enhanced version (for reference pls check @GoCamus-ref)
+* [x] ~~In the goMap, at the beginning when u zoom in, remove text it's useless.~~
+  → The fly-in has no text over it any more (no title card, no "Earth · Morocco · Al Akhawayn"): only a small ↓ button to skip. `mobile/app/index.tsx` (Launch).
+* [x] ~~The filters in the map they move very uncomfortably pls fix it it gave me nausea~~
+  → Tapping a chip no longer swings, tilts or zooms the camera: pins that stay, stay put; the others cross-fade. The camera only glides (slowly, same tilt and heading) when most results are off screen. No more drop/bounce on every filter, the count strip fades instead of sliding. Tested in `mobile/test/map.test.ts`; checked in screenshots. `mobile/src/map/mapHtml.ts` (`gentleFit`), `mobile/src/panels/Home.tsx`.
+* [x] ~~In the admin for the filters let them also delete and show it to them by clicking the filter (whenever u click a filter, all the options show up and u can even use for example keyboard to delete or buttons).~~
+  → Admin → Places: click a category chip → every place in it opens in the left panel. Click to open, Shift for a range, Ctrl/⌘ to add, Ctrl/⌘+A for all, ↑/↓ to move; **Delete/Backspace** or the buttons delete (confirm with Enter), with **Undo** right after. Also a delete button in the place editor. Server: `DELETE /api/admin/places/:id` unlinks offices, events, procedures and rules cleanly. `admin/src/screens/Places.tsx`, `server/src/app.ts`.
+* [~] ~~Have the AR be more intuitive.~~
+  → Rebuilt the AR screen: one instruction in words at the top ("Turn left" / "in 20 m") with the next step under it; a coach that says how to hold the phone (raise / lower it); a buzz and a big **"Turn around"** when you face away from the route; one quiet GPS pill instead of five (tap it to calibrate); bottom bar like the references (stop · time & distance left · arrival time · map toggle with a big map); arrival card; voice on/off in the banner. `mobile/app/ar.tsx`.
+* [x] ~~When u do satellite remove the 3D buildings and pls also remove high contrast from the options.~~
+  → Satellite hides all 3D buildings (and the 3D switch says why); High contrast is gone from the app. Tested + screenshot (admin satellite too). `mobile/src/map/mapHtml.ts`, `mobile/src/panels/Layers.tsx`.
+* [x] ~~The map is too big pls limit it to al akhawayn pls in all the views.~~
+  → After the fly-in, the camera can't leave Al Akhawayn (max bounds from the campus outline + ~250 m, min zoom 15.2) and everything outside the campus outline is dimmed, in the app and in every admin map. `mobile/src/map/campusOutline.ts` (same file in `admin/src/`).
+* [x] ~~I also like the event option pls make it better pls.~~
+  → Real events now (the old card was a placeholder): Admin → **Events** (two-week calendar + map, kind, audience, place, times on the clock). In the app: event badges on the map (pulsing when on now), an **Events** chip, a "today" line on the home screen, the next event in the visitor welcome, a "What's on at AUI" sheet with Take me there / AR, and the assistant answers "what's on this week?". Three clearly-labelled sample events to start. `server/src/services/events.ts`, `mobile/src/panels/Events.tsx`, `admin/src/screens/Events.tsx`.
+* [x] ~~Also when I try to go to building 14 it says there's no path??? fix it there should be paths to everywhere right?~~
+  → Cause: Building 14's door (and Building 1, Business Office, Enrollment Services) sat on a 3-node path island 9 m from the main network. The graph now joins every island to the network (short connectors, listed by `npm run graph:check` for checking on site), and a door still cut off gets a straight "approximate" last stretch. A test routes from the plaza to **every** place. `server/src/routing/graph.ts` (`connectIslands`), `server/src/services/campus.ts`.
+* [x] ~~Also follow the AR code in the folder @react-native-mapbox-ar-master if it could be of any use to u~~
+  → Read it: it's Mapbox's 2018 beta built on `react-viro` (abandoned), and it renders tabletop terrain from terrain-RGB tiles — no navigation, no anchors, nothing that runs in Expo Go. Not used; the one idea worth keeping (terrain-RGB heights so arrows follow slopes) is noted in the README.
+* [~] ~~We will have to add the other buildings from the satellite imagery~~
+  → The team's satellite-traced buildings now show as 3D buildings in the app. Admin → Places: **Draw a building** on the satellite photo (click corners, Enter), or **Outlines** → click one of the 27 unnamed outlines → name it. It becomes a place with an estimated entrance and the assistant knows it. **Left for someone who knows campus:** saying which outline is Building 12, 13, 20, 28… (I can't read numbers off a photo). `admin/src/screens/Places.tsx`, `server/src/app.ts` (`/api/geo/extra-buildings`, `/api/admin/footprints`).
+* [x] ~~Switching between scenes doesn't work pls implement it~~
+  → Scenes now change the real Mapbox light: **GoCampus** (default: dusk light by day, night light after dark), Day, Evening (dusk + a golden layer — the old one used a CSS filter that Android WebViews ignore, which is why nothing happened), Dark (open buildings glow). Tested in `mobile/test/map.test.ts`. `mobile/src/map/mapHtml.ts`, `mobile/src/panels/Layers.tsx`.
+* [x] ~~Also have satellite imagery for the admin page pls~~
+  → Map / Satellite toggle on every admin map (remembered), 3D off on the photo. Screenshot-checked. `admin/src/ui.tsx`.
+* [x] ~~You didn't add the semester off, won't be here this week, etc... for the sticky notes~~
+  → New door notes: *Not here this week*, *On leave this semester*, *At a conference this week*, *Teaching, back after class*, *Office hours moved this week*. Time-bound notes take themselves down (end of week / end of semester / 18:30), and picking *Semester off* or *Not here this week* also sets your status to Away for the same time. Tested. `mobile/src/ui/StickyNote.tsx`, `mobile/app/faculty-status.tsx`, `server/src/services/directory.ts`.
+* [x] ~~As for the AI could you please try it out more I don't know I first have to implement all the rules by hand and store them somewhere (we said the admin is the one responsible for that). Like go all~~
+  → Admin → **Assistant**: *Try a question* (shows how each answer was found), *Rules* (your own answers, EN/FR/AR, with directions/office/steps; stored in SQLite; they beat everything), *Tests* (18 starter questions, run free locally or with the AI model), *What people asked* (unanswered → "Answer it" makes a rule). Trying it out found and fixed 3 misroutes ("park my car" → Careers, "Harit Satt's office" → Business Office, "World Cup" → ITS). `admin/src/screens/Assistant.tsx`, `server/src/services/assistantAdmin.ts`, `server/src/assistant/router.ts`.
+* [x] ~~For the AI chatbot and AR implementation, pls I want them both to be as good as they can get, PLS IF U FEEL THE NEED TO CHANGE THE TECH STACK OR SMTH THEN PLS JUST DO SO AND AT THE END GIVE ME THE UPDATED SETUP_GUIDE WHERE I CAN CHANGE AND PROVIDE YOU WITH THE APPROPRIATE CHANGES.~~
+  → Assistant: added **Claude** (official Anthropic SDK, `claude-opus-5-5`) as the preferred model behind one provider switch, Gemini kept as the free option and voice fallback; events and admin rules became model tools. AR: kept sensor fusion (works in Expo Go; world-locked AR needs a dev build and on-campus testing — upgrade path written down) and made it far more intuitive (item above). **[setup_guide.md](setup_guide.md)** says what to set up and what to send back (checklist at the end).
+* [x] ~~Also when u repeat the readme pls give me the updated architecture and everything (like a really good one and the choices behind those decisions)~~
+  → **[README.md](README.md)**: architecture diagram, how a question is answered (sequence diagram), and every choice with the alternatives and why (map, data stores, routing, assistant, voice, AR, admin).
+* [x] ~~And ultimately remember I want the website to still look like the GoCampus application keep that in mind like I don't want it to look out of place just a more enhanced version (for reference pls check @GoCampus-ref)~~
+  → Default map scene is the GoCampus look (Mapbox Standard dusk/night: dark green land, plum/navy buildings, slate paths, white-ringed category pins). Chips are GoCampus chips (white pill, slate icon, bold label, filled with the category colour when on), in the app and the admin. AR bottom bar follows the `exp`/screenshot references. Screenshot-checked.

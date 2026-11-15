@@ -266,6 +266,28 @@ export function buildRoute(graph: Graph, start: Snap, startCoord: Position, path
   };
 }
 
+/** Of every node reachable from `start` (closures and mode respected), the one closest to `coord`. */
+export function nearestReachable(graph: Graph, start: Snap, coord: Position, mode: RouteMode, closed: Set<string>): number | null {
+  const { toXY } = projector(graph.origin);
+  const p = toXY(coord);
+  const se = graph.edges[start.edge];
+  const seen = new Set<number>([se.a, se.b]);
+  const stack = [se.a, se.b];
+  let best: { node: number; d: number } | null = null;
+  while (stack.length) {
+    const n = stack.pop()!;
+    const d = Math.hypot(graph.nodes[n].xy[0] - p[0], graph.nodes[n].xy[1] - p[1]);
+    if (!best || d < best.d) best = { node: n, d };
+    for (const ei of graph.nodes[n].edges) {
+      const e = graph.edges[ei];
+      if (!Number.isFinite(edgeCost(e, mode, closed))) continue;
+      const m = e.a === n ? e.b : e.a;
+      if (!seen.has(m)) { seen.add(m); stack.push(m); }
+    }
+  }
+  return best?.node ?? null;
+}
+
 /** Nearest node usable by this mode. Used to attach entrances to the network. */
 export function nearestNode(graph: Graph, coord: Position, mode: RouteMode, closed: Set<string> = new Set()) {
   const s = snap(graph, coord, mode, closed);

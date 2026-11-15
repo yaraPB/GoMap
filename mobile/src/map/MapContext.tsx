@@ -1,15 +1,16 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { Closure, CrowdingCollection, PlaceLite, Position, WalkwayCollection } from '../api/types';
 
-export type MapStyle = 'default' | 'satellite' | 'contrast';
+export type MapStyle = 'default' | 'satellite';
 export type MapLayers = { threeD: boolean; labels: boolean; cars: boolean; crowding: boolean };
-/** Day, golden evening, dark; auto follows the campus clock. */
-export type MapSkin = 'auto' | 'day' | 'evening' | 'night';
+/** Scenes. campus = the GoCampus look (follows the campus clock); then bright day, golden evening, dark. */
+export type MapSkin = 'campus' | 'day' | 'evening' | 'night';
+export type MapEventPin = { id: string; title: string; coordinates: Position | null; state: string };
 export type BuildingCollection = { type: 'FeatureCollection'; features: { type: 'Feature'; geometry: unknown; properties: { id: string; category: string; height: number; open: boolean } }[] };
 
 export type MapCommand =
   | { type: 'places'; places: PlaceLite[] }
-  | { type: 'filter'; category: string; school: string; fit?: boolean; padding?: { top: number; bottom: number; left: number; right: number } }
+  | { type: 'filter'; category: string; school: string; fit?: boolean | 'gentle'; padding?: { top: number; bottom: number; left: number; right: number } }
   | { type: 'select'; id: string | null; bottom?: number; fly?: boolean; dim?: boolean }
   | { type: 'route'; geometry: { type: 'LineString'; coordinates: Position[] } | null; crossings?: Position[]; dest?: Position | null; fit?: boolean; padding?: { top: number; bottom: number; left: number; right: number } }
   | { type: 'clearRoute' }
@@ -24,13 +25,15 @@ export type MapCommand =
   | { type: 'style'; style: MapStyle }
   | { type: 'skin'; skin: MapSkin }
   | { type: 'buildings'; data: BuildingCollection }
+  | { type: 'extraBuildings'; data: BuildingCollection }
+  | { type: 'events'; list: MapEventPin[] }
   | { type: 'pick'; on: boolean }
   | { type: 'flyIn' }
   | { type: 'skipIntro' }
   | { type: 'camera'; center?: Position; zoom?: number; pitch?: number; bearing?: number; duration?: number; padding?: { top: number; bottom: number; left: number; right: number } };
 
 export type MapEvent =
-  | { type: 'ready' } | { type: 'error'; detail: string } | { type: 'select'; detail: string }
+  | { type: 'ready' } | { type: 'error'; detail: string } | { type: 'select'; detail: string } | { type: 'selectEvent'; detail: string }
   | { type: 'picked'; detail: Position } | { type: 'tapMap'; detail: Position } | { type: 'flyInDone' } | { type: 'followOff' } | { type: 'log'; detail: string };
 
 type Ctx = {
@@ -58,14 +61,14 @@ export function MapProvider({ children }: { children: React.ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const [style, setStyleState] = useState<MapStyle>('default');
   const styleRef = useRef<MapStyle>('default');
-  const [skin, setSkinState] = useState<MapSkin>('auto');
+  const [skin, setSkinState] = useState<MapSkin>('campus');
   const [layers, setLayersState] = useState<MapLayers>({ threeD: true, labels: true, cars: false, crowding: false });
   // last value per "sticky" command, replayed after a style switch reloads the page's layers
   const sticky = useRef(new Map<string, string>());
 
   const send = useCallback((cmd: MapCommand) => {
     const msg = JSON.stringify(cmd);
-    if (['places', 'filter', 'walkways', 'closures', 'route', 'layers', 'user', 'crowding', 'skin', 'buildings'].includes(cmd.type)) sticky.current.set(cmd.type, msg);
+    if (['places', 'filter', 'walkways', 'closures', 'route', 'layers', 'user', 'crowding', 'skin', 'buildings', 'extraBuildings', 'events', 'style'].includes(cmd.type)) sticky.current.set(cmd.type, msg);
     if (cmd.type === 'clearRoute') sticky.current.delete('route');
     if (readyRef.current && post.current) post.current(msg); else queue.current.push(msg);
   }, []);
@@ -79,10 +82,8 @@ export function MapProvider({ children }: { children: React.ReactNode }) {
       if (prev === s) return;
       styleRef.current = s;
       setStyleState(s);
-      // deliver the command FIRST (it used to be queued behind the not-ready flag and never sent)
+      // satellite is a photo layer inside the same style: switched in place, nothing reloads
       send({ type: 'style', style: s });
-      // only satellite swaps the whole style; contrast is a theme switch in place
-      if ((prev === 'satellite') !== (s === 'satellite')) { readyRef.current = false; setReady(false); }
     },
     setSkin: k => { setSkinState(k); send({ type: 'skin', skin: k }); },
     setLayers: l => { setLayersState(prev => ({ ...prev, ...l })); send({ type: 'layers', layers: l }); },

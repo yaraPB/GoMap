@@ -1,5 +1,5 @@
 import { Platform } from 'react-native';
-import type { Answer, CampusInfo, Service, SttSession, Closure, CrowdingCollection, Lang, MockUser, OfficeList, Person, PlaceDetail, PlaceLite, Position, Procedure, ReportKind, Route, RouteMode, WalkwayCollection } from './types';
+import type { CampusEvent, Answer, CampusInfo, Service, SttSession, Closure, CrowdingCollection, Lang, MockUser, OfficeList, Person, PlaceDetail, PlaceLite, Position, Procedure, ReportKind, Route, RouteMode, WalkwayCollection } from './types';
 
 const local = Platform.OS === 'android' ? 'http://10.0.2.2:4000' : 'http://localhost:4000';
 export const API_URL = (process.env.EXPO_PUBLIC_API_URL || local).replace(/\/$/, '');
@@ -43,6 +43,8 @@ export const api = {
   walkways: () => request<WalkwayCollection>('/api/geo/walkways'),
   closures: () => request<Closure[]>('/api/geo/closures'),
   buildings: () => request<import('../map/MapContext').BuildingCollection>('/api/geo/buildings'),
+  extraBuildings: () => request<import('../map/MapContext').BuildingCollection>('/api/geo/extra-buildings'),
+  events: (audience?: string) => request<CampusEvent[]>(`/api/events${qs({ audience })}`),
   crowding: (weekday: number, hour: number) => request<CrowdingCollection>(`/api/crowding${qs({ weekday, hour })}`),
   ask: (text: string, lang: Lang, from: Position | null, history: { role: 'user' | 'assistant'; text: string }[], localOnly = false) =>
     request<Answer>('/api/assistant/ask', { method: 'POST', body: JSON.stringify({ text, lang, from: ll(from), history: history.slice(-6), local_only: localOnly }) }),

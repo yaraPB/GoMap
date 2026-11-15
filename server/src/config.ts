@@ -29,6 +29,10 @@ export const config = {
   get sqliteFile() { return process.env.GOMAP_DB || join(SERVER_DIR, 'data', 'gomap.sqlite'); },
   get geminiKey() { return process.env.GEMINI_API_KEY || ''; },
   get geminiModel() { return process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite'; },
+  get anthropicKey() { return process.env.ANTHROPIC_API_KEY || ''; },
+  get claudeModel() { return process.env.CLAUDE_MODEL || 'claude-opus-5-5'; },
+  /** auto: Claude when ANTHROPIC_API_KEY is set, otherwise Gemini. */
+  get assistantProvider() { const v = (process.env.ASSISTANT_PROVIDER || 'auto').toLowerCase(); return v === 'claude' || v === 'gemini' ? v : 'auto'; },
   get sonioxKey() { return process.env.SONIOX_API_KEY || ''; },
   get sonioxModel() { return process.env.SONIOX_MODEL || 'stt-async-v6'; },
   get sonioxRtModel() { return process.env.SONIOX_RT_MODEL || 'stt-rt-v6'; },

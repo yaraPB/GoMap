@@ -171,7 +171,55 @@ export function openSqlite(file: string): Sql {
   `);
   addColumn(db, 'people', 'admin_edited', 'INTEGER NOT NULL DEFAULT 0');
   addColumn(db, 'people', 'lunch', 'TEXT'); // JSON ["13:00","14:00"], NULL = campus default
-  addColumn(db, 'office_notes', 'kind', 'TEXT'); // sick | online | appointment | email | back_soon | custom
+  addColumn(db, 'office_notes', 'kind', 'TEXT'); // sick | online | appointment | email | back_soon | away_week | semester_off | … | custom
+  addColumn(db, 'office_notes', 'expires_at', 'TEXT'); // "not here this week" ends by itself; NULL = until removed
+  db.exec(`
+    -- Campus events: talks, matches, fairs. Shown on the map, in the visitor card and by the assistant.
+    CREATE TABLE IF NOT EXISTS events (
+      id            TEXT PRIMARY KEY,
+      title         TEXT NOT NULL,
+      description   TEXT,
+      kind          TEXT NOT NULL DEFAULT 'talk',   -- talk | sport | club | culture | official | career | other
+      place_id      TEXT,                           -- Mongo places._id: makes "take me there" work
+      location_text TEXT,                           -- "Room 102", "the lawn behind Building 8"
+      starts_at     TEXT NOT NULL,
+      ends_at       TEXT NOT NULL,
+      audience      TEXT NOT NULL DEFAULT 'all',    -- all | students | faculty | visitors
+      organizer     TEXT,
+      link          TEXT,
+      sample        INTEGER NOT NULL DEFAULT 0,     -- 1 = demo event, labelled "Sample" in the app
+      created_at    TEXT NOT NULL,
+      updated_at    TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS events_time ON events(ends_at, starts_at);
+    -- Answers the admin writes by hand. They win over everything else the assistant knows.
+    CREATE TABLE IF NOT EXISTS assistant_rules (
+      id           TEXT PRIMARY KEY,
+      title        TEXT NOT NULL,
+      triggers     TEXT NOT NULL DEFAULT '[]',      -- JSON [string]: questions/phrases that should fire it
+      answer       TEXT NOT NULL,                   -- English
+      answer_fr    TEXT,
+      answer_ar    TEXT,
+      place_id     TEXT,                            -- optional: offer directions there
+      service_id   TEXT,                            -- optional: show this office's card
+      procedure_id TEXT,                            -- optional: show these steps
+      urgent       INTEGER NOT NULL DEFAULT 0,      -- 1 = shown as an alert (emergencies)
+      enabled      INTEGER NOT NULL DEFAULT 1,
+      hits         INTEGER NOT NULL DEFAULT 0,
+      updated_at   TEXT NOT NULL
+    );
+    -- Questions the assistant must keep answering right: run after every change in the admin.
+    CREATE TABLE IF NOT EXISTS assistant_tests (
+      id            TEXT PRIMARY KEY,
+      question      TEXT NOT NULL,
+      lang          TEXT NOT NULL DEFAULT 'en',
+      expect_intent TEXT,                           -- place | person | procedure | service | info | rule | unknown
+      expect_id     TEXT,                           -- the place / service / procedure / rule / person id
+      expect_text   TEXT,                           -- words the answer must contain
+      last_result   TEXT,                           -- JSON {pass, intent, id, text, answered_by, at, why}
+      updated_at    TEXT NOT NULL
+    );
+  `);
   return db;
 }
 

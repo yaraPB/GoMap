@@ -127,6 +127,7 @@ export const icons = {
   plus: 'M12 5v14M5 12h14',
   wifiOff: 'M3 3l18 18M8.5 16.5a5 5 0 017 0M5 13a10 10 0 015-2.7M12 20h.01M16.7 11.3A10 10 0 0119 13M2 9a15 15 0 014.5-2.8M10.7 5.1A15 15 0 0122 9',
   dots: 'M5 12h.01M12 12h.01M19 12h.01',
+  calendarStar: 'M8 2v4M16 2v4M4 5h16v16H4zM4 10h16M12 13.5l1.1 2.2 2.4.3-1.8 1.6.5 2.4-2.2-1.2-2.2 1.2.5-2.4-1.8-1.6 2.4-.3z',
 } as const;
 export type { IconName } from './icons';
 import type { IconName } from './icons';

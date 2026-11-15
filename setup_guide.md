@@ -1,170 +1,170 @@
 # GoMap setup guide (external services)
 
-Everything below is what you set up **outside the code**: accounts, keys, databases, builds.
-GoMap runs without any of them (local answers, in-memory MongoDB, recorded voice through the
-server). Each item unlocks one thing. Keys go in `server/.env` (copy `server/.env.example`)
-or `mobile/.env.local`. Never commit them.
+Everything below is what you set up **outside the code**: accounts, keys, databases, builds. GoMap runs without any of
+them (local answers, in-memory MongoDB, recorded voice through the server). Each item unlocks one thing.
+
+Keys go in `server/.env` (copy `server/.env.example`) or `mobile/.env.local`. **Never commit them, and never paste a
+key in a chat or an issue.** When a step says "tell me", send the *result* (e.g. "gemini:check passes"), not the key.
 
 | Service | Unlocks | Where the key goes | Cost |
-|---|---|---|---|
-| Gemini (Google AI Studio) | Open questions, "I lost my card"-style problems the local router misses | `server/.env` `GEMINI_API_KEY` | Free tier |
-| Soniox | Live words while you speak (dev build); best Arabic/Darija/French transcription | `server/.env` `SONIOX_API_KEY` | Pay per minute, free credit to start |
-| MongoDB Atlas | Map data that survives restarts (places, pins, reports) | `server/.env` `MONGODB_URI` | Free M0 cluster |
-| Mapbox | The map itself, admin map, geometry import | `mobile/.env.local`, `admin/.env.local` | Free tier |
-| EAS (Expo) | A dev build: on-device speech, Soniox streaming | `eas login` | Free tier |
+| --- | --- | --- | --- |
+| **Claude** (Anthropic) — recommended | Best answers to open questions ("I lost my card and my exam is tomorrow") | `server/.env` `ANTHROPIC_API_KEY` | Pay per use |
+| Gemini (Google AI Studio) | Open questions if no Claude key; voice transcription fallback | `server/.env` `GEMINI_API_KEY` | Free tier |
+| Soniox | Live words while you speak; best Arabic/Darija/French transcription | `server/.env` `SONIOX_API_KEY` | Pay per minute, free credit |
+| MongoDB Atlas | Map data that survives restarts (places you draw, reports) | `server/.env` `MONGODB_URI` | Free M0 |
+| Mapbox | The map, admin map, geometry import | `mobile/.env.local`, `admin/.env.local` | Free tier |
+| EAS (Expo) | A dev build: on-device speech, live Soniox | `eas login` | Free tier |
 
 ---
 
-## 1. Gemini: the assistant's model
+## 0. What changed in this round (read first)
 
-**Why Gemini, not ChatGPT or Groq.** GoMap needs three things from the model:
-1. **Reliable function calling**: every answer must come from our tools (`find_place`,
-   `get_person_office`, `get_procedure`, `find_service`, `campus_info`), never invented.
-2. **Arabic and French**, including Darija mixed with French.
-3. **Low latency at near-zero cost** for a student app.
+- **New: Claude as the assistant model.** The server picks the model with `ASSISTANT_PROVIDER`:
+  `auto` (default: Claude if `ANTHROPIC_API_KEY` is set, otherwise Gemini), `claude`, or `gemini`.
+- **New tables** (events, assistant rules, assistant tests, note expiry) are created automatically on the next start.
+  Nothing to migrate by hand, in SQLite or in Atlas.
+- **Three sample events** are added on the first start so the map has something to show. They are labelled
+  "Sample". Delete them in Admin → Events; they never come back.
+- **One example rule** (Emergency → Security 24/7) is added once. Edit or delete it in Admin → Assistant → Rules.
+- **Restart the API** after pulling (it rebuilds the routing graph; that is what fixes Building 14).
 
-Gemini Flash-Lite does all three on a free tier, with parallel tool calls. GPT-4.1-mini is
-comparable but paid from the first call. Groq is the fastest, but its open models are weaker
-at Arabic and at tool choice. Alerts, leaving the chat for directions and procedure steps are
-built by **our server** from our records, so the model only has to pick the right tool. That
-is also why switching models later is a one-file change (`server/src/assistant/gemini.ts`).
+## 1. The assistant model: Claude (recommended) or Gemini
 
-**Steps**
-1. Go to <https://aistudio.google.com/apikey> and sign in. Click **Create API key**.
+**Why the model matters less than you'd think.** Most questions never reach it: your rules, places, people, offices,
+procedures and events are answered locally, for free, in ~50 ms. The model only resolves what is left, and it can only
+*choose* one of our records through tools (`campus_rule`, `find_place`, `get_person_office`, `get_procedure`,
+`find_service`, `whats_on`, `campus_info`). The facts on screen are built by the server from that record.
+
+**Why Claude first.** On mixed Darija/French/Arabic questions it picks the right tool most reliably and says "I don't
+know" instead of improvising. The server uses `claude-opus-5-5` with prompt caching and low effort, so answers stay
+quick. Gemini stays as the free option and as the voice-transcription fallback (Claude does not take audio).
+
+**Steps (Claude)**
+1. Create an account at <https://platform.claude.com>, add billing, and create an API key (**API keys** → *Create key*).
 2. In `server/.env`:
    ```
-   GEMINI_API_KEY=your-key
-   GEMINI_MODEL=gemini-3.5-flash-lite
+   ASSISTANT_PROVIDER=auto
+   ANTHROPIC_API_KEY=your-key
+   CLAUDE_MODEL=claude-opus-5-5
    ```
-3. Check it: `cd server && npm run gemini:check`.
+   `CLAUDE_MODEL` is yours to change. `claude-haiku-5-5` is much cheaper and faster, at some cost in answer quality on
+   tricky questions; try both with the test suite (step 4) and keep the one you like.
+3. Restart the API. The log prints `Assistant model: claude (claude-opus-5-5)`.
+4. Open **Admin → Assistant → Tests** and click **Run with the AI model**. **Tell me** the score and any red rows.
 
-The key stays on the server. The phone never sees it.
+**Steps (Gemini, free)**
+1. <https://aistudio.google.com/apikey> → *Create API key*.
+2. In `server/.env`: `GEMINI_API_KEY=your-key` and `GEMINI_MODEL=gemini-3.5-flash-lite`.
+3. `cd server && npm run gemini:check` → **tell me** if it passes.
 
-## 2. Soniox: voice
+Keys stay on the server. The phone never sees them.
 
-There are two modes, both using the same key:
-- **Recorded** (works in Expo Go): the phone records, and the server sends the clip to
-  Soniox's async API (`SONIOX_MODEL=stt-async-v6`).
-- **Live** (dev build): the server mints a **5-minute temporary key**
-  (`POST /api/assistant/stt-session`). The phone streams 16 kHz PCM straight to
-  `wss://stt-rt.soniox.com/transcribe-websocket` and words appear as you speak. The
-  permanent key never leaves the server.
+## 2. Teach the assistant (Admin → Assistant)
+
+This is where "the admin is responsible for the rules" lives.
+
+1. **Try a question** — type what a student would ask (EN/FR/AR). You see the answer and *how it was found* (which
+   records competed, their scores, which tools the model called). Nothing here is logged or shown to students.
+2. **Rules** — your own answers, word for word. Give it the phrases people say ("print", "printer", "imprimer",
+   "طباعة"), the answer (French and Arabic optional), and optionally directions / an office card / procedure steps.
+   Rules beat everything else. "Urgent" shows it in red with a Call button.
+3. **Tests** — questions that must keep landing right. 18 starter questions are there. Add one from any answer with
+   **Keep as a test**. Click **Run all (free)** after every change; the AI-model run costs a fraction of a cent.
+4. **What people asked** — unanswered questions first; **Answer it** turns one into a rule in one click.
+
+## 3. Soniox: voice
+
+Two modes, same key:
+- **Recorded** (Expo Go): the phone records, the server sends the clip to Soniox's async API (`SONIOX_MODEL=stt-async-v6`).
+- **Live** (dev build): the server mints a **5-minute temporary key** (`POST /api/assistant/stt-session`); the phone
+  streams 16 kHz PCM to `wss://stt-rt.soniox.com/transcribe-websocket`. The permanent key never leaves the server.
 
 **Steps**
-1. Create an account at <https://console.soniox.com>. Under **API keys**, create a key.
-2. In `server/.env`:
-   ```
-   SONIOX_API_KEY=your-key
-   SONIOX_MODEL=stt-async-v6
-   SONIOX_RT_MODEL=stt-rt-v6
-   ```
-   If Soniox renames its models, check the models page in their docs and update these two lines.
-3. Restart the API. In the app, the voice screen says **"live words by Soniox"** when
-   streaming works. Otherwise it falls back on its own: first on-device recognition, then
-   record-and-transcribe.
+1. <https://console.soniox.com> → **API keys** → create a key.
+2. In `server/.env`: `SONIOX_API_KEY=…`, `SONIOX_MODEL=stt-async-v6`, `SONIOX_RT_MODEL=stt-rt-v6`.
+   If Soniox renames its models, update these two lines from their models page.
+3. Restart the API. The voice screen says **"live words by Soniox"** when streaming works. **Tell me** if it doesn't.
 
-Without Soniox, recorded voice is transcribed by Gemini instead.
+Without Soniox, recorded voice is transcribed by Gemini.
 
-## 3. MongoDB Atlas: map data
+## 4. MongoDB Atlas: map data that persists
 
-Without `MONGODB_URI`, the API starts an in-memory MongoDB and re-seeds it on every start.
-That's fine for development, but admin edits to places and reports are lost on restart.
+Without `MONGODB_URI` the API uses an in-memory MongoDB, re-seeded at every start: **buildings you draw or delete in the
+admin are lost on restart.** Use Atlas for anything you want to keep.
 
-1. Create a free **M0** cluster at <https://cloud.mongodb.com>. A region close to Morocco
-   (e.g. Paris or Frankfurt) is best.
-2. **Database Access** → add a user with a password.
-3. **Network Access** → add your IP (or `0.0.0.0/0` while developing only).
-4. **Connect → Drivers** → copy the `mongodb+srv://…` string and add the database name:
-   ```
-   MONGODB_URI=mongodb+srv://USER:PASSWORD@cluster0.xxxxx.mongodb.net/gomap
-   ```
-5. Run `cd server && npm run seed` once. It fills the empty collections and leaves existing
-   data alone.
+1. Free **M0** cluster at <https://cloud.mongodb.com>, region Paris or Frankfurt.
+2. **Database Access** → add a user. **Network Access** → add your IP (`0.0.0.0/0` only while developing).
+3. **Connect → Drivers** → copy the string and add the database name:
+   `MONGODB_URI=mongodb+srv://USER:PASSWORD@cluster0.xxxxx.mongodb.net/gomap`
+4. `cd server && npm run seed` once (fills empty collections, leaves existing data alone).
 
-## 4. SQLite: people, offices, procedures, accounts (nothing to set up)
+> **Security note.** A copy of an Atlas username, password and connection string sits in `misc.txt` at the repo root.
+> It is git-ignored, but it is a live credential on disk: **rotate that database user's password in Atlas** and keep
+> the new one only in `server/.env`.
 
-- File: `server/data/gomap.sqlite`, created automatically. Override with `GOMAP_DB=…`.
-- It is filled from `data/aui_departments_faculty.json`:
-  - faculty and staff
-  - the 26 offices and services
-  - the 30 "where to go for…" rows
-  - working hours: Mon–Fri 09:00–17:30, closed 13:00–14:00 for lunch
-- **Updating the JSON:** replace the file and restart the API. It notices the change and
-  re-imports everything **except rows edited in the admin dashboard**.
-- An old file from the first prototype is upgraded in place. Its old `services` table is kept
-  as `legacy_services`.
-- To start fresh, stop the API and delete `server/data/gomap.sqlite*`.
-- Postgres for users comes later, with GoCampus sign-in. The schema is already Postgres-safe.
+## 5. SQLite (nothing to set up)
 
-> Hours: TODO.md assumed 9–17 with lunch 12–14, but the updated JSON says 09:00–17:30 with
-> lunch 13:00–14:00, so GoMap uses the JSON. Change it in **Admin → Offices & services →
-> Campus working hours**.
+`server/data/gomap.sqlite`, created automatically (override with `GOMAP_DB`). Filled from
+`data/aui_departments_faculty.json`; replacing the JSON re-imports everything **except rows edited in the admin**. To
+start fresh, stop the API and delete `server/data/gomap.sqlite*`. Postgres-safe schema for the later move.
 
-## 5. Mapbox
+## 6. Mapbox
 
-1. Go to <https://account.mapbox.com/access-tokens>. Use the default **public** token
-   (`pk.…`), or create one with the public scopes only.
-2. Add a **URL restriction** for your web domains before going public. Mobile apps can't be
-   URL-restricted, so keep usage alerts on.
-3. Set the token:
-   ```
-   # mobile/.env.local
-   EXPO_PUBLIC_MAPBOX_TOKEN=pk.…
-   # admin/.env.local (optional; falls back to the mobile one)
-   VITE_MAPBOX_TOKEN=pk.…
-   ```
-4. Re-import paths, roads and buildings when the campus changes: `cd server && npm run geo:import`.
+1. <https://account.mapbox.com/access-tokens> → default **public** token (`pk.…`).
+2. Add a **URL restriction** for your web domains before going public; keep usage alerts on (mobile can't be restricted).
+3. `mobile/.env.local`: `EXPO_PUBLIC_MAPBOX_TOKEN=pk.…` · `admin/.env.local` (optional): `VITE_MAPBOX_TOKEN=pk.…`
+4. Satellite: the app asks Mapbox first and falls back to Esri World Imagery if your token is refused (HTTP 429/403).
+   The admin uses Esri imagery directly. **Tell me** if satellite stays blank.
 
-## 6. Admin dashboard token
+## 7. Buildings missing from the map (needs someone who knows campus)
 
-In `server/.env`, set `ADMIN_TOKEN=a-long-random-string` and use it to sign in at the admin
-app. The local default is `dev-admin-token`. This gets replaced by GoCampus SSO later.
+The basemap lacks some buildings, and 27 outlines (from the map data and the team's satellite traces) have no name.
+1. Admin → **Places & POIs** → **Outlines**: amber = no name yet, blue = linked to a place.
+2. Click an amber outline → give it its number, name, category, height → **Add to the map**. Or **Draw a building**:
+   switch the map to **Satellite**, click the corners on the photo, press Enter.
+3. It appears as a 3D building in the app with an estimated entrance; drag the green dot to the real door.
+4. Use Atlas (section 4) first, or the buildings vanish when the API restarts.
 
-## 7. Running on your phone
+## 8. Admin dashboard token
 
-1. Phone and computer on the **same Wi-Fi**.
-2. In `mobile/.env.local`, set `EXPO_PUBLIC_API_URL=http://YOUR-PC-LAN-IP:4000`. Find the
-   IP with `ipconfig` and look for the "IPv4 Address".
-3. Windows: allow Node.js through the firewall on private networks when asked, or open TCP
-   port 4000.
-4. Check that **only one API** is running on port 4000. An old one left in a terminal answers
-   with old data, and new screens then show "Not found".
+`server/.env`: `ADMIN_TOKEN=a-long-random-string`; sign in with it at the admin. Local default `dev-admin-token`.
+Replaced by GoCampus SSO later.
 
-## 8. Dev build: native voice and live Soniox
+## 9. Running on your phone
 
-Expo Go runs everything, with voice in record-then-send mode. A dev build adds on-device
-recognition (`expo-speech-recognition`) and PCM streaming for live Soniox.
+1. Phone and computer on the **same Wi-Fi**; `EXPO_PUBLIC_API_URL=http://YOUR-PC-LAN-IP:4000` (`ipconfig` → IPv4).
+2. Windows: allow Node.js on private networks, or open TCP 4000.
+3. Only **one** API on port 4000 (`netstat -ano | findstr :4000`): an old one answers with old data.
+
+## 10. Dev build: native voice and live Soniox
 
 ```bash
-npm i -g eas-cli
-eas login
-cd mobile
-npx expo install expo-dev-client
-eas build:configure                    # creates eas.json
-eas build --profile development --platform android   # or ios (needs an Apple developer account)
+npm i -g eas-cli && eas login
+cd mobile && npx expo install expo-dev-client
+eas build:configure
+eas build --profile development --platform android   # or ios (Apple developer account)
+npx expo start --dev-client
 ```
+Pin one voice engine with `EXPO_PUBLIC_SPEECH_ENGINE=soniox` (or `native` / `recorded`) in `mobile/.env.local`.
 
-Install the build on the phone, then run `npx expo start --dev-client`. To pin one voice
-engine, set `EXPO_PUBLIC_SPEECH_ENGINE=soniox` (or `native` / `recorded`) in
-`mobile/.env.local`.
+## 11. AR: what to expect, and the upgrade path
 
-## 9. AR and GPS: what to expect on campus
+**Now:** camera + GPS + compass + gyro fusion. Works in Expo Go, no ARCore/Unity. The screen tells you how to hold the
+phone, says "Turn around" when you face away, and dims the arrows when GPS is worse than ±15 m. If arrows drift, tap the
+GPS pill → **Align with the path** while pointing along the path. Android: accept **"Improve location accuracy"**.
 
-- AR uses the camera, GPS, compass and the gyro-fused motion sensor. No ARCore or Unity is
-  needed.
-- GPS is filtered: jumps are ignored and the dot is snapped onto walkways. Accuracy is still
-  worse next to tall buildings and indoors, and the AR arrows dim when GPS is above ±15 m.
-- If the arrows point slightly off, tap **Recalibrate → Align with the path** while pointing
-  the phone along the path ahead.
-- Android: say yes to **"Improve location accuracy"** when asked. It turns on Wi-Fi-assisted
-  GPS.
+**If you want world-locked arrows later** (they stay glued to the paving as you walk), the path is a dev build with
+ViroReact (`@reactvision/react-viro`) plus either ARCore Geospatial (Google Cloud key, depends on Street View coverage in
+Ifrane) or plane detection + our GPS route. It cannot run in Expo Go and needs on-campus testing; **tell me** when you
+have a dev build on a phone and I'll add it behind a switch.
 
-## 10. Checklist
+## 12. Checklist — send me the ticks
 
-- [ ] `GEMINI_API_KEY` set, `npm run gemini:check` passes
-- [ ] `SONIOX_API_KEY` set (optional), voice screen shows live words in the dev build
-- [ ] `MONGODB_URI` set and `npm run seed` run (optional for development)
+- [ ] `ANTHROPIC_API_KEY` (or `GEMINI_API_KEY`) set; log shows `Assistant model: …`
+- [ ] Admin → Assistant → Tests: **Run with the AI model** score: ___ / 18
+- [ ] `SONIOX_API_KEY` set (optional); voice screen shows live words in the dev build
+- [ ] `MONGODB_URI` set, `npm run seed` run; **Atlas password from `misc.txt` rotated**
 - [ ] `ADMIN_TOKEN` changed from the default
-- [ ] Mapbox token in `mobile/.env.local`
-- [ ] `EXPO_PUBLIC_API_URL` points at your PC's LAN IP
-- [ ] One walk on campus: GPS dot on the paths, AR arrows on the floor, "where do I pay my fees?" by voice
+- [ ] Mapbox token in `mobile/.env.local`; satellite shows a photo
+- [ ] Missing buildings named in Admin → Places → Outlines (which numbers were they?)
+- [ ] One walk on campus with the [README checklist](README.md#6-on-campus-checklist-a-real-phone-outdoors)

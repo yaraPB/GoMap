@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withSequence, withSpring, withTiming } from 'react-native-reanimated';
 import type { NoteKind } from '../api/types';
 import { useT } from '../i18n';
@@ -13,9 +13,18 @@ export const NOTE_CHARACTERS: Record<NoteKind, { icon: IconName; label: string; 
   appointment: { icon: 'calendarClock', label: 'Please take an appointment', short: 'By appointment', paper: '#E3F3E9', ink: '#0B6B3F' },
   email: { icon: 'mail', label: 'Email me, I answer fast', short: 'Email me', paper: '#EFE6FF', ink: '#5B21B6' },
   back_soon: { icon: 'hourglass', label: 'Back in a few minutes', short: 'Back soon', paper: '#FFF4BF', ink: '#6B4A05' },
+  teaching: { icon: 'faculty', label: 'Teaching now, back after class', short: 'Teaching', paper: '#E6F0FF', ink: '#1D4ED8' },
+  conference: { icon: 'plane', label: 'At a conference this week', short: 'Conference', paper: '#F1E8FF', ink: '#6D28D9' },
+  away_week: { icon: 'calendar', label: 'Not here this week', short: 'Away this week', paper: '#FFE8D6', ink: '#9A3412' },
+  semester_off: { icon: 'leave', label: 'On leave this semester', short: 'Semester off', paper: '#E0F2F1', ink: '#115E59' },
+  hours_moved: { icon: 'moved', label: 'Office hours moved this week, see my card', short: 'Hours moved', paper: '#FEF3C7', ink: '#92400E' },
   custom: { icon: 'note', label: 'Note', short: 'Note', paper: '#FFF4BF', ink: '#4A3B05' },
 };
-export const NOTE_ORDER: NoteKind[] = ['sick', 'online', 'appointment', 'email', 'back_soon'];
+export const NOTE_ORDER: NoteKind[] = ['back_soon', 'teaching', 'appointment', 'email', 'online', 'sick', 'conference', 'away_week', 'semester_off', 'hours_moved'];
+/** Notes that also mean you are away: picking one sets your status for the same length. */
+export const NOTE_AWAY: Partial<Record<NoteKind, { reason: string; length: 'today' | 'week' | 'semester' }>> = {
+  sick: { reason: 'sick', length: 'today' }, conference: { reason: 'conference', length: 'week' }, away_week: { reason: 'away', length: 'week' }, semester_off: { reason: 'leave', length: 'semester' },
+};
 
 /** A sticky note on the office door: tilted paper, a pin, the icon pops in once. */
 export function StickyNote({ kind, text, small, onPress }: { kind: NoteKind | null; text: string | null; small?: boolean; onPress?: () => void }) {
@@ -58,8 +67,11 @@ export function NoteTag({ kind, text }: { kind: NoteKind | null; text?: string |
 /** A picker of notes (faculty status screen and the home widget). */
 export function NotePicker({ value, onPick, compact }: { value: NoteKind | null; onPick: (k: NoteKind | null) => void; compact?: boolean }) {
   const t = useT();
+  const Wrap = compact
+    ? ({ children }: { children: React.ReactNode }) => <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>{children}</ScrollView>
+    : ({ children }: { children: React.ReactNode }) => <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>{children}</View>;
   return (
-    <View style={{ flexDirection: 'row', flexWrap: compact ? 'nowrap' : 'wrap', gap: 8 }}>
+    <Wrap>
       {NOTE_ORDER.map(k => {
         const c = NOTE_CHARACTERS[k];
         const on = value === k;
@@ -71,7 +83,7 @@ export function NotePicker({ value, onPick, compact }: { value: NoteKind | null;
           </Pressable>
         );
       })}
-    </View>
+    </Wrap>
   );
 }
 

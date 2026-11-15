@@ -61,8 +61,9 @@ export function Chip({ label, icon, active, activeColor = color.ink, onPress, sm
   return (
     <Pressable accessibilityRole="button" accessibilityState={{ selected: !!active }} onPress={onPress}
       style={({ pressed }) => [small ? s.chipSmall : s.chip, { backgroundColor: active ? activeColor : light ? 'rgba(255,255,255,0.92)' : color.panel }, !light && shadow.float, light && !active && s.chipLightBorder, pressed && { transform: [{ scale: 0.96 }] }]}>
-      {icon && <Icon name={icon} size={16} stroke={fg} />}
-      <T weight="semibold" style={{ color: fg, fontSize: small ? 12.5 : 14 }}>{label}</T>
+      {/* GoCampus chips: slate icon on white, filled with the category colour when on */}
+      {icon && <Icon name={icon} size={17} stroke={active ? '#fff' : '#55607A'} width={2.2} />}
+      <T weight={small ? 'semibold' : 'bold'} style={{ color: fg, fontSize: small ? 12.5 : 14.5 }}>{label}</T>
     </Pressable>
   );
 }

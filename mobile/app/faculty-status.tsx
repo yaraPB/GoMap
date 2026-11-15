@@ -12,7 +12,7 @@ import { useApp } from '../src/state/app';
 import { usePanels } from '../src/state/panels';
 import { todayKey } from '../src/ui/bits';
 import { Avatar, Btn, Icon, IconBtn, Label, Loading, Notice, T } from '../src/ui/kit';
-import { NOTE_CHARACTERS, NotePicker, StickyNote } from '../src/ui/StickyNote';
+import { NOTE_AWAY, NOTE_CHARACTERS, NotePicker, StickyNote } from '../src/ui/StickyNote';
 import { color, type IconName } from '../src/ui/theme';
 
 type Status = 'in' | 'busy' | 'out';
@@ -181,7 +181,14 @@ export default function FacultyStatus() {
         <View style={{ backgroundColor: '#FFFBEA', padding: 15, borderRadius: 14, gap: 10 }}>
           <T weight="bold">{t('A note on your door')}</T>
           <T style={{ fontSize: 12, color: color.muted }}>{t('It shows next to your name in search, in the office list and when students ask the assistant, until you remove it.')}</T>
-          <NotePicker value={kind === undefined ? me.note_kind : kind} onPick={k => { setKind(k); setNote(k ? t(NOTE_CHARACTERS[k].label) : ''); }} />
+          <NotePicker value={kind === undefined ? me.note_kind : kind} onPick={k => {
+            setKind(k); setNote(k ? t(NOTE_CHARACTERS[k].label) : '');
+            // 'not here this week', 'semester off'…: the status follows, for the same length
+            const away = k ? NOTE_AWAY[k] : undefined;
+            if (away) { setStatus('out'); setAwayReason(away.reason); const o = awayOptions.find(x => x.id === away.length); if (o) setAway({ id: o.id, iso: o.iso }); }
+          }} />
+          {(() => { const k = kind === undefined ? me.note_kind : kind; const away = k ? NOTE_AWAY[k] : undefined; return away ? <T style={{ fontSize: 12, color: '#6B4A05' }}>{t('Your status is set to Away for the same time. Publish to apply both.')}</T> : null; })()}
+          {me.note_until && kind === undefined && <T style={{ fontSize: 12, color: color.muted }}>{t('This note comes down by itself on {date}.', { date: shortDate(me.note_until, lang) })}</T>}
           {((kind === undefined ? me.note_kind : kind) || (note ?? me.note)) && <Animated.View entering={FadeIn}><StickyNote kind={kind === undefined ? me.note_kind : kind} text={note ?? me.note} /></Animated.View>}
           <TextInput accessibilityLabel={t('Note for students')} multiline maxLength={500} value={note ?? me.note ?? ''} onChangeText={setNote} placeholder={t('Write your own note…')} blurOnSubmit returnKeyType="done" onSubmitEditing={() => Keyboard.dismiss()}
             style={{ minHeight: 64, padding: 10, backgroundColor: '#fff', borderRadius: 8, textAlignVertical: 'top', textAlign: lang === 'ar' ? 'right' : 'left' }} />

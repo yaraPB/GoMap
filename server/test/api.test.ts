@@ -29,7 +29,7 @@ before(async () => {
     assert.equal((init?.headers as Record<string, string>)['x-goog-api-key'], 'test-key');
     return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: 'Invented office: Building 999.' }] } }] }), { status: 200 });
   }) as typeof fetch;
-  ctx = await boot({ mongoUri: '', sqliteFile: ':memory:', geminiKey: 'test-key', fetchImpl: mockGemini, quiet: true });
+  ctx = await boot({ mongoUri: '', sqliteFile: ':memory:', geminiKey: 'test-key', provider: 'gemini', fetchImpl: mockGemini, quiet: true });
   server = createApp({ ...ctx, uploadsDir: mkdtempSync(join(tmpdir(), 'gomap-')) }).listen(0, '127.0.0.1');
   await new Promise<void>(r => server.once('listening', r));
   base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
@@ -253,4 +253,70 @@ test('a professor away for several days stays away past the evening reset, with 
   assert.equal(semester.status, 200);
   assert.equal(semester.body.availability.label, 'Away');
   await send('/api/people/harit-satt/presence', { status: 'clear' }, h, 'PUT');
+});
+
+test('every place has a walking route from the plaza (Building 14, Building 1, Enrollment Services)', async () => {
+  const { body: places } = await get('/api/places');
+  const failed: string[] = [];
+  for (const p of places as { id: string }[]) {
+    const r = await send('/api/route', { from: PLAZA, to_place_id: p.id, mode: 'walk' });
+    if (r.status !== 200) failed.push(`${p.id}: ${r.body.error}`);
+  }
+  assert.deepEqual(failed, []);
+});
+
+test('events: samples are listed with their place, the admin creates and deletes one, the assistant knows', async () => {
+  const { body: list } = await get('/api/events');
+  assert.ok(list.length >= 1 && list.every((e: { sample: boolean }) => e.sample));
+  const starts = new Date(Date.now() + 3600_000).toISOString(), ends = new Date(Date.now() + 7200_000).toISOString();
+  const created = await send('/api/admin/events', { title: 'Robotics demo', kind: 'talk', place_id: 'building-7', starts_at: starts, ends_at: ends }, admin);
+  assert.equal(created.status, 201, JSON.stringify(created.body));
+  assert.equal(created.body.place.id, 'building-7');
+  assert.equal((await send('/api/admin/events', { title: 'Bad', starts_at: ends, ends_at: starts }, admin)).status, 400);
+  const { body: a } = await send('/api/assistant/ask', { text: "What's happening on campus this week?", lang: 'en' });
+  assert.equal(a.intent, 'events');
+  assert.ok(a.events.some((e: { title: string }) => e.title === 'Robotics demo'));
+  assert.equal((await send(`/api/admin/events/${created.body.id}`, {}, admin, 'DELETE')).status, 200);
+});
+
+test('places: the admin draws a building, it gets an entrance and a route; deleting it unlinks everything', async () => {
+  const ring = [[-5.10450, 33.54070], [-5.10420, 33.54070], [-5.10420, 33.54090], [-5.10450, 33.54090], [-5.10450, 33.54070]];
+  const c = await send('/api/admin/places', { name: 'Building 13', number: '13', category: 'residential', footprint: { type: 'Polygon', coordinates: [ring] } }, admin);
+  assert.equal(c.status, 201, JSON.stringify(c.body));
+  assert.equal(c.body._id, 'building-13');
+  const r = await send('/api/route', { from: PLAZA, to_place_id: 'building-13', mode: 'walk' });
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  const { body: extra } = await get('/api/geo/extra-buildings');
+  assert.ok(extra.features.some((f: { properties: { id: string } }) => f.properties.id === 'building-13'));
+  const d = await send('/api/admin/places/building-13', {}, admin, 'DELETE');
+  assert.equal(d.status, 200);
+  assert.equal(d.body.deleted.name, 'Building 13');
+  assert.equal((await get('/api/places/building-13')).status, 404);
+});
+
+test('assistant rules: an admin answer wins, in the asker\'s language, and the starter tests pass locally', async () => {
+  const rule = await send('/api/admin/rules', { title: 'Printing on campus', triggers: ['print', 'printer', 'imprimer'], answer: 'Print at the library desk with your card.', answer_fr: 'Imprimez au comptoir de la bibliothèque avec votre carte.', place_id: 'building-15' }, admin);
+  assert.equal(rule.status, 201, JSON.stringify(rule.body));
+  const { body: en } = await send('/api/assistant/ask', { text: 'where can I print my essay', lang: 'en' });
+  assert.equal(en.rule?.id, rule.body.id);
+  assert.match(en.text, /library desk/);
+  assert.equal(en.place.id, 'building-15');
+  const { body: fr } = await send('/api/assistant/ask', { text: 'où imprimer', lang: 'fr' });
+  assert.match(fr.text, /comptoir/);
+  const run = await send('/api/admin/assistant-tests/run', { local_only: true }, admin);
+  const failed = run.body.results.filter((r: { pass: boolean }) => !r.pass).map((r: { test: string; why: string[] }) => `${r.test}: ${r.why.join('; ')}`);
+  // every starter question must land right from local data alone (no AI model)
+  assert.deepEqual(failed, []);
+  await send(`/api/admin/rules/${rule.body.id}`, {}, admin, 'DELETE');
+});
+
+test('door notes: "not here this week" ends by itself; semester off lasts the semester', async () => {
+  const user = { 'content-type': 'application/json', 'x-gomap-user': 'harit-satt' };
+  const r = await send('/api/people/harit-satt/presence', { status: 'keep', note: 'Not here this week', note_kind: 'away_week' }, user, 'PUT');
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  assert.equal(r.body.note_kind, 'away_week');
+  assert.ok(r.body.note_until && Date.parse(r.body.note_until) - Date.now() <= 7 * 86400_000);
+  const s = await send('/api/people/harit-satt/presence', { status: 'keep', note: 'On leave this semester', note_kind: 'semester_off' }, user, 'PUT');
+  assert.ok(Date.parse(s.body.note_until) > Date.parse(r.body.note_until));
+  await send('/api/people/harit-satt/presence', { status: 'keep', note: null, note_kind: null }, user, 'PUT');
 });

@@ -5,7 +5,7 @@
  */
 import type { LucideIcon } from 'lucide-react-native';
 import {
-  Accessibility, ArrowUp, ArrowUpLeft, ArrowUpRight, Backpack, Ban, BookOpen, BriefcaseBusiness, Building2, Calendar, CalendarClock,
+  Accessibility, ArrowUp, CalendarDays, Ticket, PencilRuler, Volume, RotateCcw, Smartphone, PartyPopper, MoveUp, ArrowUpLeft, ArrowUpRight, Backpack, Ban, BookOpen, BriefcaseBusiness, Building2, Calendar, CalendarClock,
   Camera, Car, ChartNoAxesColumnIncreasing, Check, ChevronDown, ChevronLeft, ChevronRight, Clock, Compass, CornerUpLeft, CornerUpRight,
   DoorOpen, Dumbbell, Ellipsis, Eye, FileText, Flag, FlagTriangleRight, Flame, Footprints, Globe, GraduationCap, Hourglass, House, Info,
   Keyboard, Laptop, Layers, LayoutGrid, Lightbulb, LocateFixed, Mail, Map, MapPin, Mic, Moon, Navigation, Palmtree, Phone, Plane, Plus,
@@ -28,6 +28,8 @@ export const LUCIDE = {
   // door notes
   sick: Thermometer, laptop: Laptop, hourglass: Hourglass, note: StickyNote, plane: Plane, leave: Palmtree,
   satellite: Satellite, contrast: Contrast,
+  // events, AR, door notes (new)
+  events: CalendarDays, ticket: Ticket, party: PartyPopper, moved: PencilRuler, turnAround: RotateCcw, phone2: Smartphone, up: MoveUp, sound: Volume,
 } satisfies Record<string, LucideIcon>;
 
 export type IconName = keyof typeof LUCIDE;
