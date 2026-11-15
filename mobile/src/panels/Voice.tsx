@@ -7,7 +7,7 @@ import { router } from 'expo-router';
 import { openAR } from '../ar/open';
 import { api } from '../api/client';
 import type { Answer, Lang } from '../api/types';
-import { t } from '../i18n/strings';
+import { useT, type TFn } from '../i18n';
 import { useApp, useLocation } from '../state/app';
 import { useNav } from '../state/navigation';
 import { usePanels } from '../state/panels';
@@ -20,13 +20,13 @@ import Waveform from '../voice/Waveform';
 
 const LANG_LABEL: Record<Lang, string> = { en: 'English', fr: 'Français', ar: 'العربية' };
 
-function understood(a: Answer | null) {
+function understood(a: Answer | null, t: TFn) {
   if (!a || a.intent === 'unknown') return null;
-  if (a.intent === 'place' && a.place) return { title: `Directions → ${a.place.name}`, body: 'Release to confirm. Directions open on their own · you will not have to tap again.' };
-  if (a.intent === 'person' && a.person) return { title: `Office → ${a.person.name}`, body: 'Release to see where they are and whether they are in.' };
-  if (a.intent === 'procedure' && a.procedure) return { title: `How to → ${a.procedure.title}`, body: 'Release to see the steps, the office and its hours.' };
-  if (a.intent === 'service' && a.service) return { title: `Office → ${a.service.short_name}`, body: a.issue ? `For ${a.issue.issue.toLowerCase()}. Release for where it is, its hours and contact.` : 'Release for where it is, its hours and contact.' };
-  if (a.intent === 'help') return { title: 'Help → a quick tour of GoMap', body: 'Release to start the walkthrough.' };
+  if (a.intent === 'place' && a.place) return { title: `${t('Directions')} → ${a.place.name}`, body: t('Release to confirm. Directions open on their own · you will not have to tap again.') };
+  if (a.intent === 'person' && a.person) return { title: `${t('Office')} → ${a.person.name}`, body: t('Release to see where they are and whether they are in.') };
+  if (a.intent === 'procedure' && a.procedure) return { title: `${t('How to')} → ${a.procedure.title}`, body: t('Release to see the steps, the office and its hours.') };
+  if (a.intent === 'service' && a.service) return { title: `${t('Office')} → ${a.service.short_name}`, body: t('Release for where it is, its hours and contact.') };
+  if (a.intent === 'help') return { title: t('Help → a quick tour of GoMap'), body: t('Release to start the walkthrough.') };
   return null;
 }
 
@@ -50,6 +50,7 @@ function MicRings({ on }: { on: boolean }) {
 }
 
 export default function Voice({ auto = false }: { auto?: boolean }) {
+  const t = useT();
   const insets = useSafeAreaInsets();
   const { lang, setLang, reduceMotion } = useApp();
   const loc = useLocation();
@@ -152,57 +153,57 @@ export default function Voice({ auto = false }: { auto?: boolean }) {
   const words = partial.split(' ');
   const confirmed = listening && words.length > 2 ? words.slice(0, -2).join(' ') : partial;
   const tail = listening && words.length > 2 ? ' ' + words.slice(-2).join(' ') : '';
-  const card = understood(preview);
+  const card = understood(preview, t);
   const cycleLang = () => setLang(lang === 'en' ? 'fr' : lang === 'fr' ? 'ar' : 'en');
 
   return (
     <Animated.View entering={FadeIn.duration(220)} exiting={FadeOut.duration(160)} style={[StyleSheet.absoluteFill, styles.root]}>
       <View style={[styles.top, { top: insets.top + 8 }]}>
-        <IconBtn icon="close" label="Cancel voice input" onPress={() => { speech.cancel(); pop(); }} bg="rgba(255,255,255,0.14)" stroke="#fff" float={false} />
-        <Pressable accessibilityRole="button" accessibilityLabel={`Language: ${LANG_LABEL[lang]}. Tap to switch.`} onPress={cycleLang} style={styles.langBtn}>
+        <IconBtn icon="close" label={t('Cancel voice input')} onPress={() => { speech.cancel(); pop(); }} bg="rgba(255,255,255,0.14)" stroke="#fff" float={false} />
+        <Pressable accessibilityRole="button" accessibilityLabel={t('Language: {lang}. Tap to switch.', { lang: LANG_LABEL[lang] })} onPress={cycleLang} style={styles.langBtn}>
           <Icon name="globe" size={16} stroke="#fff" />
           <T weight="semibold" style={{ color: '#fff', fontSize: 13 }}>{LANG_LABEL[lang]}</T>
         </Pressable>
       </View>
 
       <View style={[styles.center, { top: insets.top + 140 }]}>
-        <T weight="semibold" style={styles.state}>{thinking ? t(lang, 'thinking') : listening ? t(lang, 'listening') : speech.state === 'error' ? 'Microphone' : 'Ready'}</T>
+        <T weight="semibold" style={styles.state}>{thinking ? t('Thinking') : listening ? t('Listening') : speaking ? t('GoMap is answering') : speech.state === 'error' ? t('Microphone') : t('Ready')}</T>
         <Waveform level={speaking && !listening ? ttsLevel : level} mode={thinking ? 'thinking' : listening ? 'listening' : speaking ? 'speaking' : 'idle'} reduceMotion={reduceMotion} />
         <View style={{ minHeight: 70, paddingHorizontal: 28 }}>
           {partial ? (
             <T weight="semibold" style={styles.transcript} accessibilityLiveRegion="polite">{confirmed}<T weight="semibold" style={[styles.transcript, { color: '#6B7280' }]}>{tail}{listening ? '…' : ''}</T></T>
           ) : (
-            <T style={[styles.transcript, { color: '#6B7280', fontSize: 20 }]}>{listening ? (speech.engine === 'recorded' ? (toggled ? 'Speak, I stop when you pause' : 'Speak, then release') : 'Go ahead…') : 'Try “Where do I pay my fees?”'}</T>
+            <T style={[styles.transcript, { color: '#6B7280', fontSize: 20 }]}>{listening ? (speech.engine === 'recorded' ? (toggled ? t('Speak, I stop when you pause') : t('Speak, then release')) : t('Go ahead…')) : t('Try “Where do I pay my fees?”')}</T>
           )}
-          <T style={styles.hint}>{speech.engine === 'soniox' ? `${LANG_LABEL[lang]} · live words by Soniox${toggled ? ' · stops when you pause' : ''}` : speech.engine === 'native' ? `${LANG_LABEL[lang]} · on-device recognition` : `${LANG_LABEL[lang]} · words appear after you release`}</T>
+          <T style={styles.hint}>{`${LANG_LABEL[lang]} · ${speech.engine === 'soniox' ? t('live words by Soniox') + (toggled ? ` · ${t('stops when you pause')}` : '') : speech.engine === 'native' ? t('on-device recognition') : t('words appear after you release')}`}</T>
         </View>
       </View>
 
       {card && !speech.error && (
         <Animated.View entering={FadeInDown.duration(260)} style={[styles.card, { bottom: insets.bottom + 150 }]}>
-          <T weight="bold" style={styles.cardLabel}>{t(lang, 'understoodAs').toUpperCase()}</T>
+          <T weight="bold" style={styles.cardLabel}>{t('Understood as').toUpperCase()}</T>
           <T weight="semibold" style={{ color: '#fff', fontSize: 15 }}>{card.title}</T>
           <T style={{ color: '#A7ACB4', fontSize: 12.5, lineHeight: 18, marginTop: 4 }}>{card.body}</T>
         </Animated.View>
       )}
       {speech.error && (
         <Animated.View entering={FadeInDown} style={[styles.card, { bottom: insets.bottom + 150 }]}>
-          <T weight="semibold" style={{ color: '#fff', fontSize: 14 }}>{speech.error.includes('permission') ? 'Microphone permission is off' : 'Voice did not work this time'}</T>
+          <T weight="semibold" style={{ color: '#fff', fontSize: 14 }}>{speech.error.includes('permission') ? t('Microphone permission is off') : t('Voice did not work this time')}</T>
           <T style={{ color: '#A7ACB4', fontSize: 12.5, lineHeight: 18, marginTop: 4 }}>{speech.error}</T>
-          <Btn title="Type instead" kind="secondary" small onPress={() => replace({ name: 'assistant' })} style={{ marginTop: 10, alignSelf: 'flex-start' }} />
+          <Btn title={t('Type instead')} kind="secondary" small onPress={() => replace({ name: 'assistant' })} style={{ marginTop: 10, alignSelf: 'flex-start' }} />
         </Animated.View>
       )}
 
       <View style={[styles.mic, { bottom: insets.bottom + 34 }]}>
         <View style={{ width: 72, height: 72, alignItems: 'center', justifyContent: 'center' }}>
           <MicRings on={listening && !reduceMotion} />
-          <Pressable accessibilityRole="button" accessibilityLabel={listening ? 'Release to send' : 'Hold to talk'} accessibilityHint="Hold while you speak, release to send. Or tap once to start and again to send."
+          <Pressable accessibilityRole="button" accessibilityLabel={listening ? t('Release to send') : t('Hold to talk')} accessibilityHint={t('Hold while you speak, release to send. Or tap once to start and again to send.')}
             onPressIn={onPressIn} onPressOut={onPressOut} disabled={thinking}
             style={({ pressed }) => [styles.micBtn, (pressed || listening) && { transform: [{ scale: 1.06 }] }, thinking && { opacity: 0.6 }]}>
             <Icon name="mic" size={28} stroke="#fff" />
           </Pressable>
         </View>
-        <T style={{ color: color.muted2, fontSize: 12 }}>{toggled ? t(lang, 'tapToStop') : t(lang, 'holdToTalk')}</T>
+        <T style={{ color: color.muted2, fontSize: 12 }}>{toggled ? t('Tap again to send') : t('Hold to talk · release to send')}</T>
       </View>
     </Animated.View>
   );

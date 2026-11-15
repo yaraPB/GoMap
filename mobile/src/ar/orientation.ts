@@ -37,6 +37,8 @@ export class HeadingFusion {
   private offset: number | null = null;
   private manual = false;
   private last = 0;
+  private first = 0;
+  private guessed = false;
 
   /** Feed each attitude sample; returns the fused camera heading (true north) or null. */
   update(input: { yaw: number; pitchDown: number; compass: number | null; compassAccuracy: number | null; course: number | null; t: number; platform: string }): number | null {
@@ -44,10 +46,14 @@ export class HeadingFusion {
     this.last = input.t;
     // Android's compass reads the top edge of the phone and degrades when upright; iOS fuses it.
     const compassOk = input.compass != null && (input.compassAccuracy ?? 0) >= 1 && (input.platform === 'ios' || input.pitchDown > 35 || (input.compassAccuracy ?? 0) >= 3);
+    if (!this.first) this.first = input.t;
     if (this.offset == null) {
-      if (input.compass == null) return null;
-      this.offset = angleDelta(input.yaw, input.compass); // first guess, even if rough
+      // no compass reading yet: after a moment use the attitude's own north (absolute on Android)
+      // so the arrows appear at once; the compass and walking course correct it as they arrive
+      if (input.compass == null) { if (input.t - this.first < 1200) return null; this.offset = 0; this.guessed = true; }
+      else this.offset = angleDelta(input.yaw, input.compass); // first guess, even if rough
     }
+    if (this.guessed && input.compass != null) { this.offset = angleDelta(input.yaw, input.compass); this.guessed = false; } // first real reading: snap to it
     const pull = (target: number, tau: number) => { this.offset = wrap(this.offset! + angleDelta(this.offset!, target) * Math.min(1, dt / tau)); };
     if (input.course != null) pull(angleDelta(input.yaw, input.course), this.manual ? 12 : 5);   // walking: trust the path
     else if (compassOk && !this.manual) pull(angleDelta(input.yaw, input.compass!), 3);

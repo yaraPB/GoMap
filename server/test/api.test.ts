@@ -235,3 +235,22 @@ test('office time: presence changes are logged and the admin sees totals; notes 
   const accounts = (await get('/api/accounts')).body;
   assert.deepEqual(accounts.map((a: { role: string }) => a.role), ['student', 'faculty', 'staff', 'guest']);
 });
+
+test('a professor away for several days stays away past the evening reset, with a return date', async () => {
+  const { activePresence, availability } = await import('../src/services/directory.js');
+  const setAt = new Date('2026-11-16T09:00:00Z');
+  const until = new Date('2026-11-20T08:00:00Z').toISOString();
+  const row = { person_id: 'x', status: 'out' as const, reason: 'conference', until, set_by: 'x', set_at: setAt.toISOString() };
+  assert.ok(activePresence(row, new Date('2026-11-18T19:00:00Z')), 'still away two days later, after 18:30');
+  assert.equal(activePresence(row, new Date('2026-11-20T09:00:00Z')), null, 'back on the return date');
+  const a = availability(null, row, new Date('2026-11-17T10:00:00Z')).availability;
+  assert.equal(a.label, 'Away');
+  assert.match(a.detail ?? '', /At a conference · back Fri 20 Nov/);
+  const h = { 'content-type': 'application/json', 'x-gomap-user': 'harit-satt' };
+  const tooLong = await send('/api/people/harit-satt/presence', { status: 'out', reason: 'leave', until: new Date(Date.now() + 300 * 86400000).toISOString() }, h, 'PUT');
+  assert.equal(tooLong.status, 400);
+  const semester = await send('/api/people/harit-satt/presence', { status: 'out', reason: 'leave', until: new Date(Date.now() + 40 * 86400000).toISOString() }, h, 'PUT');
+  assert.equal(semester.status, 200);
+  assert.equal(semester.body.availability.label, 'Away');
+  await send('/api/people/harit-satt/presence', { status: 'clear' }, h, 'PUT');
+});

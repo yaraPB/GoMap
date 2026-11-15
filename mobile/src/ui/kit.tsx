@@ -2,27 +2,30 @@ import React, { useEffect } from 'react';
 import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View, useWindowDimensions, type PressableProps, type StyleProp, type TextProps, type TextStyle, type ViewStyle } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import Animated, { Easing, FadeInDown, runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
+import Animated, { Easing, FadeInDown, FadeOut, runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { color, font, icons, shadow, status as statusColors, type IconName } from './theme';
+import { color, font, shadow, status as statusColors } from './theme';
+import { LUCIDE, type IconName } from './icons';
+import { useLang, useT } from '../i18n';
 
 const ARABIC = /[؀-ۿ]/;
 
 export function Icon({ name, size = 20, stroke = color.ink, width = 2, fill = 'none' }: { name: IconName; size?: number; stroke?: string; width?: number; fill?: string }) {
+  const Glyph = LUCIDE[name] ?? LUCIDE.dots;
   return (
-    <Svg width={size} height={size} viewBox="0 0 24 24" fill={fill} stroke={stroke} strokeWidth={width} strokeLinecap="round" strokeLinejoin="round"
-      {...(Platform.OS === 'web' ? { 'aria-hidden': true } : { accessibilityElementsHidden: true, importantForAccessibility: 'no-hide-descendants' as const })}>
-      <Path d={icons[name]} />
-    </Svg>
+    <Glyph size={size} color={stroke} strokeWidth={width} fill={fill === 'none' ? 'none' : fill}
+      {...(Platform.OS === 'web' ? { 'aria-hidden': true } : { accessibilityElementsHidden: true, importantForAccessibility: 'no-hide-descendants' as const })} />
   );
 }
 
 type Weight = 'regular' | 'medium' | 'semibold' | 'bold';
 export function T({ style, weight = 'regular', children, ...rest }: TextProps & { weight?: Weight }) {
+  const rtl = useLang() === 'ar';
   const text = typeof children === 'string' ? children : Array.isArray(children) ? children.filter(c => typeof c === 'string').join('') : '';
   const arabic = ARABIC.test(text);
   const family = arabic ? (weight === 'bold' || weight === 'semibold' ? font.arabicBold : font.arabic) : font[weight];
-  return <Text {...rest} style={[{ fontFamily: family, color: color.ink }, arabic && { writingDirection: 'rtl' }, style]}>{children}</Text>;
+  // in Arabic the whole UI reads right to left; a style's own textAlign (e.g. center) still wins
+  return <Text {...rest} style={[{ fontFamily: rtl ? (weight === 'bold' || weight === 'semibold' ? font.arabicBold : font.arabic) : family, color: color.ink }, (arabic || rtl) && { writingDirection: 'rtl', textAlign: 'right' }, style]}>{children}</Text>;
 }
 
 export function Label({ children, style }: { children: React.ReactNode; style?: StyleProp<TextStyle> }) {
@@ -105,11 +108,12 @@ export function Avatar({ name, tone = 'closed', size = 40 }: { name: string; ton
 }
 
 export function Provenance({ text, onReport }: { text: string; onReport?: () => void }) {
+  const tr = useT();
   return (
     <View style={s.prov}>
       <Icon name="shield" size={16} stroke={color.muted} />
       <T style={{ flex: 1, fontSize: 11.5, lineHeight: 16, color: color.muted }}>{text}</T>
-      {onReport && <Pressable accessibilityRole="button" onPress={onReport} hitSlop={8}><T weight="semibold" style={{ fontSize: 12, color: color.blue }}>Report</T></Pressable>}
+      {onReport && <Pressable accessibilityRole="button" onPress={onReport} hitSlop={8}><T weight="semibold" style={{ fontSize: 12, color: color.blue }}>{tr('Report')}</T></Pressable>}
     </View>
   );
 }
@@ -127,11 +131,12 @@ export function Sheet({ snaps = [0.5, 0.9], initial = 0, onClose, children, head
 }) {
   const { height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
+  const tr = useT();
   const heights = snaps.map(f => Math.round(height * f));
   const max = heights[heights.length - 1];
   const y = useSharedValue(max);
   const start = useSharedValue(0);
-  const snapTo = (i: number) => { 'worklet'; y.value = withSpring(max - heights[i], { damping: 22, stiffness: 220, mass: 0.8 }); };
+  const snapTo = (i: number) => { 'worklet'; y.value = withSpring(max - heights[i], { damping: 26, stiffness: 240, mass: 0.9, overshootClamping: false }); };
   useEffect(() => { snapTo(index ?? initial); }, [index, height]);
   const notifyIndex = (i: number) => onIndexChange?.(i);
   const close = () => onClose?.();
@@ -149,9 +154,9 @@ export function Sheet({ snaps = [0.5, 0.9], initial = 0, onClose, children, head
     });
   const anim = useAnimatedStyle(() => ({ transform: [{ translateY: y.value }] }));
   return (
-    <Animated.View style={[s.sheet, { height: max, paddingBottom: insets.bottom }, dark && { backgroundColor: '#14171C' }, anim, style]}>
+    <Animated.View exiting={FadeOut.duration(170)} style={[s.sheet, { height: max, paddingBottom: insets.bottom }, dark && { backgroundColor: '#14171C' }, anim, style]}>
       <GestureDetector gesture={pan}>
-        <View accessible accessibilityRole="adjustable" accessibilityLabel="Sheet handle. Drag to resize." style={{ paddingTop: 10 }}>
+        <View accessible accessibilityRole="adjustable" accessibilityLabel={tr('Sheet handle. Drag to resize.')} style={{ paddingTop: 10 }}>
           <View style={[s.handle, dark && { backgroundColor: 'rgba(255,255,255,0.25)' }]} />
           {header}
         </View>
@@ -172,8 +177,9 @@ export function Empty({ icon = 'search', title, body, action, onAction }: { icon
   );
 }
 
-export function Loading({ label = 'Loading' }: { label?: string }) {
-  return <View style={{ padding: 28, alignItems: 'center' }} accessibilityLabel={label}><ActivityIndicator color={color.muted} /></View>;
+export function Loading({ label }: { label?: string }) {
+  const tr = useT();
+  return <View style={{ padding: 28, alignItems: 'center' }} accessibilityLabel={label ?? tr('Loading…')}><ActivityIndicator color={color.muted} /></View>;
 }
 
 export const s = StyleSheet.create({

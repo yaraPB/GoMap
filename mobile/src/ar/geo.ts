@@ -85,3 +85,6 @@ export function createHeadingFilter(alpha = 0.15) {
 
 export const fmtDistance = (m: number) => (m < 1000 ? `${Math.max(1, Math.round(m / (m < 100 ? 5 : 10)) * (m < 100 ? 5 : 10))} m` : `${(m / 1000).toFixed(1)} km`);
 export const fmtMinutes = (s: number) => `${Math.max(1, Math.round(s / 60))} min`;
+/** Translated duration and distance (t from useT). */
+export const fmtMinutesT = (s: number, t: (en: string, v?: Record<string, string | number>) => string) => t('{n} min', { n: Math.max(1, Math.round(s / 60)) });
+export const fmtDistanceT = (m: number, t: (en: string, v?: Record<string, string | number>) => string) => (m < 1000 ? t('{n} m', { n: Math.round(m / 5) * 5 || Math.round(m) }) : t('{n} km', { n: (m / 1000).toFixed(1) }));

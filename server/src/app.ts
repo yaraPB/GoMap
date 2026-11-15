@@ -13,7 +13,7 @@ import { json, type Sql } from './db/sqlite.js';
 import { formatHours, openState, parseHours, type Hours } from './lib/hours.js';
 import type { RouteMode } from './routing/route.js';
 import type { Campus } from './services/campus.js';
-import { DEPARTMENTS, Directory, isStale, NOTE_KINDS, type PersonRow } from './services/directory.js';
+import { DEPARTMENTS, Directory, isStale, NOTE_KINDS, REASONS, type PersonRow } from './services/directory.js';
 import { Offices, SERVICE_CATEGORIES, weeklyMinutes, type IssueRow, type ServiceRow } from './services/offices.js';
 import { meta } from './db/sqlite.js';
 import type { CampusHours } from './seed/services.js';
@@ -206,9 +206,11 @@ export function createApp(ctx: AppContext) {
     const status = req.body?.status;
     if (!['in', 'busy', 'out', 'clear', 'keep'].includes(status)) throw bad('status must be in, busy, out, clear or keep');
     const reason = req.body?.reason ?? null;
-    if (reason !== null && !['meeting', 'teaching', 'campus', 'away', 'none'].includes(reason)) throw bad('unknown reason');
+    if (reason !== null && !(REASONS as readonly string[]).includes(reason)) throw bad('unknown reason');
     const until = req.body?.until ?? null;
     if (until !== null && (typeof until !== 'string' || Number.isNaN(Date.parse(until)))) throw bad('until must be an ISO timestamp or null');
+    if (until && Date.parse(until) - Date.now() > 200 * 86400000) throw bad('an absence can last at most one semester (200 days)');
+    if (until && Date.parse(until) - Date.now() > 86400000 && status !== 'out') throw bad('only "out" can last several days');
     if (req.body?.note !== undefined && req.body.note !== null && typeof req.body.note !== 'string') throw bad('note must be text');
     const noteKind = req.body?.note_kind ?? null;
     if (noteKind !== null && !NOTE_KINDS.includes(noteKind)) throw bad(`note_kind must be one of ${NOTE_KINDS.join(', ')}`);
@@ -252,6 +254,16 @@ export function createApp(ctx: AppContext) {
     res.set('Cache-Control', 'public, max-age=300');
     res.json({ type: 'FeatureCollection', attribution: '© Mapbox © OpenStreetMap contributors', features: campus.walkways.map(w => ({ ...w, properties: { ...w.properties, closed: false } })) });
   });
+
+  /** Footprints of known places with their open state: the map lights up open buildings after dark. */
+  app.get('/api/geo/buildings', wrap(async (_req, res) => {
+    const places = await Place.find({ footprint: { $ne: null } }, { name: 1, category: 1, footprint: 1, height: 1, hours: 1, status: 1 }).lean();
+    res.set('Cache-Control', 'public, max-age=60');
+    res.json({ type: 'FeatureCollection', features: places.map(p => ({
+      type: 'Feature', geometry: p.footprint,
+      properties: { id: String(p._id), category: p.category, height: Math.max(4, Number(p.height) || 8), open: p.status !== 'closed' && openState(p.hours as Hours | null, config.timezone).state === 'open' },
+    })) });
+  }));
 
   app.get('/api/geo/closures', wrap(async (_req, res) => {
     const reports = await Report.find({ status: 'confirmed', closure: { $ne: null } }).lean();

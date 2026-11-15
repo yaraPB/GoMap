@@ -1,89 +1,122 @@
-import { useAccounts } from '../api/hooks';
 import React from 'react';
 import { Pressable, ScrollView, Switch, View } from 'react-native';
 import { router } from 'expo-router';
-import { useMap, type MapStyle } from '../map/MapContext';
-import { USERS, useApp } from '../state/app';
+import { useT } from '../i18n';
+import { useMap, type MapSkin, type MapStyle } from '../map/MapContext';
+import { useApp } from '../state/app';
 import { usePanels } from '../state/panels';
 import { Icon, IconBtn, Label, Sheet, T } from '../ui/kit';
 import { color, type IconName } from '../ui/theme';
+import { ROLE_LOOK } from './Views';
 
-const STYLES: { id: MapStyle; name: string; swatch: string[] }[] = [
-  { id: 'default', name: 'Default', swatch: ['#E9E5DA', '#CFE3C4'] },
-  { id: 'satellite', name: 'Satellite', swatch: ['#3E4C44', '#6B7B5E'] },
-  { id: 'contrast', name: 'High contrast', swatch: ['#FFFFFF', '#15171A'] },
+const STYLES: { id: MapStyle; name: string; swatch: string[]; icon: IconName }[] = [
+  { id: 'default', name: 'Default', swatch: ['#E9E5DA', '#CFE3C4'], icon: 'map' },
+  { id: 'satellite', name: 'Satellite', swatch: ['#3E4C44', '#6B7B5E'], icon: 'satellite' },
+  { id: 'contrast', name: 'High contrast', swatch: ['#FFFFFF', '#15171A'], icon: 'contrast' },
+];
+const SKINS: { id: MapSkin; name: string; sub: string; colors: string[]; icon: IconName }[] = [
+  { id: 'auto', name: 'Auto', sub: 'Follows the time on campus', colors: ['#CFE3F7', '#F6B26B', '#1B2433'], icon: 'clock' },
+  { id: 'day', name: 'Day', sub: 'Bright', colors: ['#EAF2FA', '#CFE3C4'], icon: 'sun' },
+  { id: 'evening', name: 'Evening', sub: 'Golden hour', colors: ['#F9C78B', '#D9773F'], icon: 'sunset' },
+  { id: 'night', name: 'Dark', sub: 'Lights on in open buildings', colors: ['#1B2433', '#3B4A66'], icon: 'moon' },
 ];
 
-/** Board 05: map style and layers (+ the demo account switcher until SSO). */
+/** Board 05: map style, time-of-day skin, layers, language and the demo view. */
 export default function Layers() {
   const { pop, push } = usePanels();
   const map = useMap();
-  const { user, setUser, lang, setLang } = useApp();
-  const accounts = useAccounts();
+  const t = useT();
+  const { user, lang, setLang } = useApp();
   const toggles: { key: keyof typeof map.layers; label: string; sub: string; icon: IconName }[] = [
+    { key: 'crowding', label: 'Busy paths now', sub: 'Only busy paths are coloured; quiet ones stay as they are', icon: 'flame' },
     { key: 'threeD', label: '3D buildings', sub: 'See buildings rise from the map as you zoom in', icon: 'building' },
     { key: 'cars', label: 'Show where cars go', sub: 'Roads as a solid band, paths stay dotted', icon: 'car' },
     { key: 'labels', label: 'Building labels', sub: 'Numbers on the pins up close', icon: 'pin' },
   ];
-  const header = <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingBottom: 10 }}><T weight="bold" style={{ flex: 1, fontSize: 18 }}>Map style and layers</T><IconBtn icon="close" label="Close" onPress={pop} float={false} bg={color.surface} size={34} /></View>;
+  const look = ROLE_LOOK[user.role] ?? ROLE_LOOK.student;
+  const header = <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingBottom: 10 }}><T weight="bold" style={{ flex: 1, fontSize: 18 }}>{t('Map style and layers')}</T><IconBtn icon="close" label={t('Close')} onPress={pop} float={false} bg={color.surface} size={34} /></View>;
   return (
-    <Sheet snaps={[0.62, 0.92]} onClose={pop} header={header}>
-      <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 32, gap: 18 }}>
-        <View style={{ flexDirection: 'row', gap: 10 }}>
-          {STYLES.map(s => (
-            <Pressable key={s.id} accessibilityRole="radio" accessibilityState={{ selected: map.style === s.id }} onPress={() => map.setStyle(s.id)} style={{ flex: 1, gap: 6 }}>
-              <View style={{ height: 70, borderRadius: 14, overflow: 'hidden', borderWidth: map.style === s.id ? 3 : 1, borderColor: map.style === s.id ? color.blue : color.line, flexDirection: 'row' }}>
-                {s.swatch.map(c => <View key={c} style={{ flex: 1, backgroundColor: c }} />)}
-              </View>
-              <T weight="semibold" style={{ fontSize: 13, textAlign: 'center', color: map.style === s.id ? color.blue : color.ink }}>{s.name}</T>
-            </Pressable>
-          ))}
-        </View>
+    <Sheet snaps={[0.66, 0.94]} onClose={pop} header={header}>
+      <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 32, gap: 20 }}>
         <View>
-          {toggles.map(t => (
-            <View key={t.key} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: color.hairline }}>
-              <Icon name={t.icon} size={20} stroke={color.ink2} />
-              <View style={{ flex: 1 }}><T weight="semibold" style={{ fontSize: 15 }}>{t.label}</T><T style={{ fontSize: 12.5, color: color.muted }}>{t.sub}</T></View>
-              <Switch accessibilityLabel={t.label} value={map.layers[t.key]} onValueChange={v => map.setLayers({ [t.key]: v })} trackColor={{ true: color.blue, false: '#D5D7D2' }} />
+          <Label style={{ marginBottom: 8 }}>{t('Map')}</Label>
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            {STYLES.map(s => {
+              const on = map.style === s.id;
+              return (
+                <Pressable key={s.id} accessibilityRole="radio" accessibilityState={{ selected: on }} onPress={() => map.setStyle(s.id)} style={{ flex: 1, gap: 6 }}>
+                  <View style={{ height: 64, borderRadius: 14, overflow: 'hidden', borderWidth: on ? 3 : 1, borderColor: on ? color.blue : color.line, flexDirection: 'row' }}>
+                    {s.swatch.map(c => <View key={c} style={{ flex: 1, backgroundColor: c }} />)}
+                    <View style={{ position: 'absolute', top: 6, start: 6, width: 24, height: 24, borderRadius: 8, backgroundColor: '#ffffffd9', alignItems: 'center', justifyContent: 'center' }}><Icon name={s.icon} size={14} stroke={color.ink} /></View>
+                  </View>
+                  <T weight="semibold" style={{ fontSize: 13, textAlign: 'center', color: on ? color.blue : color.ink }}>{t(s.name)}</T>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+
+        <View>
+          <Label style={{ marginBottom: 8 }}>{t('Time of day')}</Label>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            {SKINS.map(s => {
+              const on = map.skin === s.id;
+              return (
+                <Pressable key={s.id} accessibilityRole="radio" accessibilityState={{ selected: on }} accessibilityHint={t(s.sub)} onPress={() => map.setSkin(s.id)} style={{ flex: 1, gap: 6 }}>
+                  <View style={{ height: 52, borderRadius: 12, overflow: 'hidden', borderWidth: on ? 3 : 1, borderColor: on ? color.blue : color.line, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
+                    {s.colors.map(c => <View key={c} style={{ flex: 1, alignSelf: 'stretch', backgroundColor: c }} />)}
+                    <View style={{ position: 'absolute' }}><Icon name={s.icon} size={18} stroke={s.id === 'night' ? '#FFE2A8' : '#15171A'} /></View>
+                  </View>
+                  <T weight="semibold" style={{ fontSize: 12, textAlign: 'center', color: on ? color.blue : color.ink }}>{t(s.name)}</T>
+                </Pressable>
+              );
+            })}
+          </View>
+          <T style={{ fontSize: 12, color: color.muted, marginTop: 6 }}>{t(SKINS.find(s => s.id === map.skin)?.sub ?? '')}</T>
+        </View>
+
+        <View>
+          {toggles.map(tg => (
+            <View key={tg.key} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: color.hairline }}>
+              <Icon name={tg.icon} size={20} stroke={color.ink2} />
+              <View style={{ flex: 1 }}><T weight="semibold" style={{ fontSize: 15 }}>{t(tg.label)}</T><T style={{ fontSize: 12.5, color: color.muted }}>{t(tg.sub)}</T></View>
+              <Switch accessibilityLabel={t(tg.label)} value={map.layers[tg.key]} onValueChange={v => map.setLayers({ [tg.key]: v })} trackColor={{ true: color.blue, false: '#D5D7D2' }} />
             </View>
           ))}
           <Pressable accessibilityRole="button" onPress={() => { pop(); push({ name: 'crowding' }); }} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: color.hairline }}>
-            <Icon name="flame" size={20} stroke={color.ink2} />
-            <View style={{ flex: 1 }}><T weight="semibold" style={{ fontSize: 15 }}>Crowding</T><T style={{ fontSize: 12.5, color: color.muted }}>Busy walkways by hour, historic</T></View>
+            <Icon name="clock" size={20} stroke={color.ink2} />
+            <View style={{ flex: 1 }}><T weight="semibold" style={{ fontSize: 15 }}>{t('Busy paths by hour')}</T><T style={{ fontSize: 12.5, color: color.muted }}>{t('Typical crowding for any day and hour')}</T></View>
             <Icon name="chevron" size={16} stroke={color.muted} />
           </Pressable>
         </View>
 
         <View>
-          <Label style={{ marginBottom: 8 }}>Language</Label>
+          <Label style={{ marginBottom: 8 }}>{t('Language')}</Label>
           <View style={{ flexDirection: 'row', gap: 8 }}>
             {([['en', 'English'], ['fr', 'Français'], ['ar', 'العربية']] as const).map(([id, name]) => (
               <Pressable key={id} accessibilityRole="radio" accessibilityState={{ selected: lang === id }} onPress={() => setLang(id)} style={{ flex: 1, height: 40, borderRadius: 11, borderWidth: 1, borderColor: lang === id ? color.ink : color.line, backgroundColor: lang === id ? color.ink : '#fff', alignItems: 'center', justifyContent: 'center' }}>
-                <T weight="semibold" style={{ color: lang === id ? '#fff' : color.ink }}>{name}</T>
+                <T weight="semibold" style={{ color: lang === id ? '#fff' : color.ink, textAlign: 'center' }}>{name}</T>
               </Pressable>
             ))}
           </View>
-          {lang !== 'en' && <T style={{ fontSize: 12, color: color.warnText, marginTop: 6 }}>Translation under review: the assistant and map controls switch; most screens are English for now.</T>}
         </View>
 
-        <View>
-          <Label style={{ marginBottom: 8 }}>Demo account · until GoCampus sign-in</Label>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-            {(accounts.data?.length ? accounts.data : USERS).map(u => (
-              <Pressable key={u.id} accessibilityRole="radio" accessibilityState={{ selected: user.id === u.id }} onPress={() => setUser(u)} style={{ paddingHorizontal: 12, height: 36, borderRadius: 999, borderWidth: 1, borderColor: user.id === u.id ? color.blue : color.line, backgroundColor: user.id === u.id ? '#EEF4FF' : '#fff', justifyContent: 'center' }}>
-                <T weight="semibold" style={{ fontSize: 13, color: user.id === u.id ? color.blue : color.ink }}>{u.role === 'faculty' ? `Faculty (${u.name})` : u.role === 'guest' ? 'Visitor' : u.role[0].toUpperCase() + u.role.slice(1)}</T>
-              </Pressable>
-            ))}
-          </View>
+        <View style={{ gap: 10 }}>
+          <Label>{t('View')}</Label>
+          <Pressable accessibilityRole="button" onPress={() => { pop(); push({ name: 'views' }); }} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 14, backgroundColor: look.tint }}>
+            <Icon name={look.icon} size={20} stroke={look.ink} />
+            <T weight="semibold" style={{ flex: 1, color: look.ink }}>{t(look.title)}{user.role === 'faculty' ? ` · ${user.name}` : ''}</T>
+            <T weight="semibold" style={{ color: look.ink, fontSize: 13 }}>{t('Switch')}</T>
+          </Pressable>
           {user.role === 'faculty' && (
-            <Pressable accessibilityRole="button" onPress={() => router.push('/faculty-status')} style={{ marginTop: 12, flexDirection: 'row', alignItems: 'center', gap: 10, padding: 14, borderRadius: 12, backgroundColor: '#EEF4FF' }}>
-              <Icon name="user" size={18} stroke={color.blue} /><T weight="semibold" style={{ flex: 1, color: color.blue }}>I'm in / I'm out · set today's status</T><Icon name="chevron" size={16} stroke={color.blue} />
+            <Pressable accessibilityRole="button" onPress={() => router.push('/faculty-status')} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: 14, borderRadius: 14, backgroundColor: '#EEF4FF' }}>
+              <Icon name="door" size={18} stroke={color.blue} /><T weight="semibold" style={{ flex: 1, color: color.blue }}>{t("I'm in / I'm away · set my status")}</T><Icon name="chevron" size={16} stroke={color.blue} />
             </Pressable>
           )}
         </View>
         <Pressable accessibilityRole="button" onPress={() => push({ name: 'help', step: 0 })} style={{ flexDirection: 'row', gap: 12, alignItems: 'center', padding: 16, borderRadius: 18, backgroundColor: '#E8F3EB' }}>
           <Icon name="map" stroke="#226348" size={22} />
-          <View style={{ flex: 1 }}><T weight="semibold" style={{ color: '#226348' }}>Take a quick tour</T><T style={{ color: '#617368', fontSize: 12, marginTop: 3 }}>Try the map and meet your campus guide.</T></View>
+          <View style={{ flex: 1 }}><T weight="semibold" style={{ color: '#226348' }}>{t('Take a quick tour')}</T><T style={{ color: '#617368', fontSize: 12, marginTop: 3 }}>{t('Try the map and meet your campus guide.')}</T></View>
           <Icon name="chevron" stroke="#226348" size={18} />
         </Pressable>
         <T style={{ fontSize: 11.5, color: color.muted }}>Map © Mapbox © OpenStreetMap</T>

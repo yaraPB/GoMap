@@ -42,6 +42,7 @@ export const api = {
     request<Route>('/api/route', { method: 'POST', body: JSON.stringify({ from: ll(from), to_place_id: to.placeId, to: ll(to.coord), mode }) }),
   walkways: () => request<WalkwayCollection>('/api/geo/walkways'),
   closures: () => request<Closure[]>('/api/geo/closures'),
+  buildings: () => request<import('../map/MapContext').BuildingCollection>('/api/geo/buildings'),
   crowding: (weekday: number, hour: number) => request<CrowdingCollection>(`/api/crowding${qs({ weekday, hour })}`),
   ask: (text: string, lang: Lang, from: Position | null, history: { role: 'user' | 'assistant'; text: string }[], localOnly = false) =>
     request<Answer>('/api/assistant/ask', { method: 'POST', body: JSON.stringify({ text, lang, from: ll(from), history: history.slice(-6), local_only: localOnly }) }),

@@ -29,8 +29,15 @@ function localDate(d: Date) {
   return new Intl.DateTimeFormat('en-CA', { timeZone: config.timezone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
 }
 
+/** An absence that runs past today (several days, a semester): it outlives the 18:30 reset. */
+export const isLongAbsence = (p: { status: string; until: string | null }, now = new Date()) =>
+  p.status === 'out' && !!p.until && localDate(new Date(p.until)) > localDate(now);
+
 export function activePresence(p: PresenceRow | undefined, now = new Date()): PresenceRow | null {
   if (!p) return null;
+  if (p.status === 'out' && p.until && localDate(new Date(p.until)) >= localDate(now) && localDate(new Date(p.until)) !== localDate(new Date(p.set_at))) {
+    return p.until > now.toISOString() ? p : null; // multi-day: valid until the return date
+  }
   if (localDate(new Date(p.set_at)) !== localDate(now)) return null;
   if (campusNow(config.timezone, now).time >= PRESENCE_CLEARS_AT) return null;
   if (p.until && p.until <= now.toISOString()) return null;
@@ -45,7 +52,9 @@ export function clearExpiredPresence(db: Sql, now = new Date()) {
 
 export type Availability = { state: 'in' | 'busy' | 'out' | 'open' | 'closed' | 'not_published'; label: string; detail: string | null; source: 'presence' | 'hours' };
 
-const REASON: Record<string, string> = { meeting: 'In a meeting', teaching: 'Teaching', campus: 'Elsewhere on campus', away: 'Off campus', none: '' };
+export const REASONS = ['meeting', 'teaching', 'campus', 'away', 'sick', 'conference', 'leave', 'none'] as const;
+const REASON: Record<string, string> = { meeting: 'In a meeting', teaching: 'Teaching', campus: 'Elsewhere on campus', away: 'Off campus', sick: 'Sick', conference: 'At a conference', leave: 'On leave', none: '' };
+const dayName = (iso: string) => new Intl.DateTimeFormat('en-GB', { timeZone: config.timezone, weekday: 'short', day: 'numeric', month: 'short' }).format(new Date(iso));
 const time = (iso: string) => new Intl.DateTimeFormat('en-GB', { timeZone: config.timezone, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date(iso));
 const DAYNAME: Record<string, string> = { mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday', sat: 'Saturday', sun: 'Sunday' };
 
@@ -57,8 +66,9 @@ export function availability(hours: Hours | null, presence: PresenceRow | null, 
     return { availability: { state: 'closed', label: 'At lunch', detail: `back at ${lunch[1]}`, source: 'hours' }, open };
   }
   if (presence) {
-    const until = presence.until ? `until ${time(presence.until)}` : 'for the rest of today';
-    const label = presence.status === 'in' ? 'In the office' : presence.status === 'busy' ? 'Busy' : 'Not in today';
+    const long = isLongAbsence(presence, now);
+    const until = !presence.until ? 'for the rest of today' : long ? `back ${dayName(presence.until)}` : `until ${time(presence.until)}`;
+    const label = presence.status === 'in' ? 'In the office' : presence.status === 'busy' ? 'Busy' : long ? 'Away' : 'Not in today';
     const detail = [REASON[presence.reason ?? 'none'], until].filter(Boolean).join(' · ');
     return { availability: { state: presence.status, label, detail, source: 'presence' }, open };
   }

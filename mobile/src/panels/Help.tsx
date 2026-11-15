@@ -11,6 +11,7 @@ import { useApp } from '../state/app';
 import { usePanels, type Panel } from '../state/panels';
 import { Btn, Icon, IconBtn, T } from '../ui/kit';
 import { categoryIcon, categoryName, type IconName } from '../ui/theme';
+import { useT } from '../i18n';
 
 const STOPS: { title: string; body: string; icon: IconName; tint: string; ink: string }[] = [
   { title: 'What are you looking for?', body: 'Pick one below. Watch the map find your spots.', icon: 'map', tint: '#E8F3EB', ink: '#226348' },
@@ -25,6 +26,7 @@ const PICKS: { id: Category; label: string; icon: IconName }[] = [
 
 /** A live practice tour. Nothing covers or pretends to highlight the map. */
 export default function Help({ step = 0 }: { step?: number }) {
+  const t = useT();
   const { height, width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const { reset } = usePanels();
@@ -74,9 +76,9 @@ export default function Help({ step = 0 }: { step?: number }) {
       <View style={[styles.top, { top: insets.top + 12 }]} pointerEvents="box-none">
         <View style={styles.badge}>
           <Icon name="globe" size={17} stroke="#226348" />
-          <T weight="semibold" style={styles.badgeText}>A little campus adventure</T>
+          <T weight="semibold" style={styles.badgeText}>{t("A little campus adventure")}</T>
         </View>
-        <IconBtn icon="close" label="Leave the tour" size={44} float={false} onPress={() => done()} />
+        <IconBtn icon="close" label={t("Leave the tour")} size={44} float={false} onPress={() => done()} />
       </View>
 
       <Animated.View entering={enter} exiting={reduceMotion ? undefined : FadeOut.duration(150)}
@@ -89,7 +91,7 @@ export default function Help({ step = 0 }: { step?: number }) {
             </View>
             <T weight="semibold" style={styles.counter}>{i + 1} / 3</T>
             <Pressable accessibilityRole="button" onPress={() => done()} style={styles.skip}>
-              <T weight="medium" style={styles.skipText}>Skip tour</T>
+              <T weight="medium" style={styles.skipText}>{t("Skip tour")}</T>
             </Pressable>
           </View>
 
@@ -97,9 +99,9 @@ export default function Help({ step = 0 }: { step?: number }) {
           <Animated.View entering={reduceMotion ? undefined : FadeIn.duration(220)}>
             <View style={styles.heading}>
               <View style={[styles.medallion, { backgroundColor: m.tint }]}><Icon name={m.icon} size={23} stroke={m.ink} /></View>
-              <T weight="bold" accessibilityRole="header" style={styles.title}>{place && i === 1 ? 'There you go!' : m.title}</T>
+              <T weight="bold" accessibilityRole="header" style={styles.title}>{place && i === 1 ? t('There you go!') : t(m.title)}</T>
             </View>
-            <T style={styles.body}>{place && i === 1 ? 'This is your place. Open it for hours, directions, and what’s inside.' : m.body}</T>
+            <T style={styles.body}>{place && i === 1 ? t('This is your place. Open it for hours, directions, and what’s inside.') : t(m.body)}</T>
 
             {i === 0 && <>
               <View style={styles.choices}>
@@ -107,12 +109,12 @@ export default function Help({ step = 0 }: { step?: number }) {
                   onPress={() => { feedback(); setSelected(null); setCategory(category === p.id ? 'all' : p.id); }}
                   style={({ pressed }) => [styles.choice, category === p.id && styles.chosen, pressed && styles.pressed]}>
                   <Icon name={p.icon} size={20} stroke={category === p.id ? '#fff' : '#226348'} />
-                  <T weight="semibold" style={[styles.choiceText, category === p.id && { color: '#fff' }]}>{p.label}</T>
+                  <T weight="semibold" style={[styles.choiceText, category === p.id && { color: '#fff' }]}>{t(p.label)}</T>
                 </Pressable>)}
               </View>
               <View style={styles.feedback} accessibilityLiveRegion="polite">
                 <Icon name={category === 'all' ? 'locate' : 'check'} size={15} stroke="#226348" />
-                <T style={styles.feedbackText}>{places.isError ? 'Places couldn’t load. You can still explore the tour.' : places.isPending ? 'Finding campus places…' : category === 'all' ? 'Try a category. Tap it again to show everything.' : `${list.length} ${list.length === 1 ? 'spot' : 'spots'} on the map. Pick another to switch it up.`}</T>
+                <T style={styles.feedbackText}>{places.isError ? t('Places couldn’t load. You can still explore the tour.') : places.isPending ? t('Finding campus places…') : category === 'all' ? t('Try a category. Tap it again to show everything.') : list.length === 1 ? t('1 spot on the map. Pick another to switch it up.') : t('{n} spots on the map. Pick another to switch it up.', { n: list.length })}</T>
               </View>
             </>}
 
@@ -128,30 +130,30 @@ export default function Help({ step = 0 }: { step?: number }) {
             ) : (
               <Pressable accessibilityRole="button" disabled={!example} onPress={() => example && choosePlace(example.id)} style={({ pressed }) => [styles.example, pressed && styles.pressed]}>
                 <Icon name="pin" size={18} stroke="#95571A" />
-                <T weight="medium" style={styles.exampleText}>{example ? `Or try ${example.name}` : places.isError ? 'Places are unavailable right now. You can continue.' : 'Finding a place to try…'}</T>
+                <T weight="medium" style={styles.exampleText}>{example ? t('Or try {place}', { place: example.name }) : places.isError ? t('Places are unavailable right now. You can continue.') : t('Finding a place to try…')}</T>
                 {example && <Icon name="chevron" size={17} stroke="#95571A" />}
               </Pressable>
             ))}
 
             {i === 2 && <View style={styles.askOptions}>
-              <Pressable accessibilityRole="button" accessibilityLabel="Ask GoMap: Where is the library?" onPress={() => done({ name: 'assistant', ask: 'Where is the library?' })}
+              <Pressable accessibilityRole="button" accessibilityLabel={t("Ask GoMap: Where is the library?")} onPress={() => done({ name: 'assistant', ask: t('Where is the library?') })}
                 style={({ pressed }) => [styles.question, pressed && styles.pressed]}>
                 <Icon name="sparkle" size={20} stroke="#375ED1" />
-                <T weight="medium" style={styles.questionText}>Where is the library?</T>
+                <T weight="medium" style={styles.questionText}>{t("Where is the library?")}</T>
                 <Icon name="send" size={19} stroke="#375ED1" />
               </Pressable>
               <View style={styles.choices}>
-                <Btn title="Type a question" icon="doc" kind="secondary" style={{ flex: 1 }} small onPress={() => done({ name: 'assistant' })} />
-                <Btn title="Use my voice" icon="mic" kind="secondary" style={{ flex: 1 }} small onPress={() => done({ name: 'voice' })} />
+                <Btn title={t("Type a question")} icon="doc" kind="secondary" style={{ flex: 1 }} small onPress={() => done({ name: 'assistant' })} />
+                <Btn title={t("Use my voice")} icon="mic" kind="secondary" style={{ flex: 1 }} small onPress={() => done({ name: 'voice' })} />
               </View>
-              <T style={styles.voiceHint}>English, French, or Arabic. Open the mic, then hold to talk.</T>
+              <T style={styles.voiceHint}>{t("English, French, or Arabic. Open the mic, then hold to talk.")}</T>
             </View>}
           </Animated.View>
         </ScrollView>
 
           <View style={styles.footer}>
-            {i > 0 && <IconBtn icon="back" label="Previous tour step" size={44} float={false} bg="#F1F3EF" onPress={() => { feedback(); setI(n => n - 1); }} />}
-            <Btn title={i === 0 ? 'Let’s find a place' : i === 1 ? 'Meet your guide' : 'Let’s explore'} icon={i === 2 ? 'check' : 'chevron'}
+            {i > 0 && <IconBtn icon="back" label={t("Previous tour step")} size={44} float={false} bg="#F1F3EF" onPress={() => { feedback(); setI(n => n - 1); }} />}
+            <Btn title={i === 0 ? t('Let’s find a place') : i === 1 ? t('Meet your guide') : t('Let’s explore')} icon={i === 2 ? 'check' : 'chevron'}
               kind="dark" style={{ flex: 1, borderRadius: 16 }} onPress={i === 2 ? () => done() : next} />
           </View>
       </Animated.View>

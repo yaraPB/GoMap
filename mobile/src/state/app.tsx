@@ -1,5 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { AccessibilityInfo, Platform } from 'react-native';
+import { AccessibilityInfo, Platform, View } from 'react-native';
+import { LangContext, isRTL } from '../i18n';
 import * as Location from 'expo-location';
 import NetInfo from '@react-native-community/netinfo';
 import { setApiUser } from '../api/client';
@@ -40,7 +41,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
   const setUser = useCallback((u: MockUser) => { setApiUser(u.id); setUserState(u); }, []);
   const value = useMemo(() => ({ lang, setLang, user, setUser, online, reduceMotion, firstSession, finishOnboarding: () => setFirstSession(false) }), [lang, user, online, reduceMotion, firstSession, setUser]);
-  return <App.Provider value={value}>{children}</App.Provider>;
+  // Arabic mirrors the whole layout from here down (Yoga 'direction' is inherited), no reload needed
+  return (
+    <App.Provider value={value}>
+      <LangContext.Provider value={lang}>
+        <View style={{ flex: 1, direction: isRTL(lang) ? 'rtl' : 'ltr' }}>{children}</View>
+      </LangContext.Provider>
+    </App.Provider>
+  );
 }
 export function useApp() {
   const c = useContext(App);

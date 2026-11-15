@@ -11,6 +11,7 @@ import { DEMO_POSITION, useLocation } from '../state/app';
 import { usePanels } from '../state/panels';
 import { Btn, Icon, IconBtn, Label, Notice, Sheet, T } from '../ui/kit';
 import { color, font, shadow, type IconName } from '../ui/theme';
+import { useT } from '../i18n';
 
 const KINDS: { id: ReportKind; label: string; icon: IconName }[] = [
   { id: 'closed', label: 'Closed or blocked', icon: 'ban' },
@@ -24,6 +25,7 @@ const DURATIONS = [['today', 'Just today'], ['days', 'A few days'], ['unknown', 
 
 /** Board 29: drop a pin on what is wrong. Nothing reaches the map until the admin confirms it. */
 export default function Report({ at }: { at?: Position }) {
+  const t = useT();
   const insets = useSafeAreaInsets();
   const { pop } = usePanels();
   const map = useMap();
@@ -53,11 +55,11 @@ export default function Report({ at }: { at?: Position }) {
       <Sheet snaps={[0.42]} onClose={pop}>
         <Animated.View entering={FadeIn} style={{ alignItems: 'center', padding: 24, gap: 12 }}>
           <Animated.View entering={ZoomIn.springify()} style={styles.done}><Icon name="check" size={30} stroke="#fff" width={3} /></Animated.View>
-          <T weight="bold" style={{ fontSize: 20 }}>Thanks, it's with the admin</T>
+          <T weight="bold" style={{ fontSize: 20 }}>{t("Thanks, it's with the admin")}</T>
           <T style={{ fontSize: 14, color: color.muted, textAlign: 'center', lineHeight: 20 }}>
-            {submit.data.merged_with_existing ? 'Someone reported this spot already, so yours was added to the same item.' : 'Nothing changes on the map until it is confirmed.'} You'll see here when it is handled.
+            {submit.data.merged_with_existing ? t('Someone reported this spot already, so yours was added to the same item.') : t('Nothing changes on the map until it is confirmed.')} {t("You'll see here when it is handled.")}
           </T>
-          <Btn title="Back to the map" kind="dark" onPress={pop} style={{ alignSelf: 'stretch', marginTop: 6 }} />
+          <Btn title={t("Back to the map")} kind="dark" onPress={pop} style={{ alignSelf: 'stretch', marginTop: 6 }} />
         </Animated.View>
       </Sheet>
     );
@@ -66,39 +68,39 @@ export default function Report({ at }: { at?: Position }) {
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
       <View style={[styles.hint, { top: insets.top + 8 }]}>
-        <IconBtn icon="close" label="Cancel the report" onPress={pop} />
-        <View style={styles.hintText}><T weight="semibold" style={{ fontSize: 13.5 }}>Tap the map to move the pin</T><T style={{ fontSize: 12, color: color.muted }}>Put it where the problem is</T></View>
+        <IconBtn icon="close" label={t("Cancel the report")} onPress={pop} />
+        <View style={styles.hintText}><T weight="semibold" style={{ fontSize: 13.5 }}>{t("Tap the map to move the pin")}</T><T style={{ fontSize: 12, color: color.muted }}>{t("Put it where the problem is")}</T></View>
       </View>
       <Sheet snaps={[0.56, 0.9]}>
         <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: insets.bottom + 24, gap: 14 }} keyboardShouldPersistTaps="handled">
-          <T weight="bold" style={{ fontSize: 20 }} accessibilityRole="header">Report a problem here</T>
+          <T weight="bold" style={{ fontSize: 20 }} accessibilityRole="header">{t("Report a problem here")}</T>
           <View style={styles.kinds}>
             {KINDS.map(k => (
               <Pressable key={k.id} accessibilityRole="radio" accessibilityState={{ selected: kind === k.id }} onPress={() => setKind(k.id)} style={[styles.kind, kind === k.id && { borderColor: color.ink, backgroundColor: color.surface }]}>
                 <Icon name={k.icon} size={20} stroke={kind === k.id ? color.ink : color.ink2} />
-                <T weight="semibold" style={{ fontSize: 13 }}>{k.label}</T>
+                <T weight="semibold" style={{ fontSize: 13 }}>{t(k.label)}</T>
               </Pressable>
             ))}
           </View>
-          <TextInput value={note} onChangeText={setNote} placeholder="What's wrong? (optional)" placeholderTextColor={color.muted} multiline maxLength={1000}
-            style={styles.note} accessibilityLabel="Note" />
+          <TextInput value={note} onChangeText={setNote} placeholder={t("What's wrong? (optional)")} placeholderTextColor={color.muted} multiline maxLength={1000}
+            style={styles.note} accessibilityLabel={t("Note")} />
           <View>
             <Label style={{ marginBottom: 8 }}>How long will it last?</Label>
             <View style={{ flexDirection: 'row', gap: 8 }}>
               {DURATIONS.map(([id, label]) => (
                 <Pressable key={id} accessibilityRole="radio" accessibilityState={{ selected: duration === id }} onPress={() => setDuration(id)} style={[styles.dur, duration === id && { backgroundColor: color.ink, borderColor: color.ink }]}>
-                  <T weight="semibold" style={{ fontSize: 13, color: duration === id ? '#fff' : color.ink2 }}>{label}</T>
+                  <T weight="semibold" style={{ fontSize: 13, color: duration === id ? '#fff' : color.ink2 }}>{t(label)}</T>
                 </Pressable>
               ))}
             </View>
           </View>
           <Pressable accessibilityRole="button" onPress={addPhoto} style={styles.photo}>
-            {photo ? <Image source={{ uri: photo }} style={{ width: 56, height: 56, borderRadius: 10 }} accessibilityLabel="Attached photo" /> : <Icon name="camera" size={22} stroke={color.ink2} />}
-            <T weight="semibold" style={{ flex: 1, fontSize: 14 }}>{photo ? 'Photo attached · tap to change' : 'Add a photo (optional)'}</T>
+            {photo ? <Image source={{ uri: photo }} style={{ width: 56, height: 56, borderRadius: 10 }} accessibilityLabel={t("Attached photo")} /> : <Icon name="camera" size={22} stroke={color.ink2} />}
+            <T weight="semibold" style={{ flex: 1, fontSize: 14 }}>{photo ? t('Photo attached · tap to change') : t('Add a photo (optional)')}</T>
           </Pressable>
-          <Notice tone="info" icon="shield" text="Your name goes with the report so the admin can ask you about it. It is never shown on the map." />
-          {submit.isError && <Notice tone="missing" text={submit.error instanceof Error && submit.error.message !== 'offline' ? submit.error.message : 'Could not send. Check your connection.'} />}
-          <Btn title="Send to the admin" kind="dark" disabled={!kind} loading={submit.isPending} onPress={() => submit.mutate()} />
+          <Notice tone="info" icon="shield" text={t("Your name goes with the report so the admin can ask you about it. It is never shown on the map.")} />
+          {submit.isError && <Notice tone="missing" text={submit.error instanceof Error && submit.error.message !== 'offline' ? submit.error.message : t('Could not send. Check your connection.')} />}
+          <Btn title={t("Send to the admin")} kind="dark" disabled={!kind} loading={submit.isPending} onPress={() => submit.mutate()} />
         </ScrollView>
       </Sheet>
     </View>

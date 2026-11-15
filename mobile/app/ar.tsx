@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { DeviceMotion } from 'expo-sensors';
 import { router } from 'expo-router';
-import Svg, { Circle, Defs, LinearGradient, Polygon, Polyline, Stop } from 'react-native-svg';
+import Svg, { Circle, Defs, LinearGradient, Path, Polygon, Polyline, Stop } from 'react-native-svg';
 import type { Position } from '../src/api/types';
 import { bearing, enu, fmtDistance, fmtMinutes, pointAlong, snapToLine } from '../src/ar/geo';
 import { chevronsAhead, labelFor, pathRibbon, steerHint, turnMarker, type Pose } from '../src/ar/projection';
@@ -15,6 +15,9 @@ import { useNav } from '../src/state/navigation';
 import { ManeuverIcon } from '../src/ui/bits';
 import { Btn, Icon, IconBtn, T } from '../src/ui/kit';
 import { color } from '../src/ui/theme';
+import { useT } from '../src/i18n';
+import { trStep } from '../src/i18n/steps';
+import { fmtDistanceT } from '../src/ar/geo';
 
 const GPS_LIMIT_M = 15;      // arrows are exact-ish below this
 const GPS_PAUSE_M = 40;      // above this they would point at the wrong path: pause
@@ -64,6 +67,7 @@ function usePose(compass: { heading: number | null; accuracy: number | null; cou
 }
 
 export default function ARGuidance() {
+  const t = useT();
   const screen = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const [camera, requestCamera] = useCameraPermissions();
@@ -102,12 +106,19 @@ export default function ARGuidance() {
   const gpsBad = !loc.simulated && (loc.accuracy == null || loc.accuracy > GPS_LIMIT_M || stale);
   const gpsLost = !loc.simulated && (loc.accuracy == null || loc.accuracy > GPS_PAUSE_M || stale);
   // arrows show whenever we know where the camera looks; poor GPS dims them instead of hiding them
-  const needsCalibration = !pose || gpsLost;
-  const arrowAlpha = gpsBad ? 0.6 : 1;
+  // arrows always show once we know where the camera looks; weak GPS only dims them
+  const needsCalibration = !pose;
+  const arrowAlpha = gpsLost ? 0.45 : gpsBad ? 0.7 : 1;
+  /** The way to go relative to where the camera points: drives the big guide arrow on the floor. */
+  const guideRel = pose && user && line.length ? (() => {
+    const sn = snapToLine(line, user);
+    const target = pointAlong(line, Math.min(sn.along + 8, sn.along + Math.max(2, nav.progress.toNext)));
+    return ((bearing(user, target) - pose.heading + 540) % 360) - 180;
+  })() : null;
   const onRoad = useMemo(() => {
     if (!user || !line.length) return null;
     const s = snapToLine(line, user);
-    return route?.steps[Math.max(0, nav.progress.stepIndex - 1)]?.kind === 'road' ? 'Road · watch for cars' : s.off < 10 ? 'Pedestrian path' : null;
+    return route?.steps[Math.max(0, nav.progress.stepIndex - 1)]?.kind === 'road' ? t('Road · watch for cars') : s.off < 10 ? t('Pedestrian path') : null;
   }, [user?.[0], user?.[1], nav.progress.stepIndex]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /** Point the phone along the path ahead and tap: the difference becomes the compass correction. */
@@ -124,9 +135,9 @@ export default function ARGuidance() {
   if (!route) {
     return (
       <View style={[styles.root, styles.center, { padding: 28 }]}>
-        <T weight="bold" style={{ color: '#fff', fontSize: 20, textAlign: 'center' }}>Choose a destination first</T>
-        <T style={{ color: '#C2C6CB', textAlign: 'center', marginTop: 8 }}>AR guidance follows a route. Pick a building and tap the AR button.</T>
-        <Btn title="Back to the map" kind="secondary" onPress={back} style={{ marginTop: 20 }} />
+        <T weight="bold" style={{ color: '#fff', fontSize: 20, textAlign: 'center' }}>{t("Choose a destination first")}</T>
+        <T style={{ color: '#C2C6CB', textAlign: 'center', marginTop: 8 }}>{t("AR guidance follows a route. Pick a building and tap the AR button.")}</T>
+        <Btn title={t("Back to the map")} kind="secondary" onPress={back} style={{ marginTop: 20 }} />
       </View>
     );
   }
@@ -136,10 +147,10 @@ export default function ARGuidance() {
       {camera?.granted ? <CameraView style={StyleSheet.absoluteFill} facing="back" animateShutter={false} /> : !camera || camera.canAskAgain && !requestedCamera.current ? null : (
         <View style={[StyleSheet.absoluteFill, styles.center, { padding: 28, backgroundColor: '#0F1419' }]}>
           <Icon name="camera" size={36} stroke="#fff" />
-          <T weight="bold" style={{ color: '#fff', fontSize: 18, marginTop: 12, textAlign: 'center' }}>Camera access is off</T>
+          <T weight="bold" style={{ color: '#fff', fontSize: 18, marginTop: 12, textAlign: 'center' }}>{t("Camera access is off")}</T>
           <T style={{ color: '#C2C6CB', textAlign: 'center', marginTop: 6 }}>AR draws the arrows over the camera view. The 2D route works without it.</T>
-          <Btn title="Allow camera" onPress={requestCamera} style={{ marginTop: 18, alignSelf: 'stretch' }} />
-          <Btn title="Use the 2D map instead" kind="secondary" onPress={back} style={{ marginTop: 10, alignSelf: 'stretch' }} />
+          <Btn title={t("Allow camera")} onPress={requestCamera} style={{ marginTop: 18, alignSelf: 'stretch' }} />
+          <Btn title={t("Use the 2D map instead")} kind="secondary" onPress={back} style={{ marginTop: 10, alignSelf: 'stretch' }} />
         </View>
       )}
       <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: 'transparent' }]}>
@@ -177,9 +188,18 @@ export default function ARGuidance() {
         <View pointerEvents="none" style={[styles.label, { left: label.x - 90, top: label.y - 46 }]}>
           <View style={styles.labelPill}>
             <Icon name="flagEnd" size={14} stroke="#fff" />
-            <T weight="semibold" style={{ color: '#fff', fontSize: 13 }} numberOfLines={1}>{nav.dest?.name ?? 'Destination'} · {fmtDistance(label.dist)}</T>
+            <T weight="semibold" style={{ color: '#fff', fontSize: 13 }} numberOfLines={1}>{nav.dest?.name ?? t('Destination')} · {fmtDistanceT(label.dist, t)}</T>
           </View>
           {!label.clamped && <View style={styles.labelStem} />}
+        </View>
+      )}
+
+      {/* the big guide arrow on the floor: always visible, turns towards the way to go */}
+      {camera?.granted && guideRel != null && nav.status !== 'arrived' && (
+        <View pointerEvents="none" style={[styles.guide, { bottom: insets.bottom + 132 }]}>
+          <View style={{ transform: [{ perspective: 700 }, { rotateX: '58deg' }, { rotateZ: `${Math.max(-150, Math.min(150, guideRel))}deg` }] }}>
+            <GuideArrow dim={gpsLost} />
+          </View>
         </View>
       )}
 
@@ -187,7 +207,7 @@ export default function ARGuidance() {
       {camera?.granted && steer && !needsCalibration && (
         <Animated.View entering={FadeIn} exiting={FadeOut} pointerEvents="none" style={[styles.steer, steer.side === 'left' ? { left: 12 } : { right: 12 }]}>
           <View style={{ transform: [{ rotate: steer.around ? '180deg' : steer.side === 'left' ? '-90deg' : '90deg' }] }}><Icon name="arrowUp" size={30} stroke="#fff" width={3} /></View>
-          <T weight="bold" style={{ color: '#fff', fontSize: 13, marginTop: 4 }}>{steer.around ? 'Turn around' : `Turn ${steer.side}`}</T>
+          <T weight="bold" style={{ color: '#fff', fontSize: 13, marginTop: 4 }}>{steer.around ? t('Turn around') : steer.side === 'left' ? t('Turn left') : t('Turn right')}</T>
         </Animated.View>
       )}
 
@@ -195,22 +215,22 @@ export default function ARGuidance() {
       {camera?.granted && <Animated.View entering={FadeInDown.duration(300)} style={[styles.banner, { top: insets.top + 6 }]} accessibilityLiveRegion="polite">
         {step && <ManeuverIcon turn={step.turn} size={44} crossing={step.crossing} stairs={step.stairs} />}
         <View style={{ flex: 1 }}>
-          <T weight="bold" style={{ fontSize: 22, letterSpacing: -0.5, color: '#fff' }}>{nav.status === 'arrived' ? 'Arrived' : fmtDistance(nav.progress.toNext)}</T>
-          <T style={{ fontSize: 13.5, color: '#C2C6CB' }} numberOfLines={2}>{nav.status === 'arrived' ? route.steps.at(-1)?.text : step?.text ?? 'Follow the green arrows'}</T>
+          <T weight="bold" style={{ fontSize: 22, letterSpacing: -0.5, color: '#fff' }}>{nav.status === 'arrived' ? t('Arrived') : fmtDistanceT(nav.progress.toNext, t)}</T>
+          <T style={{ fontSize: 13.5, color: '#C2C6CB' }} numberOfLines={2}>{nav.status === 'arrived' ? trStep(route.steps.at(-1)?.text ?? 'You have arrived', t) : step ? trStep(step.text, t) : t('Follow the green arrows')}</T>
         </View>
-        <IconBtn icon="close" label="Stop AR guidance" onPress={back} size={34} bg="rgba(255,255,255,0.16)" stroke="#fff" float={false} />
+        <IconBtn icon="close" label={t("Stop AR guidance")} onPress={back} size={34} bg="rgba(255,255,255,0.16)" stroke="#fff" float={false} />
       </Animated.View>}
 
       {/* honest status */}
       {camera?.granted && <View style={[styles.pills, { top: insets.top + 92 }]}>
         <View style={styles.pill}>
           <View style={[styles.dot, { backgroundColor: loc.simulated ? '#60A5FA' : gpsBad ? '#F59E0B' : '#4ADE80' }]} />
-          <T weight="semibold" style={styles.pillText}>{loc.simulated ? 'Demo position' : loc.accuracy != null ? `GPS ±${Math.round(loc.accuracy)} m` : 'Finding GPS'}</T>
+          <T weight="semibold" style={styles.pillText}>{loc.simulated ? t('Demo position') : loc.accuracy != null ? t('GPS ±{n} m', { n: Math.round(loc.accuracy) }) : t('Finding GPS')}</T>
         </View>
         {onRoad && <View style={styles.pill}><Icon name={onRoad.startsWith('Road') ? 'car' : 'walk'} size={13} stroke="#E6E7E4" /><T weight="semibold" style={styles.pillText}>{onRoad}</T></View>}
-        {sensed.fusion.aligned && <View style={styles.pill}><Icon name="calibrate" size={13} stroke="#E6E7E4" /><T weight="semibold" style={styles.pillText}>Aligned with the path</T></View>}
-        {gpsBad && !gpsLost && <View style={styles.pill}><T weight="semibold" style={styles.pillText}>Arrows approximate</T></View>}
-        {!tilt.ok && Platform.OS !== 'web' && <View style={styles.pill}><T weight="semibold" style={styles.pillText}>Motion sensor unavailable</T></View>}
+        {sensed.fusion.aligned && <View style={styles.pill}><Icon name="calibrate" size={13} stroke="#E6E7E4" /><T weight="semibold" style={styles.pillText}>{t("Aligned with the path")}</T></View>}
+        {gpsBad && <View style={styles.pill}><T weight="semibold" style={styles.pillText}>{t("Arrows approximate")}</T></View>}
+        {!tilt.ok && Platform.OS !== 'web' && <View style={styles.pill}><T weight="semibold" style={styles.pillText}>{t("Motion sensor unavailable")}</T></View>}
       </View>}
 
       {camera?.granted && needsCalibration && !calibrating && <Pressable accessibilityRole="button" onPress={() => setCalibrating(true)} style={[styles.warning, { top: insets.top + 132 }]}>
@@ -220,15 +240,15 @@ export default function ARGuidance() {
 
       {/* bottom dock: the 2D route is one tap away */}
       {camera?.granted && <View style={[styles.dock, { bottom: insets.bottom + 18 }]}>
-        <Pressable accessibilityRole="button" accessibilityLabel="Switch back to the 2D map" onPress={back} style={styles.thumb}>
+        <Pressable accessibilityRole="button" accessibilityLabel={t("Switch back to the 2D map")} onPress={back} style={styles.thumb}>
           <MiniRoute line={line} user={user} heading={heading ?? 0} />
         </Pressable>
         <View style={{ flex: 1 }}>
           <T weight="bold" style={{ fontSize: 17, color: '#fff' }}>{fmtMinutes(nav.progress.remainingS)} · {fmtDistance(nav.progress.remaining)}</T>
-          <T style={{ fontSize: 12.5, color: '#A7ACB4' }}>{nav.status === 'arrived' ? 'You have arrived' : loc.simulated ? 'Demo overlay · not your real location' : 'Approximate overlay · check the path ahead'}</T>
+          <T style={{ fontSize: 12.5, color: '#A7ACB4' }}>{nav.status === 'arrived' ? t('You have arrived') : loc.simulated ? t('Demo overlay · not your real location') : t('Approximate overlay · check the path ahead')}</T>
         </View>
-        {loc.simulated && <IconBtn icon="walk" label={nav.simulating ? 'Stop the simulated walk' : 'Simulate walking the route'} onPress={nav.toggleSimulate} size={44} bg={nav.simulating ? color.green : 'rgba(255,255,255,0.12)'} stroke="#fff" float={false} />}
-        <IconBtn icon="calibrate" label="Recalibrate" onPress={() => setCalibrating(true)} size={44} bg="rgba(255,255,255,0.12)" stroke="#fff" float={false} />
+        {loc.simulated && <IconBtn icon="walk" label={nav.simulating ? t('Stop the simulated walk') : t('Simulate walking the route')} onPress={nav.toggleSimulate} size={44} bg={nav.simulating ? color.green : 'rgba(255,255,255,0.12)'} stroke="#fff" float={false} />}
+        <IconBtn icon="calibrate" label={t("Recalibrate")} onPress={() => setCalibrating(true)} size={44} bg="rgba(255,255,255,0.12)" stroke="#fff" float={false} />
       </View>}
 
       {/* board 19: calibration and the honest fallback */}
@@ -236,7 +256,7 @@ export default function ARGuidance() {
         <Animated.View entering={FadeIn.duration(220)} exiting={FadeOut} style={[StyleSheet.absoluteFill, styles.calib]}>
           <View style={styles.calibCard}>
             <Icon name="calibrate" size={32} stroke="#fff" />
-            <T weight="bold" style={{ color: '#fff', fontSize: 22, marginTop: 12 }} accessibilityRole="header">Line up the arrows</T>
+            <T weight="bold" style={{ color: '#fff', fontSize: 22, marginTop: 12 }} accessibilityRole="header">{t("Line up the arrows")}</T>
             <T style={{ color: '#C2C6CB', fontSize: 14, lineHeight: 20, marginTop: 8 }}>
               Point the phone along the route ahead and tap “Align with the path”. The overlay is approximate and may shift; check the real path as you walk.
             </T>
@@ -250,15 +270,30 @@ export default function ARGuidance() {
                 <T style={{ color: '#A7ACB4', fontSize: 12, marginTop: 8 }}>Accuracy is usually worse next to tall buildings and indoors. The 2D route keeps working either way.</T>
               </View>
             )}
-            <Btn title="Use the 2D map instead" onPress={back} style={{ marginTop: 18 }} />
+            <Btn title={t("Use the 2D map instead")} onPress={back} style={{ marginTop: 18 }} />
             <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
-              <Btn title="Align with the path" kind="secondary" small style={{ flex: 1 }} onPress={alignWithPath} disabled={!tilt.ok} />
-              <Btn title="Back to camera" kind="ghost" small style={{ flex: 1 }} onPress={() => setCalibrating(false)} />
+              <Btn title={t("Align with the path")} kind="secondary" small style={{ flex: 1 }} onPress={alignWithPath} disabled={!tilt.ok} />
+              <Btn title={t("Back to camera")} kind="ghost" small style={{ flex: 1 }} onPress={() => setCalibrating(false)} />
             </View>
           </View>
         </Animated.View>
       )}
     </View>
+  );
+}
+
+/** A thick 3D-looking arrow (top face + darker side + shadow), drawn flat and tilted onto the floor by the parent. */
+function GuideArrow({ dim }: { dim: boolean }) {
+  const top = 'M60 6 L108 62 L78 62 L78 120 L42 120 L42 62 L12 62 Z';
+  return (
+    <Svg width={120} height={140} viewBox="0 0 120 140" opacity={dim ? 0.55 : 0.95}>
+      <Defs>
+        <LinearGradient id="ga" x1="0" y1="0" x2="0" y2="1"><Stop offset="0" stopColor="#4ADE80" /><Stop offset="1" stopColor="#16A34A" /></LinearGradient>
+      </Defs>
+      <Path d={top} transform="translate(5 12)" fill="#000" fillOpacity={0.28} />
+      <Path d={top} transform="translate(0 8)" fill="#0B6B3F" />
+      <Path d={top} fill="url(#ga)" stroke="#fff" strokeWidth={3} strokeLinejoin="round" />
+    </Svg>
   );
 }
 
@@ -294,6 +329,7 @@ const styles = StyleSheet.create({
   label: { position: 'absolute', width: 180, alignItems: 'center' },
   labelPill: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 9, paddingHorizontal: 14, borderRadius: 999, backgroundColor: 'rgba(11,107,63,0.95)', maxWidth: 220 },
   labelStem: { width: 2, height: 26, backgroundColor: 'rgba(11,107,63,0.8)' },
+  guide: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
   steer: { position: 'absolute', top: '45%', alignItems: 'center', padding: 12, borderRadius: 18, backgroundColor: 'rgba(22,163,74,0.9)' },
   dock: { position: 'absolute', left: 12, right: 12, flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, borderRadius: 20, backgroundColor: 'rgba(10,14,18,0.82)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)' },
   thumb: { width: 64, height: 64, borderRadius: 14, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)' },

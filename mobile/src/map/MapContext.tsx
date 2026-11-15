@@ -3,6 +3,9 @@ import type { Closure, CrowdingCollection, PlaceLite, Position, WalkwayCollectio
 
 export type MapStyle = 'default' | 'satellite' | 'contrast';
 export type MapLayers = { threeD: boolean; labels: boolean; cars: boolean; crowding: boolean };
+/** Day, golden evening, dark; auto follows the campus clock. */
+export type MapSkin = 'auto' | 'day' | 'evening' | 'night';
+export type BuildingCollection = { type: 'FeatureCollection'; features: { type: 'Feature'; geometry: unknown; properties: { id: string; category: string; height: number; open: boolean } }[] };
 
 export type MapCommand =
   | { type: 'places'; places: PlaceLite[] }
@@ -19,6 +22,8 @@ export type MapCommand =
   | { type: 'closures'; list: Closure[] }
   | { type: 'layers'; layers: Partial<MapLayers> }
   | { type: 'style'; style: MapStyle }
+  | { type: 'skin'; skin: MapSkin }
+  | { type: 'buildings'; data: BuildingCollection }
   | { type: 'pick'; on: boolean }
   | { type: 'flyIn' }
   | { type: 'skipIntro' }
@@ -34,6 +39,7 @@ type Ctx = {
   ready: boolean;
   error: string | null;
   style: MapStyle; setStyle: (s: MapStyle) => void;
+  skin: MapSkin; setSkin: (s: MapSkin) => void;
   layers: MapLayers; setLayers: (l: Partial<MapLayers>) => void;
   /** wired by the map view */
   _attach: (post: (msg: string) => void) => void;
@@ -51,13 +57,15 @@ export function MapProvider({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [style, setStyleState] = useState<MapStyle>('default');
+  const styleRef = useRef<MapStyle>('default');
+  const [skin, setSkinState] = useState<MapSkin>('auto');
   const [layers, setLayersState] = useState<MapLayers>({ threeD: true, labels: true, cars: false, crowding: false });
   // last value per "sticky" command, replayed after a style switch reloads the page's layers
   const sticky = useRef(new Map<string, string>());
 
   const send = useCallback((cmd: MapCommand) => {
     const msg = JSON.stringify(cmd);
-    if (['places', 'filter', 'walkways', 'closures', 'route', 'layers', 'user', 'crowding'].includes(cmd.type)) sticky.current.set(cmd.type, msg);
+    if (['places', 'filter', 'walkways', 'closures', 'route', 'layers', 'user', 'crowding', 'skin', 'buildings'].includes(cmd.type)) sticky.current.set(cmd.type, msg);
     if (cmd.type === 'clearRoute') sticky.current.delete('route');
     if (readyRef.current && post.current) post.current(msg); else queue.current.push(msg);
   }, []);
@@ -65,8 +73,18 @@ export function MapProvider({ children }: { children: React.ReactNode }) {
   const value = useMemo<Ctx>(() => ({
     send,
     on: fn => { listeners.current.add(fn); return () => { listeners.current.delete(fn); }; },
-    ready, error, style, layers,
-    setStyle: s => { setStyleState(s); readyRef.current = false; setReady(false); send({ type: 'style', style: s }); },
+    ready, error, style, layers, skin,
+    setStyle: s => {
+      const prev = styleRef.current;
+      if (prev === s) return;
+      styleRef.current = s;
+      setStyleState(s);
+      // deliver the command FIRST (it used to be queued behind the not-ready flag and never sent)
+      send({ type: 'style', style: s });
+      // only satellite swaps the whole style; contrast is a theme switch in place
+      if ((prev === 'satellite') !== (s === 'satellite')) { readyRef.current = false; setReady(false); }
+    },
+    setSkin: k => { setSkinState(k); send({ type: 'skin', skin: k }); },
     setLayers: l => { setLayersState(prev => ({ ...prev, ...l })); send({ type: 'layers', layers: l }); },
     _attach: p => { post.current = p; },
     _emit: e => {
@@ -82,7 +100,7 @@ export function MapProvider({ children }: { children: React.ReactNode }) {
       if (e.type === 'log' && __DEV__) console.log('[map]', e.detail);
       listeners.current.forEach(fn => fn(e));
     },
-  }), [send, ready, error, style, layers]);
+  }), [send, ready, error, style, layers, skin]);
 
   return <MapCtx.Provider value={value}>{children}</MapCtx.Provider>;
 }

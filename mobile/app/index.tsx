@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeOut, FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useClosures, usePlaces, useWalkways } from '../src/api/hooks';
+import { useClosures, usePlaces, useWalkways , useBuildings, useCrowding } from '../src/api/hooks';
 import CampusMap from '../src/map/CampusMap';
 import { useMap, useMapEvent } from '../src/map/MapContext';
 import { useApp, useLocation } from '../src/state/app';
@@ -24,6 +24,14 @@ import Voice from '../src/panels/Voice';
 import Views from '../src/panels/Views';
 import { Btn, Icon, Notice, T } from '../src/ui/kit';
 import { color, font } from '../src/ui/theme';
+import { useT } from '../src/i18n';
+
+/** Campus weekday (Mon = 0) and hour, clamped to the hours crowding is modelled for. */
+function campusSlot() {
+  const p = new Intl.DateTimeFormat('en-GB', { timeZone: 'Africa/Casablanca', weekday: 'short', hour: '2-digit', hourCycle: 'h23' }).formatToParts(new Date());
+  const wd = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].indexOf(p.find(x => x.type === 'weekday')?.value ?? 'Mon');
+  return { weekday: Math.max(0, wd), hour: Math.min(20, Math.max(8, Number(p.find(x => x.type === 'hour')?.value ?? 12))) };
+}
 
 /** Keeps the map in step with app state: places, walkways, closures, you, and the route. */
 function MapSync() {
@@ -31,6 +39,11 @@ function MapSync() {
   const places = usePlaces();
   const walkways = useWalkways();
   const closures = useClosures();
+  const buildings = useBuildings();
+  // path density now: the current hour, refreshed, drawn only where paths are busy
+  const slot = campusSlot();
+  const densityOn = map.layers.crowding;
+  const crowdNow = useCrowding(slot.weekday, slot.hour, densityOn);
   const loc = useLocation();
   const nav = useNav();
   const { top, push } = usePanels();
@@ -39,6 +52,8 @@ function MapSync() {
   useEffect(() => { if (places.data) map.send({ type: 'places', places: places.data }); }, [places.data]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (walkways.data) map.send({ type: 'walkways', data: walkways.data }); }, [walkways.data]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (closures.data) map.send({ type: 'closures', list: closures.data }); }, [closures.data]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (buildings.data) map.send({ type: 'buildings', data: buildings.data }); }, [buildings.data]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (densityOn && crowdNow.data && top.name !== 'crowding') map.send({ type: 'crowding', data: crowdNow.data }); }, [densityOn, crowdNow.data, top.name]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     const key = loc.coord ? `${loc.coord[0].toFixed(6)},${loc.coord[1].toFixed(6)},${Math.round(loc.heading ?? -1)}` : 'none';
     if (key === last.current) return;
@@ -83,23 +98,25 @@ function Panels() {
 
 /** Board 01: the wordmark over the opening fly-in, world → Morocco → AUI. */
 function Launch() {
+  const t = useT();
   const insets = useSafeAreaInsets();
   const map = useMap();
   return (
     <Animated.View exiting={FadeOut.duration(320)} style={StyleSheet.absoluteFill} pointerEvents="box-none">
       <View style={[styles.launchTitle, { top: insets.top + 38 }]} pointerEvents="none">
         <T style={{ fontFamily: font.display, fontSize: 36, color: '#fff', letterSpacing: -1 }}>GoMap</T>
-        <T style={{ fontSize: 14, color: '#E1EBE5', marginTop: 4 }}>Your campus, a little closer.</T>
+        <T style={{ fontSize: 14, color: '#E1EBE5', marginTop: 4 }}>{t("Your campus, a little closer.")}</T>
       </View>
       <View style={[styles.launchFooter, { bottom: insets.bottom + 44 }]}>
-        <T weight="medium" style={{ fontSize: 12, color: '#E1EBE5', marginBottom: 16 }}>Earth · Morocco · Al Akhawayn</T>
-        <Btn title={map.ready ? 'Take me to campus' : 'Finding your campus…'} icon="arrowUp" kind="secondary" disabled={!map.ready} onPress={() => map.send({ type: 'skipIntro' })} />
+        <T weight="medium" style={{ fontSize: 12, color: '#E1EBE5', marginBottom: 16 }}>{t("Earth · Morocco · Al Akhawayn")}</T>
+        <Btn title={map.ready ? t('Take me to campus') : t('Finding your campus…')} icon="arrowUp" kind="secondary" disabled={!map.ready} onPress={() => map.send({ type: 'skipIntro' })} />
       </View>
     </Animated.View>
   );
 }
 
 export default function MapShell() {
+  const t = useT();
   const insets = useSafeAreaInsets();
   const { top, stack, push } = usePanels();
   const map = useMap();
@@ -134,13 +151,13 @@ export default function MapShell() {
           <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
             <View style={styles.offerIcon}><Icon name="map" size={23} stroke="#226348" /></View>
             <View style={{ flex: 1 }}>
-              <T weight="bold" style={{ fontSize: 17, color: '#1E3026' }}>Make yourself at home</T>
-              <T style={{ fontSize: 13, lineHeight: 19, color: '#667168', marginTop: 3 }}>Find a spot. Try a tap. Meet your guide.</T>
+              <T weight="bold" style={{ fontSize: 17, color: '#1E3026' }}>{t("Make yourself at home")}</T>
+              <T style={{ fontSize: 13, lineHeight: 19, color: '#667168', marginTop: 3 }}>{t("Find a spot. Try a tap. Meet your guide.")}</T>
             </View>
           </View>
           <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
-            <Btn title="Show me around" kind="dark" small style={{ flex: 1 }} onPress={() => { setOffer(false); push({ name: 'help', step: 0 }); }} />
-            <Pressable accessibilityRole="button" onPress={() => { setOffer(false); finishOnboarding(); }} style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><T weight="semibold" style={{ color: color.muted }}>Not now</T></Pressable>
+            <Btn title={t("Show me around")} kind="dark" small style={{ flex: 1 }} onPress={() => { setOffer(false); push({ name: 'help', step: 0 }); }} />
+            <Pressable accessibilityRole="button" onPress={() => { setOffer(false); finishOnboarding(); }} style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><T weight="semibold" style={{ color: color.muted }}>{t("Not now")}</T></Pressable>
           </View>
         </Animated.View>
       )}

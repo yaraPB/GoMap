@@ -1,6 +1,8 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import * as Haptics from 'expo-haptics';
 import { speak, stopSpeaking } from '../voice/speak';
+import { makeT, type TFn } from '../i18n';
+import { speakableStep, trStep } from '../i18n/steps';
 import { Platform } from 'react-native';
 import { api, ApiError } from '../api/client';
 import type { Position, Route, RouteMode, Step } from '../api/types';
@@ -35,10 +37,9 @@ const SPEED: Record<RouteMode, number> = { walk: 1.25, step_free: 1.0, drive: 5.
 const OFF_ROUTE_M = 25;
 const ARRIVE_M = 8;
 
-export function speakable(step: Step | undefined, toNext: number) {
+export function speakable(step: Step | undefined, toNext: number, t: TFn = makeT('en')) {
   if (!step) return '';
-  if (step.turn === 'arrive') return toNext > 15 ? `In ${Math.round(toNext / 5) * 5} metres, ${step.text.toLowerCase()}` : step.text;
-  return toNext > 15 ? `In ${Math.round(toNext / 5) * 5} metres, ${step.text.toLowerCase()}` : step.text;
+  return speakableStep(step.text, toNext, t);
 }
 
 export function NavigationProvider({ children }: { children: React.ReactNode }) {
@@ -108,7 +109,7 @@ export function NavigationProvider({ children }: { children: React.ReactNode }) 
     if (demoRef.current && !loc.simulated) loc.setSimulated(DEMO_POSITION);
     setStatus('active');
     Haptics.selectionAsync().catch(() => {});
-    if (!muted && current.steps[0]) speak(current.steps[1] ? `${current.steps[0].text}. Then ${current.steps[1].text.toLowerCase()}` : current.steps[0].text, lang);
+    if (!muted && current.steps[0]) speak(current.steps[1] ? makeT(lang)('{first}. Then {next}', { first: trStep(current.steps[0].text, makeT(lang)), next: trStep(current.steps[1].text, makeT(lang)).toLowerCase() }) : trStep(current.steps[0].text, makeT(lang)), lang);
   }, [muted, lang, loc]);
 
   const stop = useCallback(() => {
@@ -140,18 +141,18 @@ export function NavigationProvider({ children }: { children: React.ReactNode }) 
     if (spoken.current.step !== progress.stepIndex) spoken.current = { step: progress.stepIndex, near: false, at: false };
     if (!spoken.current.near && progress.toNext < 40 && progress.toNext > 12) {
       spoken.current.near = true;
-      if (!muted) speak(speakable(step, progress.toNext), lang);
+      if (!muted) speak(speakable(step, progress.toNext, makeT(lang)), lang);
     }
     if (!spoken.current.at && progress.toNext <= 8) {
       spoken.current.at = true;
       if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-      if (!muted && step?.turn !== 'arrive') speak(step.text, lang);
+      if (!muted && step?.turn !== 'arrive') speak(trStep(step.text, makeT(lang)), lang);
     }
     const reliable = loc.simulated || (loc.timestamp != null && Date.now() - loc.timestamp < 15000 && (loc.accuracy ?? 99) < 25);
     const endpoint = route.geometry.coordinates.at(-1);
     if (reliable && endpoint && loc.coord && progress.remaining < ARRIVE_M && distance(loc.coord, endpoint) < ARRIVE_M) {
       stopSpeaking();
-      if (!muted) speak(route.steps.at(-1)?.text ?? 'You have arrived', lang);
+      if (!muted) speak(trStep(route.steps.at(-1)?.text ?? 'You have arrived', makeT(lang)), lang);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       stopSim();
       setStatus('arrived');
@@ -163,7 +164,7 @@ export function NavigationProvider({ children }: { children: React.ReactNode }) 
     }
     if (offCount.current >= 3 && !rerouting.current && loc.coord) {
       rerouting.current = true; offCount.current = 0;
-      if (!muted) speak('Rerouting', lang);
+      if (!muted) speak(makeT(lang)('Rerouting'), lang);
       fetchRoute(dest, route.mode, loc.coord, true).finally(() => { rerouting.current = false; });
     }
   }, [progress, status, route, dest, muted, lang, loc.accuracy, loc.coord, loc.timestamp, loc.simulated, fetchRoute, stopSim]);

@@ -128,4 +128,5 @@ export const icons = {
   wifiOff: 'M3 3l18 18M8.5 16.5a5 5 0 017 0M5 13a10 10 0 015-2.7M12 20h.01M16.7 11.3A10 10 0 0119 13M2 9a15 15 0 014.5-2.8M10.7 5.1A15 15 0 0122 9',
   dots: 'M5 12h.01M12 12h.01M19 12h.01',
 } as const;
-export type IconName = keyof typeof icons;
+export type { IconName } from './icons';
+import type { IconName } from './icons';

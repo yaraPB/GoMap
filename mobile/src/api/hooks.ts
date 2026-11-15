@@ -51,3 +51,4 @@ export const useMyReports = (enabled: boolean) => useQuery({ queryKey: ['myRepor
 export const useServices = (q = '') => useQuery({ queryKey: ['services', q], queryFn: () => api.services(q || undefined) });
 export const useCampus = () => useQuery({ queryKey: ['campus'], queryFn: api.campus, staleTime: 5 * 60_000 });
 export const useAccounts = () => useQuery({ queryKey: ['accounts'], queryFn: api.mockUsers, staleTime: 10 * 60_000 });
+export const useBuildings = () => useQuery({ queryKey: ['buildings'], queryFn: api.buildings, refetchInterval: 5 * 60_000 });

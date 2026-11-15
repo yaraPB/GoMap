@@ -15,7 +15,7 @@ export type WayProps = {
   name: string | null;
   /** Mapbox/OSM road class, kept for styling and route cost (e.g. 'service', 'primary'). */
   road_class: string | null;
-  source: 'mapbox' | 'osm' | 'mock';
+  source: 'mapbox' | 'osm' | 'mock' | 'trace';
 };
 export type WayFeature = Feature<LineString, WayProps>;
 
@@ -24,7 +24,7 @@ export type PoiProps = {
   /** Mapbox poi class / OSM amenity, e.g. 'building', 'food_and_drink'. */
   poi_class: string | null;
   maki: string | null;
-  source: 'mapbox' | 'osm' | 'mock';
+  source: 'mapbox' | 'osm' | 'mock' | 'trace';
 };
 export type PoiFeature = Feature<Point, PoiProps>;
 

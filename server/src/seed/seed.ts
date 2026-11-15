@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { FeatureCollection } from 'geojson';
+import * as turf from '@turf/turf';
 import { DATA_DIR } from '../config.js';
 import { Place, Walkway } from '../db/mongo.js';
 import { meta, type Sql } from '../db/sqlite.js';
@@ -19,24 +20,58 @@ const readJson = <T>(file: string): T => JSON.parse(readFileSync(file, 'utf8')) 
  *   1. data/campus/walkways.geojson  (npm run geo:import, from Mapbox or OSM)
  *   2. data/walking_paths.geojson + data/driving_roads.geojson  (hand-drawn mock)
  */
+/**
+ * data/campus/traced.geojson: paths, roads and buildings the team traced from satellite imagery
+ * where the map data has gaps. Paths join the routing network; footprints fill buildings the
+ * map does not have (never replacing one it has).
+ */
+export function tracedGeo(dataDir = DATA_DIR): { ways: WayFeature[]; buildings: BuildingFeature[] } {
+  const file = join(dataDir, 'campus', 'traced.geojson');
+  if (!existsSync(file)) return { ways: [], buildings: [] };
+  type P = { id: string; kind: string; highway: string | null; name: string | null; height: number | null };
+  const fc = readJson<FeatureCollection>(file);
+  const ways: WayFeature[] = [];
+  const buildings: BuildingFeature[] = [];
+  for (const f of fc.features) {
+    const p = f.properties as P;
+    if ((p.kind === 'path' || p.kind === 'road') && f.geometry.type === 'LineString') {
+      const road = p.kind === 'road';
+      ways.push({ type: 'Feature', geometry: f.geometry, properties: { id: p.id, kind: road ? 'road' : p.highway === 'steps' ? 'stairs' : 'walkway', modes: road ? 'both' : 'walk',
+        step_free: p.highway !== 'steps', lit: null, covered: null, name: p.name, road_class: road ? (p.highway ?? 'service') : null, source: 'trace' } });
+    } else if (p.kind === 'building' && (f.geometry.type === 'Polygon' || f.geometry.type === 'MultiPolygon')) {
+      buildings.push({ type: 'Feature', geometry: f.geometry, properties: { height: p.height, source: 'trace' } });
+    }
+  }
+  return { ways, buildings };
+}
+
 export function loadGeo(dataDir = DATA_DIR): { walkways: WayFeature[]; pois: PoiFeature[]; buildings: BuildingFeature[]; source: string } {
   const campus = join(dataDir, 'campus');
   const pois = existsSync(join(campus, 'pois.geojson')) ? readJson<FeatureCollection>(join(campus, 'pois.geojson')).features as PoiFeature[] : [];
-  const buildings = existsSync(join(campus, 'buildings.geojson')) ? readJson<FeatureCollection>(join(campus, 'buildings.geojson')).features as BuildingFeature[] : [];
+  const mapped = existsSync(join(campus, 'buildings.geojson')) ? readJson<FeatureCollection>(join(campus, 'buildings.geojson')).features as BuildingFeature[] : [];
+  const traced = tracedGeo(dataDir);
+  // a traced footprint only counts when its centre is not already inside a mapped building
+  const buildings = [...mapped, ...traced.buildings.filter(t => !mapped.some(m => turf.booleanPointInPolygon(turf.centroid(t), m)))];
   if (existsSync(join(campus, 'walkways.geojson'))) {
     const fc = readJson<FeatureCollection & { attribution?: string }>(join(campus, 'walkways.geojson'));
-    return { walkways: fc.features as WayFeature[], pois, buildings, source: fc.attribution ?? 'imported' };
+    return { walkways: [...fc.features as WayFeature[], ...traced.ways], pois, buildings, source: `${fc.attribution ?? 'imported'} + ${traced.ways.length} traced paths` };
   }
   const walking = join(dataDir, 'walking_paths.geojson'), driving = join(dataDir, 'driving_roads.geojson');
   const empty: FeatureCollection = { type: 'FeatureCollection', features: [] };
   const walkways = fromMockFiles(existsSync(walking) ? readJson(walking) : empty, existsSync(driving) ? readJson(driving) : empty);
-  return { walkways, pois, buildings, source: 'mock files in data/' };
+  return { walkways: [...walkways, ...traced.ways], pois, buildings, source: 'mock files in data/' };
 }
 
 export async function seedMongo(now: string, dataDir = DATA_DIR) {
   const geo = loadGeo(dataDir);
   if (await Walkway.estimatedDocumentCount() === 0 && geo.walkways.length) {
     await Walkway.insertMany(geo.walkways.map(w => ({ _id: w.properties.id, ...w.properties, id: undefined, geometry: w.geometry })));
+  } else {
+    // a persistent database seeded before the traced paths existed: add the ones it lacks
+    const traced = geo.walkways.filter(w => w.properties.source === 'trace');
+    const have = new Set((await Walkway.find({ _id: { $in: traced.map(t => t.properties.id) } }, { _id: 1 }).lean()).map(d => String(d._id)));
+    const missing = traced.filter(t => !have.has(t.properties.id));
+    if (missing.length) await Walkway.insertMany(missing.map(w => ({ _id: w.properties.id, ...w.properties, id: undefined, geometry: w.geometry })));
   }
   const places = placesFromPois(geo.pois, geo.buildings);
   if (await Place.estimatedDocumentCount() === 0) {
