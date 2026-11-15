@@ -5,3 +5,5 @@ mobile/.env.local
 server/.env
 server/dist/
 decomp
+.vscode
+misc.txt
