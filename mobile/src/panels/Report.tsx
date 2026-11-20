@@ -9,7 +9,7 @@ import type { Position, ReportKind } from '../api/types';
 import { useMap, useMapEvent } from '../map/MapContext';
 import { DEMO_POSITION, useLocation } from '../state/app';
 import { usePanels } from '../state/panels';
-import { Btn, Icon, IconBtn, Label, Notice, Sheet, T } from '../ui/kit';
+import { Btn, Icon, Label, Notice, Sheet, T } from '../ui/kit';
 import { color, font, shadow, type IconName } from '../ui/theme';
 import { useT } from '../i18n';
 
@@ -52,15 +52,18 @@ export default function Report({ at }: { at?: Position }) {
 
   if (submit.isSuccess) {
     return (
-      <Sheet snaps={[0.42]} onClose={pop}>
+      <Sheet snaps={[0.42]} onClose={pop} scrim>
+        {/* nothing left to do here: a tap anywhere, on the card or around it, goes back to the map */}
+        <Pressable accessibilityRole="button" accessibilityLabel={t('Tap anywhere to go back to the map')} onPress={pop} style={{ flex: 1 }}>
         <Animated.View entering={FadeIn} style={{ alignItems: 'center', padding: 24, gap: 12 }}>
           <Animated.View entering={ZoomIn.springify()} style={styles.done}><Icon name="check" size={30} stroke="#fff" width={3} /></Animated.View>
           <T weight="bold" style={{ fontSize: 20 }}>{t("Thanks, it's with the admin")}</T>
           <T style={{ fontSize: 14, color: color.muted, textAlign: 'center', lineHeight: 20 }}>
             {submit.data.merged_with_existing ? t('Someone reported this spot already, so yours was added to the same item.') : t('Nothing changes on the map until it is confirmed.')} {t("You'll see here when it is handled.")}
           </T>
-          <Btn title={t("Back to the map")} kind="dark" onPress={pop} style={{ alignSelf: 'stretch', marginTop: 6 }} />
+          <T style={{ fontSize: 12.5, color: color.muted, marginTop: 6 }}>{t('Tap anywhere to go back to the map')}</T>
         </Animated.View>
+        </Pressable>
       </Sheet>
     );
   }
@@ -68,10 +71,10 @@ export default function Report({ at }: { at?: Position }) {
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
       <View style={[styles.hint, { top: insets.top + 8 }]}>
-        <IconBtn icon="close" label={t("Cancel the report")} onPress={pop} />
-        <View style={styles.hintText}><T weight="semibold" style={{ fontSize: 13.5 }}>{t("Tap the map to move the pin")}</T><T style={{ fontSize: 12, color: color.muted }}>{t("Put it where the problem is")}</T></View>
+        <View style={styles.hintText}><T weight="semibold" style={{ fontSize: 13.5 }}>{t("Tap the map to move the pin")}</T><T style={{ fontSize: 12, color: color.muted }}>{t("Put it where the problem is")} · {t('Swipe the card down to cancel')}</T></View>
       </View>
-      <Sheet snaps={[0.56, 0.9]}>
+      {/* map taps place the pin here, so leaving is a swipe down */}
+      <Sheet snaps={[0.56, 0.9]} onClose={pop}>
         <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: insets.bottom + 24, gap: 14 }} keyboardShouldPersistTaps="handled">
           <T weight="bold" style={{ fontSize: 20 }} accessibilityRole="header">{t("Report a problem here")}</T>
           <View style={styles.kinds}>

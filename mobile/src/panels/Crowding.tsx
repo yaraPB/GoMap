@@ -4,8 +4,7 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useCrowding } from '../api/hooks';
 import { useMap } from '../map/MapContext';
-import { usePanels } from '../state/panels';
-import { IconBtn, Label, Notice, T } from '../ui/kit';
+import { Label, Notice, T } from '../ui/kit';
 import { color, shadow } from '../ui/theme';
 import { dayName, useLang, useT } from '../i18n';
 
@@ -18,7 +17,6 @@ export default function Crowding() {
   const t = useT();
   const lang = useLang();
   const insets = useSafeAreaInsets();
-  const { pop } = usePanels();
   const map = useMap();
   const now = new Date();
   const [weekday, setWeekday] = useState((now.getDay() + 6) % 7);
@@ -39,7 +37,6 @@ export default function Crowding() {
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
       <View style={[styles.top, { top: insets.top + 8 }]}>
-        <IconBtn icon="back" label={t("Back to the map")} onPress={pop} />
         <View style={styles.title}><T weight="bold" style={{ fontSize: 15 }}>{t("Crowding by walkway")}</T><T style={{ fontSize: 12, color: color.muted }}>{t('Typical {day}, past four weeks', { day: dayName(DAY_KEYS[weekday], lang, true) })}</T></View>
       </View>
       <Animated.View entering={FadeInDown.duration(320)} style={[styles.sheet, { paddingBottom: insets.bottom + 16 }]}>

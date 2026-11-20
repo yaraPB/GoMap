@@ -73,7 +73,6 @@ export default function Events({ id }: { id?: string }) {
         <T weight="bold" style={{ fontSize: 18 }}>{current ? current.title : t("What's on at AUI")}</T>
         {!current && <T style={{ fontSize: 12.5, color: color.muted }}>{list.length ? t('{n} events in the next three weeks', { n: list.length }) : t('Talks, matches, fairs and ceremonies')}</T>}
       </View>
-      <IconBtn icon="close" label={t('Close')} onPress={pop} float={false} bg={color.surface} size={36} />
     </View>
   );
 

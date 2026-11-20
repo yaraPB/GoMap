@@ -89,6 +89,8 @@ const browser = await chromium.launch({ channel, headless: process.env.E2E_HEADE
   args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream', '--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
 const desktop = () => browser.newContext({ viewport: { width: 1440, height: 950 } });
 const phone = () => browser.newContext({ viewport: { width: 400, height: 860 }, deviceScaleFactor: 2, reducedMotion: 'reduce', geolocation: { ...PLAZA, accuracy: 5 }, permissions: ['geolocation', 'camera'] });
+/** Close a card the way people do: tap the map beside it (left edge, above any open sheet, below the chip rail). */
+const tapMap = async page => { await page.mouse.click(40, 250); await sleep(700); };
 const appReady = async page => { await page.goto(APP, { timeout: 180_000 }); await page.getByLabel('Ask GoMap').first().waitFor({ timeout: 120_000 }); await sleep(6000); };
 
 // ── dev dashboard & admin (email + password) ────────────────────────────────
@@ -336,7 +338,8 @@ if (want('app')) {
     await page.getByText('المشهد').waitFor();
     await shot(page, 'app-arabic');
     await page.getByRole('radio', { name: 'English' }).click();
-    await page.getByLabel('Close').first().click();
+    await tapMap(page);
+    await page.getByText('Map style and layers').waitFor({ state: 'detached', timeout: 5_000 });
   });
   await check('app', 'events: the chip opens what\'s on, with directions to an event', page, async () => {
     await page.getByText('Events', { exact: true }).first().click();
@@ -345,7 +348,8 @@ if (want('app')) {
     await page.getByRole('button', { name: /, (Today|On now|Mon|Tue|Wed|Thu|Fri|Sat|Sun)/ }).first().click();
     await page.getByText('Take me there').waitFor();
     await shot(page, 'app-event');
-    await page.getByLabel('Close').first().click();
+    await tapMap(page);
+    await page.getByText('Take me there').waitFor({ state: 'detached', timeout: 5_000 });
   });
   await check('app', 'the assistant answers: events, the mosque (local), printing (an admin rule)', page, async () => {
     const rules = (await api('/api/admin/rules', { headers: { authorization: 'Bearer e2e-admin' } })).body;

@@ -11,7 +11,7 @@ import { useT, type TFn } from '../i18n';
 import { useApp, useLocation } from '../state/app';
 import { useNav } from '../state/navigation';
 import { usePanels } from '../state/panels';
-import { Btn, Icon, IconBtn, T } from '../ui/kit';
+import { Btn, Icon, T } from '../ui/kit';
 import { color } from '../ui/theme';
 import { useSpeech } from '../voice/useSpeech';
 import { speak, speechLevel, stopSpeaking, useSpeaking } from '../voice/speak';
@@ -158,8 +158,10 @@ export default function Voice({ auto = false }: { auto?: boolean }) {
 
   return (
     <Animated.View entering={FadeIn.duration(220)} exiting={FadeOut.duration(160)} style={[StyleSheet.absoluteFill, styles.root]}>
+      {/* tapping anywhere that is not a control puts the voice screen away */}
+      <Pressable accessible={false} onPress={() => { speech.cancel(); pop(); }} style={StyleSheet.absoluteFill}>
       <View style={[styles.top, { top: insets.top + 8 }]}>
-        <IconBtn icon="close" label={t('Cancel voice input')} onPress={() => { speech.cancel(); pop(); }} bg="rgba(255,255,255,0.14)" stroke="#fff" float={false} />
+        <T accessibilityRole="button" accessibilityLabel={t('Cancel voice input')} onPress={() => { speech.cancel(); pop(); }} style={{ color: 'rgba(255,255,255,0.62)', fontSize: 13 }}>{t('Tap anywhere to go back')}</T>
         <Pressable accessibilityRole="button" accessibilityLabel={t('Language: {lang}. Tap to switch.', { lang: LANG_LABEL[lang] })} onPress={cycleLang} style={styles.langBtn}>
           <Icon name="globe" size={16} stroke="#fff" />
           <T weight="semibold" style={{ color: '#fff', fontSize: 13 }}>{LANG_LABEL[lang]}</T>
@@ -194,7 +196,8 @@ export default function Voice({ auto = false }: { auto?: boolean }) {
         </Animated.View>
       )}
 
-      <View style={[styles.mic, { bottom: insets.bottom + 34 }]}>
+      {/* taps that just miss the mic (or hit it while it waits) must not close the screen */}
+      <View style={[styles.mic, { bottom: insets.bottom + 34 }]} onStartShouldSetResponder={() => true}>
         <View style={{ width: 72, height: 72, alignItems: 'center', justifyContent: 'center' }}>
           <MicRings on={listening && !reduceMotion} />
           <Pressable accessibilityRole="button" accessibilityLabel={listening ? t('Release to send') : t('Hold to talk')} accessibilityHint={t('Hold while you speak, release to send. Or tap once to start and again to send.')}
@@ -205,6 +208,7 @@ export default function Voice({ auto = false }: { auto?: boolean }) {
         </View>
         <T style={{ color: color.muted2, fontSize: 12 }}>{toggled ? t('Tap again to send') : t('Hold to talk · release to send')}</T>
       </View>
+      </Pressable>
     </Animated.View>
   );
 }

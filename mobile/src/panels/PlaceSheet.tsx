@@ -39,17 +39,12 @@ export default function PlaceSheet({ id }: { id: string }) {
     if (mode === 'ar') { nav.start(); replace({ name: 'go' }); openAR(); } else push({ name: 'route' });
   };
 
-  const header = (
-    <View style={{ paddingHorizontal: 20, paddingBottom: 4 }}>
-      <View style={{ position: 'absolute', end: 16, top: -4 }}><IconBtn icon="close" label={t('Close')} onPress={pop} float={false} bg={color.surface} size={36} /></View>
-    </View>
-  );
-
+  // no close button: tap the map (or swipe the card down) to go back
   return (
-    <Sheet snaps={[0.56, 0.9]} onClose={pop} header={header}>
+    <Sheet snaps={[0.56, 0.9]} onClose={pop}>
       {isLoading ? <Loading /> : error || !place ? <View style={{ padding: 20 }}><Notice tone="missing" text={t('This place could not be loaded. Check your connection and try again.')} /></View> : (
         <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 28, gap: 16 }}>
-          <View style={{ gap: 7, paddingEnd: 44 }}>
+          <View style={{ gap: 7 }}>
             <T weight="bold" style={{ fontSize: 24, letterSpacing: -0.5 }} accessibilityRole="header">{place.name}</T>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
               <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: categoryColor(place.category) }} />

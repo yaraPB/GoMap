@@ -5,7 +5,7 @@ import { useT } from '../i18n';
 import { useMap, type MapSkin, type MapStyle } from '../map/MapContext';
 import { useApp } from '../state/app';
 import { usePanels } from '../state/panels';
-import { Icon, IconBtn, Label, Sheet, T } from '../ui/kit';
+import { Icon, Label, Sheet, T } from '../ui/kit';
 import { color, type IconName } from '../ui/theme';
 import { ROLE_LOOK } from './Views';
 
@@ -33,7 +33,8 @@ export default function Layers() {
     { key: 'labels', label: 'Building labels', sub: 'Numbers on the pins up close', icon: 'pin' },
   ];
   const look = ROLE_LOOK[user.role] ?? ROLE_LOOK.student;
-  const header = <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingBottom: 10 }}><T weight="bold" style={{ flex: 1, fontSize: 18 }}>{t('Map style and layers')}</T><IconBtn icon="close" label={t('Close')} onPress={pop} float={false} bg={color.surface} size={34} /></View>;
+  // the map stays live above: watch the style change, tap the map when done
+  const header = <View style={{ paddingHorizontal: 20, paddingBottom: 10 }}><T weight="bold" style={{ fontSize: 18 }}>{t('Map style and layers')}</T></View>;
   return (
     <Sheet snaps={[0.66, 0.94]} onClose={pop} header={header}>
       <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 32, gap: 20 }}>

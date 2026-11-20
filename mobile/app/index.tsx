@@ -49,7 +49,7 @@ function MapSync() {
   const crowdNow = useCrowding(slot.weekday, slot.hour, densityOn);
   const loc = useLocation();
   const nav = useNav();
-  const { top, push } = usePanels();
+  const { top, push, reset } = usePanels();
   const last = useRef('');
 
   useEffect(() => { if (places.data) map.send({ type: 'places', places: places.data }); }, [places.data]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -72,13 +72,32 @@ function MapSync() {
   }, [nav.route, nav.status]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { map.send({ type: 'follow', on: nav.status === 'active' && top.name === 'go' }); }, [nav.status, top.name]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // tapping empty map is "take me back to the map": whatever card sits over it goes away
+  const pinTap = useRef(0);
+  const leave = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (leave.current) clearTimeout(leave.current); }, []);
   useMapEvent(e => {
+    if (e.type === 'select' || e.type === 'selectEvent') pinTap.current = Date.now();
     if (e.type === 'select' && ['home', 'search', 'place', 'layers'].includes(top.name)) push({ name: 'place', id: e.detail });
     if (e.type === 'selectEvent' && ['home', 'place', 'events'].includes(top.name)) push({ name: 'events', id: e.detail });
+    if (e.type === 'tapMap' && BACK_TO_MAP.includes(top.name)) {
+      const from = top.name;
+      // a tap on a pin is never "outside": wait a beat in case the pin's own select is on its way
+      if (leave.current) clearTimeout(leave.current);
+      leave.current = setTimeout(() => {
+        leave.current = null;
+        if (Date.now() - pinTap.current < 250) return;
+        if (from === 'route' || from === 'arrived') nav.stop();
+        reset();
+      }, 90);
+    }
     if (e.type === 'followOff' && nav.status === 'active') { /* the user dragged the map: stop following until they recentre */ }
   });
   return null;
 }
+
+/** Cards that float over a live map: a tap on empty map closes them. (Turn-by-turn, reporting and the tour use map taps for themselves.) */
+const BACK_TO_MAP = ['place', 'events', 'layers', 'person', 'route', 'crowding', 'arrived'];
 
 function Panels() {
   const { top } = usePanels();
@@ -137,7 +156,8 @@ export default function MapShell() {
     const timer = setTimeout(() => setOffer(true), 900);
     return () => clearTimeout(timer);
   }, [arrived, firstSession, user.role]);
-  const showHome = stack.length === 1 || ['place', 'layers', 'help'].includes(top.name);
+  // home stays underneath the cards opened from it, so tapping outside a card visibly lands you back on it
+  const showHome = stack.length === 1 || ['place', 'layers', 'help', 'search', 'assistant', 'views', 'people', 'offices'].includes(top.name);
 
   return (
     <View style={{ flex: 1, backgroundColor: color.map }}>

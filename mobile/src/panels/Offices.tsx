@@ -1,12 +1,11 @@
 import React, { useMemo, useState } from 'react';
 import { Keyboard, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
-import Animated, { SlideInRight, SlideOutRight } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useOffices, usePlace } from '../api/hooks';
 import type { Person } from '../api/types';
 import { usePanels } from '../state/panels';
 import { shortStatus } from '../ui/bits';
-import { Avatar, Empty, FilterPill, Icon, IconBtn, Loading, Notice, T } from '../ui/kit';
+import { Avatar, Empty, FilterPill, Icon, Loading, Notice, Sheet, T } from '../ui/kit';
 import { color, font } from '../ui/theme';
 import { useT } from '../i18n';
 import { NoteTag } from '../ui/StickyNote';
@@ -41,10 +40,10 @@ export default function Offices({ placeId, department }: { placeId: string; depa
   }, [all]);
 
   return (
-    <Animated.View entering={SlideInRight.duration(260)} exiting={SlideOutRight.duration(200)} style={[StyleSheet.absoluteFill, { backgroundColor: '#fff' }]}>
-      <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
+    // a sheet over the dimmed map: tap above it, or swipe down, to go back
+    <Sheet snaps={[0.9]} scrim onClose={() => { Keyboard.dismiss(); pop(); }}>
+      <View style={styles.header}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-          <IconBtn icon="back" label={t('Back')} onPress={pop} float={false} bg={color.surface} size={40} />
           <View style={{ flex: 1 }}>
             <T weight="bold" style={{ fontSize: 18, letterSpacing: -0.3 }} accessibilityRole="header">{t('Offices in {place}', { place: place.data?.name ?? '…' })}</T>
             <T style={{ fontSize: 12.5, color: color.muted, marginTop: 1 }}>{t('{n} offices', { n: all.length })} · {t('{n} open now', { n: openNow })}{busy ? ` · ${t('{n} busy', { n: busy })}` : ''}</T>
@@ -99,7 +98,7 @@ export default function Offices({ placeId, department }: { placeId: string; depa
           </View>
         </ScrollView>
       )}
-    </Animated.View>
+    </Sheet>
   );
 }
 

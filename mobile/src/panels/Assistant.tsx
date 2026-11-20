@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Keyboard, KeyboardAvoidingView, Linking, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { Keyboard, KeyboardAvoidingView, Linking, Platform, Pressable, ScrollView, StyleSheet, TextInput, View, useWindowDimensions } from 'react-native';
 import Animated, { FadeIn, FadeInDown, LinearTransition } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -26,6 +26,7 @@ const GO = /\b(where|take me|bring me|guide me|directions?|way to|navigate|go to
 
 export default function Assistant({ ask }: { ask?: string }) {
   const insets = useSafeAreaInsets();
+  const { height: screenH } = useWindowDimensions();
   const { lang, setLang, user, online } = useApp();
   const loc = useLocation();
   const nav = useNav();
@@ -94,13 +95,13 @@ export default function Assistant({ ask }: { ask?: string }) {
           </Pressable>
         ))}
       </View>
-      <IconBtn icon="close" label={t('Close the assistant')} onPress={() => { stopSpeaking(); chat.setTalk(false); pop(); }} float={false} bg={color.surface} size={34} />
     </View>
   );
 
+  // tap the dimmed map above (or swipe down) to put the chat away; the conversation is kept
   return (
-    <Sheet snaps={[0.94]} onClose={() => { stopSpeaking(); pop(); }} header={header}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }} keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 0}>
+    <Sheet snaps={[0.88]} scrim onClose={() => { stopSpeaking(); chat.setTalk(false); pop(); }} header={header}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }} keyboardVerticalOffset={Platform.OS === 'ios' ? 60 + Math.round(screenH * 0.06) : 0}>
                 <ScrollView ref={scroll} contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: 20 }} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive" onContentSizeChange={() => scroll.current?.scrollToEnd({ animated: true })}>
           {!turns.length && (
             <Animated.View entering={FadeIn.duration(240)} style={{ gap: 12 }}>
