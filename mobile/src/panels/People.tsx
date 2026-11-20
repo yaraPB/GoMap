@@ -1,11 +1,10 @@
 import React, { useDeferredValue, useState } from 'react';
 import { FlatList, Keyboard, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
-import Animated, { SlideInRight, SlideOutRight } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usePeople } from '../api/hooks';
 import { usePanels } from '../state/panels';
 import { shortStatus } from '../ui/bits';
-import { Avatar, Empty, FilterPill, Icon, IconBtn, Loading, T } from '../ui/kit';
+import { Avatar, Empty, FilterPill, Icon, Loading, Sheet, T } from '../ui/kit';
 import { color, font } from '../ui/theme';
 import { useT } from '../i18n';
 import { NoteTag } from '../ui/StickyNote';
@@ -25,10 +24,10 @@ export default function People() {
   const list = (data ?? []).filter(p => (!dep || p.department?.id === dep) && (!openOnly || ['open', 'in'].includes(p.availability.state)));
 
   return (
-    <Animated.View entering={SlideInRight.duration(240)} exiting={SlideOutRight.duration(200)} style={[StyleSheet.absoluteFill, { backgroundColor: '#fff' }]}>
-      <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
+    // a sheet over the dimmed map: tap above it, or swipe down, to go back
+    <Sheet snaps={[0.9]} scrim onClose={() => { Keyboard.dismiss(); pop(); }}>
+      <View style={styles.header}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-          <IconBtn icon="back" label={t('Back')} onPress={() => { Keyboard.dismiss(); pop(); }} float={false} bg={color.surface} size={40} />
           <T weight="bold" style={{ fontSize: 18 }} accessibilityRole="header">{t('Find a professor')}</T>
         </View>
         <View style={styles.search}>
@@ -60,7 +59,7 @@ export default function People() {
           );
         }}
       />
-    </Animated.View>
+    </Sheet>
   );
 }
 

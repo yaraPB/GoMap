@@ -1,6 +1,5 @@
 import React, { useEffect } from 'react';
 import { Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import Animated, { SlideInRight, SlideOutRight } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { usePerson, usePlaces } from '../api/hooks';
@@ -9,7 +8,7 @@ import { useApp } from '../state/app';
 import { useNav } from '../state/navigation';
 import { usePanels } from '../state/panels';
 import { availabilityText, availabilityTone, fmtDate, HoursTable, timeAgo } from '../ui/bits';
-import { Btn, IconBtn, Label, Loading, Notice, Provenance, StatusPill, T, Tag } from '../ui/kit';
+import { Btn, IconBtn, Label, Loading, Notice, Provenance, Sheet, StatusPill, T, Tag } from '../ui/kit';
 import { NoteTag, StickyNote } from '../ui/StickyNote';
 import { shortDate, useLang, useT } from '../i18n';
 import { color, status } from '../ui/theme';
@@ -34,17 +33,17 @@ export default function PersonPanel({ id }: { id: string }) {
     push({ name: 'route' });
   };
 
-  if (isLoading || !p) return <View style={[StyleSheet.absoluteFill, { backgroundColor: '#fff', paddingTop: insets.top + 60 }]}><Loading /></View>;
+  if (isLoading || !p) return <Sheet snaps={[0.7, 0.92]} onClose={pop}><Loading /></Sheet>;
   const tone = availabilityTone(p.availability);
   const first = p.name.split(' ')[0];
   const nothing = p.missing.includes('office') && p.missing.includes('hours');
   const longAway = !!p.presence && p.presence.status === 'out' && !!p.presence.until && new Date(p.presence.until).toDateString() !== new Date().toDateString();
 
   return (
-    <Animated.View entering={SlideInRight.duration(260)} exiting={SlideOutRight.duration(200)} style={[StyleSheet.absoluteFill, { top: 200 + insets.top * 0.4 }]}>
-      <View style={[styles.back, { top: -150 }]}><IconBtn icon="back" label={t('Back')} onPress={pop} size={40} /></View>
-      <View style={styles.body}>
-        <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: insets.bottom + 28, gap: 14 }}>
+    // the map above shows their building: tap it (or swipe down) to go back
+    <Sheet snaps={[0.7, 0.92]} onClose={pop}>
+      <View style={{ flex: 1 }}>
+        <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 4, paddingBottom: insets.bottom + 28, gap: 14 }}>
           <View style={{ gap: 6 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
               <T weight="bold" style={{ fontSize: 23, letterSpacing: -0.5, flexShrink: 1 }} accessibilityRole="header">{p.name}</T>
@@ -112,13 +111,11 @@ export default function PersonPanel({ id }: { id: string }) {
           <Provenance text={`${t('From the {source}', { source: p.source })}${p.verified_at ? ` · ${t('verified {date}', { date: fmtDate(p.verified_at, lang) ?? '' })}` : ` · ${t('not verified')}`}`} onReport={() => push({ name: 'report', at: place?.coordinates })} />
         </ScrollView>
       </View>
-    </Animated.View>
+    </Sheet>
   );
 }
 
 const styles = StyleSheet.create({
-  back: { position: 'absolute', left: 14 },
-  body: { flex: 1, backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: 'hidden' },
   override: { flexDirection: 'row', gap: 11, padding: 13, borderWidth: 1, borderRadius: 13 },
   initials: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
   blank: { borderWidth: 1, borderColor: '#EBEBE7', borderRadius: 14, overflow: 'hidden' },

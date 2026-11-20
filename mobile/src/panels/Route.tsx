@@ -46,7 +46,6 @@ export function RoutePreview({ said, reply }: { said?: string; reply?: string })
                 <T weight="semibold" style={{ fontSize: 14 }}>“{said}”</T>
                 <T style={{ fontSize: 13, color: color.muted, marginTop: 2, lineHeight: 18 }}>{reply}</T>
               </View>
-              <IconBtn icon="close" label={t('End directions')} onPress={close} float={false} bg={color.surface} size={34} />
             </View>
             <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
               {([['walk', t('Walk'), 'walk'], ['ar', t('AR route'), 'ar'], ['step_free', t('Step-free'), 'wheel']] as const).map(([id, name, icon]) => {
@@ -70,12 +69,12 @@ export function RoutePreview({ said, reply }: { said?: string; reply?: string })
               <T style={{ fontSize: 14, color: color.muted }}>{nav.startedFromDemo ? t('Main plaza (demo position)') : t('Where you are now')}</T>
               <T weight="semibold" style={{ fontSize: 15 }} numberOfLines={1}>{nav.dest?.name ?? '…'}{r?.destination.entrance ? ` · ${r.destination.entrance}` : ''}</T>
             </View>
-            <IconBtn icon="close" label={t('Close directions')} onPress={close} float={false} bg={color.surface} size={36} />
           </View>
         )}
       </Animated.View>
 
-      <Sheet snaps={[0.44, 0.86]}>
+      {/* no close button: tap the map, or swipe this down, to leave the directions */}
+      <Sheet snaps={[0.44, 0.86]} onClose={close}>
         {nav.status === 'loading' ? <Loading label={t('Finding the way')} /> : nav.status === 'error' || !r ? (
           <View style={{ padding: 20, gap: 12 }}>
             <Notice tone="missing" icon="ban" text={nav.error ?? t('No route found on the mapped paths.')} />
@@ -218,7 +217,7 @@ export function Arrived() {
   const dest = nav.dest;
   const done = () => { nav.stop(); reset(); };
   return (
-    <Sheet snaps={[0.5]}>
+    <Sheet snaps={[0.5]} onClose={done}>
       <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: insets.bottom + 24, gap: 14 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
           <View style={styles.check}><Icon name="check" size={22} stroke="#fff" width={3} /></View>

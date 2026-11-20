@@ -30,7 +30,7 @@ export default function Views() {
   const fresh = () => { chat.clear(); qc.invalidateQueries(); };
   const me = signedIn ? ROLE_LOOK[signedIn.role] ?? ROLE_LOOK.student : null;
   return (
-    <Sheet snaps={[0.75, 0.94]} onClose={pop} header={<View style={styles.head}><T weight="bold" style={{ fontSize: 18 }}>{t('Your account')}</T><T style={{ fontSize: 12.5, color: color.muted }}>{signedIn ? t('Signed in to GoMap') : t('Sign in to get your own view: faculty post their status, admins edit the campus')}</T></View>}>
+    <Sheet snaps={[0.75, 0.9]} onClose={pop} scrim header={<View style={styles.head}><T weight="bold" style={{ fontSize: 18 }}>{t('Your account')}</T><T style={{ fontSize: 12.5, color: color.muted }}>{signedIn ? t('Signed in to GoMap') : t('Sign in to get your own view: faculty post their status, admins edit the campus')}</T></View>}>
       <ScrollView contentContainerStyle={{ padding: 16, gap: 10, paddingBottom: 30 }} keyboardShouldPersistTaps="handled">
         {signedIn && me ? <>
           <Animated.View entering={FadeInDown.duration(260)} style={[styles.card, { borderColor: me.ink }]}>

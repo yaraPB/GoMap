@@ -1,6 +1,6 @@
 import React, { useDeferredValue, useMemo, useState } from 'react';
 import { FlatList, Keyboard, Pressable, StyleSheet, TextInput, View } from 'react-native';
-import Animated, { FadeIn, FadeInDown, FadeOut } from 'react-native-reanimated';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../api/client';
@@ -9,7 +9,7 @@ import type { NoteKind } from '../api/types';
 import { useT } from '../i18n';
 import { useApp } from '../state/app';
 import { usePanels } from '../state/panels';
-import { Empty, Icon, IconBtn, Label, Loading, T } from '../ui/kit';
+import { Empty, Icon, Label, Loading, Sheet, T } from '../ui/kit';
 import { NoteTag } from '../ui/StickyNote';
 import { categoryColor, categoryIcon, categoryName, color, font, type IconName } from '../ui/theme';
 import { availabilityTone, shortStatus } from '../ui/bits';
@@ -71,9 +71,9 @@ export default function Search({ initial }: { initial?: string }) {
   const loading = places.isLoading || people.isFetching || procs.isFetching;
 
   return (
-    <Animated.View entering={FadeIn.duration(180)} exiting={FadeOut.duration(150)} style={[StyleSheet.absoluteFill, { backgroundColor: '#fff', paddingTop: insets.top + 8 }]}>
+    // a sheet over the dimmed map: tap the map strip above, or swipe down, to go back
+    <Sheet snaps={[0.9]} scrim onClose={() => { Keyboard.dismiss(); pop(); }}>
       <View style={styles.bar}>
-        <IconBtn icon="back" label={t('Back to the map')} onPress={() => { Keyboard.dismiss(); pop(); }} float={false} bg={color.surface} size={40} />
         <View style={styles.input}>
           <Icon name="search" size={18} stroke={color.muted} />
           <TextInput autoFocus value={q} onChangeText={setQ} placeholder={guest ? t('A building, parking, food…') : t('A place, a professor, an office')}
@@ -114,7 +114,7 @@ export default function Search({ initial }: { initial?: string }) {
           <Empty title={t('Nothing on campus matches that')} body={t('Try other words, or describe it to GoMap instead.')} action={t('Ask GoMap')} onAction={() => { Keyboard.dismiss(); push({ name: 'assistant', ask: query }); }} />
         ) : undefined}
       />
-    </Animated.View>
+    </Sheet>
   );
 }
 

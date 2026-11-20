@@ -1,8 +1,8 @@
 import React, { useEffect } from 'react';
-import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View, useWindowDimensions, type PressableProps, type StyleProp, type TextProps, type TextStyle, type ViewStyle } from 'react-native';
+import { ActivityIndicator, Keyboard, Platform, Pressable, StyleSheet, Text, View, useWindowDimensions, type PressableProps, type StyleProp, type TextProps, type TextStyle, type ViewStyle } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import Animated, { Easing, FadeInDown, FadeOut, runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
+import Animated, { Easing, Extrapolation, FadeInDown, FadeOut, interpolate, runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { color, font, shadow, status as statusColors } from './theme';
 import { LUCIDE, type IconName } from './icons';
@@ -125,10 +125,15 @@ export const rise = FadeInDown.duration(460).easing(Easing.bezier(0.2, 0.8, 0.2,
 /**
  * Bottom sheet with snap points (fractions of screen height). Drag the handle area to move it;
  * flick down from the lowest snap to dismiss. Content scrolls normally inside.
+ *
+ * Leaving a sheet never needs a button:
+ * - `scrim`: the rest of the screen dims, and tapping it closes the sheet (for sheets that are not about the map).
+ * - without `scrim`, the map stays live around the sheet, and tapping empty map takes you back to it (see MapSync).
+ * Swiping down, the hardware back button and the screen reader's escape / "Close" action all close it too.
  */
-export function Sheet({ snaps = [0.5, 0.9], initial = 0, onClose, children, header, dark, style, index, onIndexChange }: {
+export function Sheet({ snaps = [0.5, 0.9], initial = 0, onClose, children, header, dark, style, index, onIndexChange, scrim }: {
   snaps?: number[]; initial?: number; onClose?: () => void; children: React.ReactNode; header?: React.ReactNode; dark?: boolean;
-  style?: StyleProp<ViewStyle>; index?: number; onIndexChange?: (i: number) => void;
+  style?: StyleProp<ViewStyle>; index?: number; onIndexChange?: (i: number) => void; scrim?: boolean;
 }) {
   const { height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -141,6 +146,15 @@ export function Sheet({ snaps = [0.5, 0.9], initial = 0, onClose, children, head
   useEffect(() => { snapTo(index ?? initial); }, [index, height]);
   const notifyIndex = (i: number) => onIndexChange?.(i);
   const close = () => onClose?.();
+  /** slide away, then close: what tapping outside does */
+  const dismiss = () => {
+    if (!onClose) return;
+    Keyboard.dismiss();
+    y.value = withTiming(max, { duration: 190 }, done => { if (done) runOnJS(close)(); });
+  };
+  // the dim follows the sheet: it fades in as the sheet rises and out as you drag it down
+  const lowest = max - heights[0];
+  const scrimAnim = useAnimatedStyle(() => ({ opacity: interpolate(y.value, [lowest, max], [1, 0], Extrapolation.CLAMP) }));
   const pan = Gesture.Pan()
     .onStart(() => { start.value = y.value; })
     .onUpdate(e => { y.value = Math.max(0, start.value + e.translationY); })
@@ -155,15 +169,26 @@ export function Sheet({ snaps = [0.5, 0.9], initial = 0, onClose, children, head
     });
   const anim = useAnimatedStyle(() => ({ transform: [{ translateY: y.value }] }));
   return (
-    <Animated.View exiting={FadeOut.duration(170)} style={[s.sheet, { height: max, paddingBottom: insets.bottom }, dark && { backgroundColor: '#14171C' }, anim, style]}>
-      <GestureDetector gesture={pan}>
-        <View accessible accessibilityRole="adjustable" accessibilityLabel={tr('Sheet handle. Drag to resize.')} style={{ paddingTop: 10 }}>
-          <View style={[s.handle, dark && { backgroundColor: 'rgba(255,255,255,0.25)' }]} />
-          {header}
-        </View>
-      </GestureDetector>
-      <View style={{ flex: 1 }}>{children}</View>
-    </Animated.View>
+    <>
+      {scrim && onClose && (
+        <Animated.View exiting={FadeOut.duration(170)} style={[StyleSheet.absoluteFill, s.scrim, scrimAnim]}>
+          <Pressable accessibilityRole="button" accessibilityLabel={tr('Close')} onPress={dismiss} style={StyleSheet.absoluteFill} />
+        </Animated.View>
+      )}
+      <Animated.View exiting={FadeOut.duration(170)} accessibilityViewIsModal={!!scrim} onAccessibilityEscape={onClose ? dismiss : undefined}
+        style={[s.sheet, { height: max, paddingBottom: insets.bottom }, dark && { backgroundColor: '#14171C' }, anim, style]}>
+        <GestureDetector gesture={pan}>
+          {/* the handle on its own (no header) is a slim strip: give it a finger-sized area to grab */}
+          <View accessible accessibilityRole="adjustable" accessibilityLabel={tr('Sheet handle. Drag to resize.')} style={{ paddingTop: 10, minHeight: header ? undefined : 26 }}
+            accessibilityActions={onClose ? [{ name: 'escape' }, { name: 'activate', label: tr('Close') }] : undefined}
+            onAccessibilityAction={onClose ? () => dismiss() : undefined}>
+            <View style={[s.handle, dark && { backgroundColor: 'rgba(255,255,255,0.25)' }]} />
+            {header}
+          </View>
+        </GestureDetector>
+        <View style={{ flex: 1 }}>{children}</View>
+      </Animated.View>
+    </>
   );
 }
 
@@ -198,4 +223,5 @@ export const s = StyleSheet.create({
   prov: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingTop: 12, borderTopWidth: 1, borderTopColor: color.hairline },
   sheet: { position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: color.panel, borderTopLeftRadius: 24, borderTopRightRadius: 24, ...shadow.sheet },
   handle: { alignSelf: 'center', width: 38, height: 4, borderRadius: 999, backgroundColor: '#D5D7D2', marginBottom: 8 },
+  scrim: { backgroundColor: 'rgba(12,18,24,0.34)' },
 });
