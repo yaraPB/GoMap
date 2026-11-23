@@ -36,9 +36,18 @@ export type OfficeList = { place_id: string; total: number; floors: { floor: num
 export type RouteMode = 'walk' | 'step_free' | 'drive';
 export type Turn = 'depart' | 'straight' | 'slight left' | 'slight right' | 'left' | 'right' | 'sharp left' | 'sharp right' | 'arrive';
 export type Step = { turn: Turn; distance_m: number; text: string; at: Position; bearing: number; crossing: boolean; stairs: boolean; on: string | null; kind: string };
+/** One stretch of a route in one style: in the car, on a footpath, along a road cars use, on stairs. steep: more than a ramp's 8 %. */
+export type RouteSegment = { kind: 'path' | 'road' | 'stairs' | 'drive'; steep: boolean; coordinates: Position[] };
+/** How hard each path is on wheels, for the step-free view (slopes estimated from 10 m contours). */
+export type SlopeCollection = { type: 'FeatureCollection'; features: { type: 'Feature'; geometry: { type: 'LineString'; coordinates: Position[] }; properties: { class: 'gentle' | 'moderate' | 'steep' | 'stairs'; grade: number; kind: string } }[] };
 export type Route = {
   mode: RouteMode; distance_m: number; duration_s: number;
   geometry: { type: 'LineString'; coordinates: Position[] }; steps: Step[]; crossings: Position[]; uses_roads: boolean;
+  segments?: RouteSegment[];
+  /** estimated from contour lines; max_grade in %; null without terrain data */
+  slope?: { climb_m: number; descent_m: number; max_grade: number; steep_m: number } | null;
+  /** by car: where to park, and how the time splits between driving and walking */
+  park?: { place_id: string; name: string; coordinates: Position; drive_s: number; walk_s: number; walk_m: number };
   destination: { place_id: string | null; entrance: string | null; entrance_estimated: boolean; step_free: boolean };
   /** the last stretch crosses an unmapped gap: shown as approximate */
   approximate?: boolean;

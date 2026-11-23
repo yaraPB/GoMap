@@ -54,6 +54,7 @@ html,body,#map{width:100%;height:100%;margin:0;overflow:hidden;background:#24302
 .closure i{width:20px;height:20px;border-radius:50%;background:#B5342B;display:flex;align-items:center;justify-content:center}
 .closure svg{width:12px;height:12px}
 .drop-pin{width:30px;height:42px}
+.park-pin{width:30px;height:30px;border-radius:8px;background:#2563EB;border:2.5px solid #fff;color:#fff;font:700 16px/25px Inter,system-ui,sans-serif;text-align:center;box-sizing:border-box;box-shadow:0 3px 8px rgba(0,0,0,.45);z-index:6}
 .pinwrap{transition:opacity 260ms ease,transform 260ms ease;transform:scale(var(--pin-scale,1));transform-origin:50% 0}
 /* filter changes cross-fade in place: no drop, no bounce, no camera swing */
 .appear{animation:appear 320ms ease-out backwards}
@@ -84,7 +85,7 @@ function svg(d,stroke,w){return '<svg viewBox="0 0 24 24" fill="none" stroke="'+
 if(!window.mapboxgl||!mapboxgl.supported()){send('error','This device couldn’t display the map. Try reopening GoMap or using another device.');return;}
 mapboxgl.accessToken=TOKEN;
 var state={places:[],filter:{category:'all',school:'all'},selected:null,route:null,crossings:[],walkways:null,crowding:null,closures:[],events:[],
-  layers:{threeD:true,labels:true,cars:false,crowding:false},style:'default',skin:'campus',buildings:null,extra:null,user:null,heading:null,follow:false,pick:false,dest:null,highlight:null,dim:false};
+  layers:{threeD:true,labels:true,cars:false,crowding:false,access:false},slopes:null,segments:null,park:null,style:'default',skin:'campus',buildings:null,extra:null,user:null,heading:null,follow:false,pick:false,dest:null,highlight:null,dim:false};
 // One style for both looks: satellite is a photo layer under the roads and labels. No reload when switching.
 var STYLES={default:'mapbox://styles/mapbox/standard',satellite:'mapbox://styles/mapbox/standard'};
 var IMAGERY={mapbox:{url:'mapbox://mapbox.satellite',tileSize:256},
@@ -214,15 +215,28 @@ function addLayers(){
     paint:{'line-color':sat()?'#C9CED6':'#8E97A3','line-width':['interpolate',['linear'],['zoom'],15,3,18,11],'line-opacity':0.85}});
   map.addLayer({id:'roads-centre',type:'line',source:'walkways',filter:['==',['get','kind'],'road'],layout:{visibility:state.layers.cars?'visible':'none'},
     paint:{'line-color':'#FFFFFF','line-width':['interpolate',['linear'],['zoom'],15,0.6,18,1.6],'line-dasharray':[3,3]}});
-  map.addLayer({id:'paths',type:'line',source:'walkways',filter:['!=',['get','kind'],'road'],layout:{'line-cap':'round'},
+  // footpaths: people only, dotted. Stairs: short orange rungs, so nobody pushing wheels is surprised
+  map.addLayer({id:'paths',type:'line',source:'walkways',filter:['!',['in',['get','kind'],['literal',['road','stairs']]]],layout:{'line-cap':'round'},
     paint:{'line-color':PATH.campus,'line-width':['interpolate',['linear'],['zoom'],15,1.2,18,2.6],'line-dasharray':[0.3,2],'line-opacity':0.8}});
+  map.addLayer({id:'stairs',type:'line',source:'walkways',filter:['==',['get','kind'],'stairs'],minzoom:15.5,
+    paint:{'line-emissive-strength':1,'line-color':'#EA580C','line-width':['interpolate',['linear'],['zoom'],15.5,3,18,8],'line-dasharray':[0.25,0.35],'line-opacity':0.95}});
+  // the step-free view: how hard each path is on wheels (green easy, amber ramp-like, red steeper than a ramp / stairs)
+  map.addSource('slopes',{type:'geojson',data:state.slopes||emptyFC()});
+  map.addLayer({id:'access',type:'line',source:'slopes',filter:['!=',['get','class'],'stairs'],layout:{'line-cap':'round','line-join':'round',visibility:state.layers.access?'visible':'none'},
+    paint:{'line-emissive-strength':1,'line-color':['match',['get','class'],'gentle','#22C55E','moderate','#F59E0B','#DC2626'],'line-width':['interpolate',['linear'],['zoom'],15,2,18,6],'line-opacity':0.9}});
+  map.addLayer({id:'access-stairs',type:'line',source:'slopes',filter:['==',['get','class'],'stairs'],layout:{visibility:state.layers.access?'visible':'none'},
+    paint:{'line-emissive-strength':1,'line-color':'#DC2626','line-width':['interpolate',['linear'],['zoom'],15,3,18,9],'line-dasharray':[0.3,0.3]}});
   map.addLayer({id:'crowding',type:'line',source:'crowding',filter:['>=',['get','load'],0.34],layout:{'line-cap':'round','line-join':'round',visibility:state.layers.crowding?'visible':'none'},
     paint:{'line-color':['interpolate',['linear'],['get','load'],0,'rgba(253,230,138,0.15)',0.2,'#FDE68A',0.55,'#F59E0B',0.9,'#B45309'],
       'line-width':['interpolate',['linear'],['zoom'],15,3,18,10],'line-opacity':['interpolate',['linear'],['get','load'],0,0.2,0.25,0.95]}});
-  map.addLayer({id:'route-casing',type:'line',source:'route',layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':'#0B4D23','line-width':['interpolate',['linear'],['zoom'],15,6,18,13],'line-opacity':0.55}});
-  map.addLayer({id:'route-line',type:'line',source:'route',layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':'#16A34A','line-width':['interpolate',['linear'],['zoom'],15,4,18,9]}});
-  map.addLayer({id:'route-flow',type:'line',source:'route',layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':'#D9FBE5','line-width':['interpolate',['linear'],['zoom'],15,1.5,18,3.5],'line-dasharray':[0,4,3]}});
-  map.addLayer({id:'crossings',type:'circle',source:'crossings',paint:{'circle-radius':7,'circle-color':'#FFFFFF','circle-stroke-color':'#15171A','circle-stroke-width':2.5}});
+  // in the car: blue. On foot: green, with a grey edge where you walk along a road cars use.
+  // Stairs: orange. Steeper than a ramp: amber.
+  map.addLayer({id:'route-casing',type:'line',source:'route',layout:{'line-cap':'round','line-join':'round'},
+    paint:{'line-emissive-strength':1,'line-color':['match',['get','kind'],'drive','#1E3A8A','road','#4B5563','#0B4D23'],'line-width':['interpolate',['linear'],['zoom'],15,6,18,13],'line-opacity':['match',['get','kind'],'road',0.8,0.55]}});
+  map.addLayer({id:'route-line',type:'line',source:'route',layout:{'line-cap':'round','line-join':'round'},
+    paint:{'line-emissive-strength':1,'line-color':['case',['get','steep'],'#D97706',['match',['get','kind'],'drive','#2563EB','stairs','#EA580C','#16A34A']],'line-width':['interpolate',['linear'],['zoom'],15,4,18,9]}});
+  map.addLayer({id:'route-flow',type:'line',source:'route',layout:{'line-cap':'round','line-join':'round'},paint:{'line-emissive-strength':1,'line-color':'#D9FBE5','line-width':['interpolate',['linear'],['zoom'],15,1.5,18,3.5],'line-dasharray':[0,4,3]}});
+  map.addLayer({id:'crossings',type:'circle',source:'crossings',paint:{'circle-emissive-strength':1,'circle-radius':7,'circle-color':'#FFFFFF','circle-stroke-color':'#15171A','circle-stroke-width':2.5}});
   map.addSource('campus-buildings',{type:'geojson',data:buildingsFC()});
   // a warm, light-emitting shell over open buildings (a hair taller than the basemap's own)
   map.addLayer({id:'buildings-lit',type:'fill-extrusion',source:'campus-buildings',filter:['==',['get','open'],true],minzoom:14.5,
@@ -241,7 +255,14 @@ function animateDash(){
   dashTimer=setInterval(function(){if(!map.getLayer('route-flow'))return;step=(step+1)%DASH.length;map.setPaintProperty('route-flow','line-dasharray',DASH[step]);},80);
 }
 function stopDash(){if(dashTimer){clearInterval(dashTimer);dashTimer=null;}}
-function routeFC(){return state.route?{type:'FeatureCollection',features:[{type:'Feature',properties:{},geometry:state.route}]}:emptyFC();}
+/** The route in stretches (car / footpath / road shared with cars / stairs, steep marked), each drawn in its own colour. */
+function routeFC(){if(!state.route)return emptyFC();
+  if(!state.segments||!state.segments.length)return {type:'FeatureCollection',features:[{type:'Feature',properties:{kind:'path',steep:false},geometry:state.route}]};
+  return {type:'FeatureCollection',features:state.segments.map(function(s){return {type:'Feature',properties:{kind:s.kind,steep:!!s.steep},geometry:{type:'LineString',coordinates:s.coordinates}};})};}
+var parkMarker=null;
+function setPark(c){if(parkMarker){parkMarker.remove();parkMarker=null;}if(!c)return;
+  var el=document.createElement('div');el.className='park-pin';el.textContent='P';el.setAttribute('aria-label','Car park');
+  parkMarker=new mapboxgl.Marker({element:el,anchor:'center'}).setLngLat(c).addTo(map);}
 function pointsFC(list){return {type:'FeatureCollection',features:(list||[]).map(function(c){return {type:'Feature',properties:{},geometry:{type:'Point',coordinates:c}};})};}
 function visiblePlaces(){var f=state.filter;if(f.category==='events')return [];return state.places.filter(function(p){
   if(f.category!=='all'&&p.category!==f.category)return false;
@@ -351,10 +372,11 @@ var handlers={
     if(v.length&&d.category!=='all')fit(v,d.padding);},
   select:function(d){state.selected=d.id;state.dim=!!d.dim;renderPins();var p=byId[d.id];
     if(p&&d.fly!==false)map.flyTo({center:p.coordinates,zoom:Math.max(map.getZoom(),17.4),pitch:50,padding:{top:60,bottom:d.bottom||420,left:0,right:0},duration:reduce?0:650});},
-  route:function(d){state.route=d.geometry;state.crossings=d.crossings||[];
+  route:function(d){state.route=d.geometry;state.segments=d.segments||null;state.crossings=d.crossings||[];
     if(map.getSource('route')){map.getSource('route').setData(routeFC());map.getSource('crossings').setData(pointsFC(state.crossings));}
-    setDest(d.dest||null);if(d.geometry){animateDash();if(d.fit!==false)fit(d.geometry.coordinates,d.padding);}else stopDash();},
-  clearRoute:function(){state.route=null;state.crossings=[];if(map.getSource('route')){map.getSource('route').setData(emptyFC());map.getSource('crossings').setData(emptyFC());}setDest(null);stopDash();},
+    setDest(d.dest||null);setPark(d.park||null);if(d.geometry){animateDash();if(d.fit!==false)fit(d.geometry.coordinates,d.padding);}else stopDash();},
+  clearRoute:function(){state.route=null;state.segments=null;state.crossings=[];if(map.getSource('route')){map.getSource('route').setData(emptyFC());map.getSource('crossings').setData(emptyFC());}setDest(null);setPark(null);stopDash();},
+  slopes:function(d){state.slopes=d.data;if(map.getSource('slopes'))map.getSource('slopes').setData(d.data);},
   user:function(d){state.user=d.coord;state.heading=d.heading;setMe();},
   follow:function(d){state.follow=!!d.on;if(arriving)return;if(!d.on)map.easeTo({pitch:50,padding:{top:0,bottom:0,left:0,right:0},duration:reduce?0:500});else setMe();},
   locate:function(){if(state.user)map.flyTo({center:state.user,zoom:17.6,duration:reduce?0:700});},
@@ -365,6 +387,7 @@ var handlers={
   closures:function(d){state.closures=d.list||[];setClosures();},
   layers:function(d){var o=state.layers;state.layers=Object.assign({},o,d.layers);
     vis('roads-band',state.layers.cars);vis('roads-centre',state.layers.cars);vis('crowding',state.layers.crowding);
+    vis('access',state.layers.access);vis('access-stairs',state.layers.access);
     threeD();config('showPlaceLabels',state.layers.labels);config('showRoadLabels',state.layers.labels);
     document.body.classList.toggle('nolabels',!state.layers.labels);},
   // satellite is a photo layer in the same style: no reload, nothing to rebuild

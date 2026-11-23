@@ -89,8 +89,8 @@ const browser = await chromium.launch({ channel, headless: process.env.E2E_HEADE
   args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream', '--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
 const desktop = () => browser.newContext({ viewport: { width: 1440, height: 950 } });
 const phone = () => browser.newContext({ viewport: { width: 400, height: 860 }, deviceScaleFactor: 2, reducedMotion: 'reduce', geolocation: { ...PLAZA, accuracy: 5 }, permissions: ['geolocation', 'camera'] });
-/** Close a card the way people do: tap the map beside it (left edge, above any open sheet, below the chip rail). */
-const tapMap = async page => { await page.mouse.click(40, 250); await sleep(700); };
+/** Close a card the way people do: tap the map above it (left edge, under the chip rail and the event line, above even a fully raised sheet: map sheets stop at 80 %). */
+const tapMap = async page => { await page.mouse.click(40, 150); await sleep(700); };
 const appReady = async page => { await page.goto(APP, { timeout: 180_000 }); await page.getByLabel('Ask GoMap').first().waitFor({ timeout: 120_000 }); await sleep(6000); };
 
 // ── dev dashboard & admin (email + password) ────────────────────────────────
@@ -314,6 +314,24 @@ if (want('app')) {
     await shot(page, 'app-turn-by-turn');
     await page.getByText('End').click();
   });
+  await check('app', 'three ways there: walk, step-free (no stairs, slopes), car (park, then walk)', page, async () => {
+    await page.getByLabel('Search the campus').click();
+    await page.getByPlaceholder('A place, a professor, an office').fill('library');
+    await page.getByText('Mohammed VI Library').first().click();
+    await page.getByText('Directions').click();
+    await page.getByText('Start').waitFor({ timeout: 15_000 });
+    await page.getByRole('button', { name: 'Step-free', exact: true }).click();
+    await page.getByText('No stairs on this route').waitFor({ timeout: 15_000 });
+    await sleep(2500); await shot(page, 'app-route-step-free');
+    await page.getByRole('button', { name: 'Car', exact: true }).click();
+    await page.getByText(/^Park at /).first().waitFor({ timeout: 15_000 });
+    await page.getByText(/by car, then .* on foot/).waitFor();
+    await sleep(2500); await shot(page, 'app-route-car');
+    await page.getByRole('button', { name: 'Walk', exact: true }).click();
+    await page.getByText(/^Park at /).first().waitFor({ state: 'detached', timeout: 15_000 });
+    await tapMap(page);
+    await page.getByText('Start').waitFor({ state: 'detached', timeout: 5_000 });
+  });
   await check('app', 'Building 14 has a route (the old "no path" bug)', page, async () => {
     await page.getByLabel('Ask GoMap').first().click();
     const box = page.getByPlaceholder('Type a question');
@@ -330,6 +348,10 @@ if (want('app')) {
     await page.getByText('Off on satellite').waitFor();
     await sleep(2500); await shot(page, 'app-satellite');
     await page.getByRole('radio', { name: 'Map' }).click();
+    // the step-free view: paths coloured by how hard they are on wheels
+    await page.getByRole('switch', { name: 'Step-free view' }).click();
+    await sleep(3000); await shot(page, 'app-step-free-view');
+    await page.getByRole('switch', { name: 'Step-free view' }).click();
   });
   await check('app', 'French then Arabic: the interface changes language', page, async () => {
     await page.getByRole('radio', { name: 'Français' }).click();

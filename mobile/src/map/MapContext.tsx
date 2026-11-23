@@ -1,8 +1,9 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import type { Closure, CrowdingCollection, PlaceLite, Position, WalkwayCollection } from '../api/types';
+import type { Closure, CrowdingCollection, PlaceLite, Position, RouteSegment, SlopeCollection, WalkwayCollection } from '../api/types';
 
 export type MapStyle = 'default' | 'satellite';
-export type MapLayers = { threeD: boolean; labels: boolean; cars: boolean; crowding: boolean };
+/** cars: where cars go (road bands). access: the step-free view, paths coloured by how hard they are on wheels. */
+export type MapLayers = { threeD: boolean; labels: boolean; cars: boolean; crowding: boolean; access: boolean };
 /** Scenes. campus = the GoCampus look (follows the campus clock); then bright day, golden evening, dark. */
 export type MapSkin = 'campus' | 'day' | 'evening' | 'night';
 export type MapEventPin = { id: string; title: string; coordinates: Position | null; state: string };
@@ -12,13 +13,14 @@ export type MapCommand =
   | { type: 'places'; places: PlaceLite[] }
   | { type: 'filter'; category: string; school: string; fit?: boolean | 'gentle'; padding?: { top: number; bottom: number; left: number; right: number } }
   | { type: 'select'; id: string | null; bottom?: number; fly?: boolean; dim?: boolean }
-  | { type: 'route'; geometry: { type: 'LineString'; coordinates: Position[] } | null; crossings?: Position[]; dest?: Position | null; fit?: boolean; padding?: { top: number; bottom: number; left: number; right: number } }
+  | { type: 'route'; geometry: { type: 'LineString'; coordinates: Position[] } | null; segments?: RouteSegment[]; crossings?: Position[]; dest?: Position | null; park?: Position | null; fit?: boolean; padding?: { top: number; bottom: number; left: number; right: number } }
   | { type: 'clearRoute' }
   | { type: 'user'; coord: Position | null; heading: number | null }
   | { type: 'follow'; on: boolean }
   | { type: 'locate' }
   | { type: 'reset' }
   | { type: 'walkways'; data: WalkwayCollection }
+  | { type: 'slopes'; data: SlopeCollection }
   | { type: 'crowding'; data: CrowdingCollection; fit?: boolean }
   | { type: 'closures'; list: Closure[] }
   | { type: 'layers'; layers: Partial<MapLayers> }
@@ -62,13 +64,13 @@ export function MapProvider({ children }: { children: React.ReactNode }) {
   const [style, setStyleState] = useState<MapStyle>('default');
   const styleRef = useRef<MapStyle>('default');
   const [skin, setSkinState] = useState<MapSkin>('campus');
-  const [layers, setLayersState] = useState<MapLayers>({ threeD: true, labels: true, cars: false, crowding: false });
+  const [layers, setLayersState] = useState<MapLayers>({ threeD: true, labels: true, cars: false, crowding: false, access: false });
   // last value per "sticky" command, replayed after a style switch reloads the page's layers
   const sticky = useRef(new Map<string, string>());
 
   const send = useCallback((cmd: MapCommand) => {
     const msg = JSON.stringify(cmd);
-    if (['places', 'filter', 'walkways', 'closures', 'route', 'layers', 'user', 'crowding', 'skin', 'buildings', 'extraBuildings', 'events', 'style'].includes(cmd.type)) sticky.current.set(cmd.type, msg);
+    if (['places', 'filter', 'walkways', 'slopes', 'closures', 'route', 'layers', 'user', 'crowding', 'skin', 'buildings', 'extraBuildings', 'events', 'style'].includes(cmd.type)) sticky.current.set(cmd.type, msg);
     if (cmd.type === 'clearRoute') sticky.current.delete('route');
     if (readyRef.current && post.current) post.current(msg); else queue.current.push(msg);
   }, []);

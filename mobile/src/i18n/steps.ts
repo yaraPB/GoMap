@@ -11,6 +11,7 @@ export function trStep(text: string, t: TFn): string {
   if (text === 'Head along the path') return t('Head along the path');
   if ((m = text.match(/^Head along the road(?: \((.+)\))?$/))) return m[1] ? t('Head along the road ({name})', { name: m[1] }) : t('Head along the road');
   if ((m = text.match(/^Continue onto (.+)$/))) return t('Continue onto {name}', { name: m[1] });
+  if ((m = text.match(/^Park at (.+)$/))) return t('Park at {name}', { name: m[1] });
   if (text === 'You have arrived') return t('You have arrived');
   if (text === 'The entrance is ahead') return t('The entrance is ahead');
   if ((m = text.match(/^The entrance is on your (left|right)$/))) return m[1] === 'left' ? t('The entrance is on your left') : t('The entrance is on your right');

@@ -77,7 +77,7 @@ export default function Events({ id }: { id?: string }) {
   );
 
   return (
-    <Sheet snaps={[0.58, 0.92]} onClose={pop} header={header}>
+    <Sheet snaps={[0.58, 0.8]} onClose={pop} header={header}>
       {events.isLoading ? <Loading /> : current ? <EventDetail e={current} /> : !list.length ? (
         <Empty icon="events" title={t('Nothing published yet')} body={t('Events appear here as soon as the campus office adds them.')} />
       ) : (

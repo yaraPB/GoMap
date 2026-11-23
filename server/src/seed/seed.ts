@@ -46,13 +46,48 @@ export function tracedGeo(dataDir = DATA_DIR): { ways: WayFeature[]; buildings: 
   return { ways, buildings };
 }
 
+/** Share of `a`'s area that `b` covers (0..1). */
+function covered(a: BuildingFeature, b: BuildingFeature) {
+  try {
+    const x = turf.intersect(turf.featureCollection([a, b] as never));
+    return x ? turf.area(x) / turf.area(a) : 0;
+  } catch { return 0; }
+}
+
+/**
+ * data/additional-buildings.geojson: footprints the team drew precisely (no properties needed).
+ * They are the best shapes we have, so each one replaces the rough satellite traces it covers. One
+ * the basemap already draws (80 %+ inside a mapped building) is left out: Mapbox extrudes that
+ * building itself, and a second copy would flicker through it.
+ */
+export function surveyedBuildings(mapped: BuildingFeature[], dataDir = DATA_DIR): BuildingFeature[] {
+  const file = join(dataDir, 'additional-buildings.geojson');
+  if (!existsSync(file)) return [];
+  return readJson<FeatureCollection>(file).features
+    .filter(f => f.geometry?.type === 'Polygon' || f.geometry?.type === 'MultiPolygon')
+    .map(f => {
+      const p = (f.properties ?? {}) as { height?: unknown; name?: unknown };
+      return { type: 'Feature', geometry: f.geometry, properties: { height: Number(p.height) || 9, source: 'survey' } } as BuildingFeature;
+    })
+    .filter(s => !mapped.some(m => covered(s, m) >= 0.8));
+}
+
+/** 10 m contour lines (npm run geo:terrain), for path slopes. Optional: without them slopes are unknown. */
+export function loadContours(dataDir = DATA_DIR): FeatureCollection | null {
+  const file = join(dataDir, 'campus', 'contours.geojson');
+  return existsSync(file) ? readJson<FeatureCollection>(file) : null;
+}
+
 export function loadGeo(dataDir = DATA_DIR): { walkways: WayFeature[]; pois: PoiFeature[]; buildings: BuildingFeature[]; source: string } {
   const campus = join(dataDir, 'campus');
   const pois = existsSync(join(campus, 'pois.geojson')) ? readJson<FeatureCollection>(join(campus, 'pois.geojson')).features as PoiFeature[] : [];
   const mapped = existsSync(join(campus, 'buildings.geojson')) ? readJson<FeatureCollection>(join(campus, 'buildings.geojson')).features as BuildingFeature[] : [];
   const traced = tracedGeo(dataDir);
-  // a traced footprint only counts when its centre is not already inside a mapped building
-  const buildings = [...mapped, ...traced.buildings.filter(t => !mapped.some(m => turf.booleanPointInPolygon(turf.centroid(t), m)))];
+  const surveyed = surveyedBuildings(mapped, dataDir);
+  // a traced footprint only counts when its centre is not already inside a mapped building,
+  // and when no surveyed footprint has redrawn it (mostly covers it)
+  const buildings = [...mapped, ...surveyed, ...traced.buildings.filter(t => !mapped.some(m => turf.booleanPointInPolygon(turf.centroid(t), m))
+    && !surveyed.some(s => covered(t, s) >= 0.5))];
   if (existsSync(join(campus, 'walkways.geojson'))) {
     const fc = readJson<FeatureCollection & { attribution?: string }>(join(campus, 'walkways.geojson'));
     return { walkways: [...fc.features as WayFeature[], ...traced.ways], pois, buildings, source: `${fc.attribution ?? 'imported'} + ${traced.ways.length} traced paths` };

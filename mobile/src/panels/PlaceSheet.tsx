@@ -41,7 +41,7 @@ export default function PlaceSheet({ id }: { id: string }) {
 
   // no close button: tap the map (or swipe the card down) to go back
   return (
-    <Sheet snaps={[0.56, 0.9]} onClose={pop}>
+    <Sheet snaps={[0.56, 0.8]} onClose={pop}>
       {isLoading ? <Loading /> : error || !place ? <View style={{ padding: 20 }}><Notice tone="missing" text={t('This place could not be loaded. Check your connection and try again.')} /></View> : (
         <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 28, gap: 16 }}>
           <View style={{ gap: 7 }}>

@@ -139,3 +139,82 @@ test('real campus data: every place has a route from the main plaza', async () =
   }).map(p => p._id);
   assert.deepEqual(unreachable, []);
 });
+
+// ── slopes ──────────────────────────────────────────────────────────────────
+
+/**
+ * A hill on a flat plain, as Mapbox Terrain stores it: nested squares, each the area at or above
+ * its level (1600, 1610, 1620 m), centred on (-5.106, 33.539), 100 m apart from one level to the next.
+ */
+function hill() {
+  const [cx, cy] = [-5.106, 33.539];
+  const kx = 111320 * Math.cos(cy * Math.PI / 180), ky = 110540;
+  const sq = (half: number) => [[cx - half / kx, cy - half / ky], [cx + half / kx, cy - half / ky], [cx + half / kx, cy + half / ky], [cx - half / kx, cy + half / ky], [cx - half / kx, cy - half / ky]];
+  const tile: [number, number, number, number] = [-5.12, 33.53, -5.09, 33.55];
+  return { type: 'FeatureCollection' as const, features: [[1600, 300], [1610, 200], [1620, 100]].map(([ele, half]) => ({ type: 'Feature' as const, properties: { ele, tile }, geometry: { type: 'Polygon' as const, coordinates: [sq(half)] } })), kx, ky, cx, cy };
+}
+
+test('elevation: heights between contour lines are interpolated and never jump', async () => {
+  const { makeElevation } = await import('../src/geo/elevation.js');
+  const h = hill();
+  const ele = makeElevation(h, [h.cx, h.cy]);
+  // 150 m east of the centre: halfway between the 1610 line (200 m) and the 1620 line (100 m)
+  assert.ok(Math.abs(ele([h.cx + 150 / h.kx, h.cy])! - 1615) < 0.01);
+  assert.ok(Math.abs(ele([h.cx + 200 / h.kx, h.cy])! - 1610) < 0.01, 'on the line itself');
+  // walking out from the top in 1 m steps, the height never changes by more than the slope allows
+  let prev = ele([h.cx + 101 / h.kx, h.cy])!;
+  for (let d = 102; d < 299; d++) {
+    const e = ele([h.cx + d / h.kx, h.cy])!;
+    assert.ok(Math.abs(e - prev) < 0.2, `jump of ${(e - prev).toFixed(2)} m at ${d} m`);
+    prev = e;
+  }
+  assert.equal(makeElevation(null)([h.cx, h.cy]), null, 'no terrain data: unknown, not zero');
+});
+
+test('graph: with terrain every edge has a rise, and long lines are sampled without breaking them', async () => {
+  const { makeElevation } = await import('../src/geo/elevation.js');
+  const h = hill();
+  // a 180 m path from 290 m to 110 m east of the top: climbs from 1601 m to 1619 m
+  const g = buildGraph([line('up', 'walkway', [[h.cx + 290 / h.kx, h.cy], [h.cx + 110 / h.kx, h.cy]])], [h.cx, h.cy], { elevation: makeElevation(h, [h.cx, h.cy]) });
+  assert.equal(components(g).sizes.length, 1, 'still one piece');
+  assert.ok(g.edges.length >= 9, `sampled every 20 m (${g.edges.length} edges)`);
+  const climb = g.edges.reduce((s, e) => s + e.rise!, 0);
+  assert.ok(Math.abs(climb - 18) < 0.1, `climb ${climb.toFixed(1)} m`);
+  assert.equal(buildGraph([line('up', 'walkway', [[h.cx + 290 / h.kx, h.cy], [h.cx + 110 / h.kx, h.cy]])]).edges.length, 1, 'without terrain the line is left alone');
+});
+
+test('step-free takes the gentle way round a hill; walking goes straight over it', async () => {
+  const { makeElevation } = await import('../src/geo/elevation.js');
+  const { buildRoute } = await import('../src/routing/route.js');
+  const h = hill();
+  const P = (x: number, y: number) => [h.cx + x / h.kx, h.cy + y / h.ky];
+  // straight over: from 250 m west to 250 m east through the top (~10 % up, then down)
+  // round: the same two ends joined by a path that stays on the flat plain 350 m south
+  const g = buildGraph([
+    line('over', 'walkway', [P(-250, 0), P(0, 0), P(250, 0)]),
+    line('round', 'walkway', [P(-250, 0), P(-350, -350), P(350, -350), P(250, 0)]),
+  ], [h.cx, h.cy], { elevation: makeElevation(h, [h.cx, h.cy]) });
+  const from = P(-250, 0) as [number, number];
+  const end = g.nodes.reduce((b, n) => (Math.hypot(n.coord[0] - P(250, 0)[0], n.coord[1] - P(250, 0)[1]) < Math.hypot(b.coord[0] - P(250, 0)[0], b.coord[1] - P(250, 0)[1]) ? n : b)).id;
+  const go = (mode: 'walk' | 'step_free') => {
+    const s = snap(g, from, mode, new Set())!;
+    return buildRoute(g, s, from, shortestPath(g, s, [end], mode, new Set())!.path, null, mode);
+  };
+  const walk = go('walk'), wheels = go('step_free');
+  assert.ok(walk.distance_m < 520, `walking goes over the top (${walk.distance_m} m)`);
+  assert.ok(walk.slope!.climb_m >= 15 && walk.slope!.max_grade >= 8, `and says so: ${JSON.stringify(walk.slope)}`);
+  assert.ok(wheels.distance_m > 1000, `step-free goes round (${wheels.distance_m} m)`);
+  assert.ok(wheels.slope!.max_grade <= 5 && wheels.slope!.steep_m === 0, JSON.stringify(wheels.slope));
+  assert.ok(walk.segments.some(s => s.steep), 'the steep stretch is marked for the map');
+  assert.ok(walk.duration_s > walk.distance_m / 1.25, 'the climb costs time');
+});
+
+test('walking time follows the hill: up is slower than down', async () => {
+  const { walkSlowdown, wheelSlowdown } = await import('../src/routing/route.js');
+  assert.equal(walkSlowdown(0), 1);
+  assert.ok(walkSlowdown(0.1) > 1.3 && walkSlowdown(0.1) < 1.5);
+  assert.ok(walkSlowdown(-0.05) < 1, 'a gentle descent is a bit faster');
+  assert.ok(walkSlowdown(-0.25) > 1, 'a steep descent is slow again');
+  assert.equal(wheelSlowdown(0.04), 1);
+  assert.ok(wheelSlowdown(0.1) > wheelSlowdown(0.07) && wheelSlowdown(-0.1) === wheelSlowdown(0.1), 'steep is hard on wheels both ways');
+});

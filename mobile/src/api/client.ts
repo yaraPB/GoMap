@@ -44,6 +44,7 @@ export const api = {
   route: (from: Position, to: { placeId?: string; coord?: Position }, mode: RouteMode) =>
     request<Route>('/api/route', { method: 'POST', body: JSON.stringify({ from: ll(from), to_place_id: to.placeId, to: ll(to.coord), mode }) }),
   walkways: () => request<WalkwayCollection>('/api/geo/walkways'),
+  slopes: () => request<import('./types').SlopeCollection>('/api/geo/slopes'),
   closures: () => request<Closure[]>('/api/geo/closures'),
   buildings: () => request<import('../map/MapContext').BuildingCollection>('/api/geo/buildings'),
   extraBuildings: () => request<import('../map/MapContext').BuildingCollection>('/api/geo/extra-buildings'),

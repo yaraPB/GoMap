@@ -118,8 +118,23 @@ graph (`server/src/routing/graph.ts`) is built at boot from walkways: T-junction
 merge, then **island joining** — every path piece that touches nothing is linked to the main network by its closest
 short connector (≤ 80 m), and anything still cut off ends with a straight "last stretch" flagged *approximate*. That is
 the fix for "no path to Building 14": its door sat on a 3-node path island 9 m from the main network. A test now routes
-from the plaza to **every** place on campus. A* with costs per mode (walk prefers paths over roads; step-free refuses
-stairs; drive refuses footpaths), and closures confirmed in the admin block edges within their radius instantly.
+from the plaza to **every** place on campus. A* with costs per mode, and closures confirmed in the admin block edges
+within their radius instantly. Three ways to get there:
+
+| Mode | What it uses | What it avoids |
+| --- | --- | --- |
+| **Walk** | campus footpaths first, campus roads shared with cars when shorter; cost ≈ walking time, uphill slower (Tobler's hiking function) | car-only roads |
+| **Step-free** | paths and roads with no steps | stairs (never); slopes over 5 % (costlier), over a ramp's 8.3 % (much costlier) |
+| **Car** | roads only, to the car park with the best drive + walk time, then a walk to the door ("Park at Car park C") | footpaths |
+
+**Slopes.** The campus spans ~1,560–1,680 m, so step-free has to mean "no stairs *and* no steep hills". Every edge gets
+a rise from `data/campus/contours.geojson` (Mapbox Terrain v2, 10 m contours, `npm run geo:terrain`): the contour areas
+give each point its 10 m band and the distance to the band's two lines places it inside, so heights never jump. Long
+segments are sampled every 20 m. Grades are **estimates** (a built ramp can be gentler than the ground), so steep
+paths are avoided hard but never forbidden, and the app says "about". Routes report climb, the steepest stretch and the
+metres steeper than a ramp; `/api/geo/slopes` feeds the app's **step-free view** (green gentle, amber ramp-steep, red
+steeper or stairs). On the map a route is drawn by stretch: blue in the car, green on foot (grey edge along a road cars
+use), orange on stairs, amber where it is steeper than a ramp.
 
 ### Assistant: local first, AI model second, admin rules above both
 
@@ -243,8 +258,12 @@ Footpaths, roads, stairs, building labels and footprints come from **Mapbox Stre
 or `-- --osm` for OpenStreetMap, which must be used before a public release because Mapbox's terms limit storing tile
 data). `data/campus/traced.geojson` adds paths and footprints traced from satellite imagery — the team's, plus 13
 buildings traced on Esri World Imagery after comparing the whole campus against every footprint (OpenStreetMap adds
-nothing on campus) — and the app extrudes them as 3D buildings because the basemap lacks them. `npm run graph:check` prints the network, the joined
-islands (with coordinates to check on site) and any place without a walkable entrance.
+nothing on campus) — and the app extrudes them as 3D buildings because the basemap lacks them.
+`data/additional-buildings.geojson` holds footprints the team drew precisely (plain polygons, no properties needed):
+each one replaces the rough traces it covers (≥ 50 % of a trace inside it), and one the basemap already draws
+(≥ 80 % inside a Mapbox building) is skipped so it is not drawn twice. `data/campus/contours.geojson` gives the slopes
+(above). `npm run graph:check` prints the network, the joined islands (with coordinates to check on site) and any place
+without a walkable entrance.
 
 **Known gaps:** no open source (Mapbox, OpenStreetMap) labels buildings 12, 13, 16, 20, 28 or 37, so the traced
 outlines carry no number yet — give them one in Admin → Places → Outlines (only someone who knows the campus can say

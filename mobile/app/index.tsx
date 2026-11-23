@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeOut, FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useClosures, usePlaces, useWalkways, useBuildings, useCrowding, useExtraBuildings } from '../src/api/hooks';
+import { useClosures, usePlaces, useWalkways, useBuildings, useCrowding, useExtraBuildings, useSlopes } from '../src/api/hooks';
 import Events, { useRoleEvents } from '../src/panels/Events';
 import CampusMap from '../src/map/CampusMap';
 import { useMap, useMapEvent } from '../src/map/MapContext';
@@ -39,6 +39,8 @@ function MapSync() {
   const map = useMap();
   const places = usePlaces();
   const walkways = useWalkways();
+  // the step-free view's data: fetched the first time the view is switched on
+  const slopes = useSlopes(map.layers.access);
   const closures = useClosures();
   const buildings = useBuildings();
   const extra = useExtraBuildings();
@@ -54,6 +56,7 @@ function MapSync() {
 
   useEffect(() => { if (places.data) map.send({ type: 'places', places: places.data }); }, [places.data]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (walkways.data) map.send({ type: 'walkways', data: walkways.data }); }, [walkways.data]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (slopes.data) map.send({ type: 'slopes', data: slopes.data }); }, [slopes.data]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (closures.data) map.send({ type: 'closures', list: closures.data }); }, [closures.data]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (buildings.data) map.send({ type: 'buildings', data: buildings.data }); }, [buildings.data]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (extra.data) map.send({ type: 'extraBuildings', data: extra.data }); }, [extra.data]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -67,7 +70,7 @@ function MapSync() {
   }, [loc.coord, loc.heading]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (nav.route && ['preview', 'active', 'arrived', 'loading'].includes(nav.status)) {
-      map.send({ type: 'route', geometry: nav.route.geometry, crossings: nav.route.crossings, dest: nav.route.geometry.coordinates.at(-1) ?? null, fit: nav.status !== 'active', padding: { top: 210, bottom: 380, left: 40, right: 40 } });
+      map.send({ type: 'route', geometry: nav.route.geometry, segments: nav.route.segments, park: nav.route.park?.coordinates ?? null, crossings: nav.route.crossings, dest: nav.route.geometry.coordinates.at(-1) ?? null, fit: nav.status !== 'active', padding: { top: 210, bottom: 380, left: 40, right: 40 } });
     } else map.send({ type: 'clearRoute' });
   }, [nav.route, nav.status]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { map.send({ type: 'follow', on: nav.status === 'active' && top.name === 'go' }); }, [nav.status, top.name]); // eslint-disable-line react-hooks/exhaustive-deps

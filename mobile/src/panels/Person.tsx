@@ -33,7 +33,7 @@ export default function PersonPanel({ id }: { id: string }) {
     push({ name: 'route' });
   };
 
-  if (isLoading || !p) return <Sheet snaps={[0.7, 0.92]} onClose={pop}><Loading /></Sheet>;
+  if (isLoading || !p) return <Sheet snaps={[0.7, 0.86]} onClose={pop}><Loading /></Sheet>;
   const tone = availabilityTone(p.availability);
   const first = p.name.split(' ')[0];
   const nothing = p.missing.includes('office') && p.missing.includes('hours');
@@ -41,7 +41,7 @@ export default function PersonPanel({ id }: { id: string }) {
 
   return (
     // the map above shows their building: tap it (or swipe down) to go back
-    <Sheet snaps={[0.7, 0.92]} onClose={pop}>
+    <Sheet snaps={[0.7, 0.86]} onClose={pop}>
       <View style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 4, paddingBottom: insets.bottom + 28, gap: 14 }}>
           <View style={{ gap: 6 }}>

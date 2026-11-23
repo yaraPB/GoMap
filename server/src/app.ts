@@ -122,8 +122,8 @@ export function createApp(ctx: AppContext) {
   const placeRefs = async () => new Map<string, PlaceRef>((await Place.find({}, { name: 1, location: 1, category: 1 }).lean()).map(p => [String(p._id), { id: String(p._id), name: p.name, coordinates: p.location!.coordinates as Position, category: p.category }]));
   // building footprints the basemap does not draw: traced from satellite imagery by the team
   let tracedCache: { type: 'Feature'; geometry: unknown; properties: Record<string, unknown> }[] | null = null;
-  const tracedBuildings = () => (tracedCache ??= loadGeo().buildings.filter(b => b.properties.source === 'trace')
-    .map((b, i) => ({ type: 'Feature' as const, geometry: b.geometry as unknown, properties: { id: 'trace-' + i, height: b.properties.height ?? 8, source: 'trace' } as Record<string, unknown> })));
+  const tracedBuildings = () => (tracedCache ??= loadGeo().buildings.filter(b => b.properties.source === 'trace' || b.properties.source === 'survey')
+    .map((b, i) => ({ type: 'Feature' as const, geometry: b.geometry as unknown, properties: { id: `${b.properties.source}-${i}`, height: b.properties.height ?? 8, source: b.properties.source } as Record<string, unknown> })));
 
   // ── public ────────────────────────────────────────────────────────────────
 
@@ -340,6 +340,12 @@ export function createApp(ctx: AppContext) {
   app.get('/api/geo/walkways', (_req, res) => {
     res.set('Cache-Control', 'public, max-age=300');
     res.json({ type: 'FeatureCollection', attribution: '© Mapbox © OpenStreetMap contributors', features: campus.walkways.map(w => ({ ...w, properties: { ...w.properties, closed: false } })) });
+  });
+
+  /** How hard each path is on wheels (gentle / moderate / steep / stairs): the app's step-free view. */
+  app.get('/api/geo/slopes', (_req, res) => {
+    res.set('Cache-Control', 'public, max-age=300');
+    res.json({ ...campus.slopes(), note: 'Slopes estimated from 10 m contour lines (© Mapbox Terrain).' });
   });
 
   /** Footprints of known places with their open state: the map lights up open buildings after dark. */

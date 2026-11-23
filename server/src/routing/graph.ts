@@ -10,6 +10,7 @@
  * grid index, so this stays fast even with thousands of vertices.
  */
 import type { Position } from 'geojson';
+import type { Elevation } from '../geo/elevation.js';
 import type { WayFeature, WayKind, WayModes } from '../geo/types.js';
 
 export const TOLERANCE_M = 3;
@@ -24,8 +25,11 @@ export type Edge = {
   stepFree: boolean;
   roadClass: string | null;
   name: string | null;
+  /** metres gained going from a to b (negative = downhill); null when the ground height is unknown */
+  rise: number | null;
 };
-export type Node = { id: number; coord: Position; xy: [number, number]; edges: number[] };
+/** ele: estimated ground height in metres (null without contour data) */
+export type Node = { id: number; coord: Position; xy: [number, number]; edges: number[]; ele: number | null };
 export type Graph = { nodes: Node[]; edges: Edge[]; origin: Position };
 
 // ── local projection ────────────────────────────────────────────────────────
@@ -89,7 +93,12 @@ type Line = { feature: WayFeature; xy: [number, number][]; splits: Map<number, {
 const canJoin = (a: WayFeature, b: WayFeature) => !(a.properties.modes === 'drive' && b.properties.modes === 'walk')
   && !(a.properties.modes === 'walk' && b.properties.modes === 'drive');
 
-export function buildGraph(features: WayFeature[], origin?: Position): Graph {
+/**
+ * `elevation`: ground height lookup. With it, every node gets a height, every edge a rise, and
+ * long segments are cut into pieces of at most `maxSegment` metres so a hill in the middle of a
+ * long straight line still shows up as a slope.
+ */
+export function buildGraph(features: WayFeature[], origin?: Position, opts: { elevation?: Elevation; maxSegment?: number } = {}): Graph {
   const first = features[0]?.geometry.coordinates[0] ?? [0, 0];
   const o = origin ?? first;
   const { toXY, toLL } = projector(o);
@@ -155,6 +164,12 @@ export function buildGraph(features: WayFeature[], origin?: Position): Graph {
   const nodes: Node[] = [];
   const nodeGrid = new Grid<number>(TOLERANCE_M * 2);
   const nodeFor = (xy: [number, number]) => {
+    // a point added only to measure slope belongs to its own line: never merged with a neighbour's
+    if (synthetic.has(xy)) {
+      const coord = toLL(xy);
+      nodes.push({ id: nodes.length, coord, xy, edges: [], ele: opts.elevation ? opts.elevation(coord) : null });
+      return nodes.length - 1;
+    }
     let best = -1, bestD = TOLERANCE_M;
     for (const id of nodeGrid.near(xy[0], xy[1], TOLERANCE_M)) {
       const d = dist(xy, nodes[id].xy);
@@ -162,11 +177,13 @@ export function buildGraph(features: WayFeature[], origin?: Position): Graph {
     }
     if (best >= 0) return best;
     const id = nodes.length;
-    nodes.push({ id, coord: toLL(xy), xy, edges: [] });
+    const coord = toLL(xy);
+    nodes.push({ id, coord, xy, edges: [], ele: opts.elevation ? opts.elevation(coord) : null });
     nodeGrid.insertBox(xy[0], xy[1], xy[0], xy[1], id);
     return id;
   };
 
+  const synthetic = new WeakSet<[number, number]>();
   const edges: Edge[] = [];
   const edgeKeys = new Set<string>();
   for (const line of lines) {
@@ -176,10 +193,13 @@ export function buildGraph(features: WayFeature[], origin?: Position): Graph {
       const splits = line.splits.get(s);
       if (splits && s < line.xy.length - 1) for (const sp of [...splits].sort((m, n) => m.t - n.t)) pts.push(sp.xy);
     });
+    if (opts.elevation) densify(pts, opts.maxSegment ?? 20, synthetic);
     const props = line.feature.properties;
     let segIndex = 0;
+    // one node per point (a slope point would get a fresh node on every call)
+    const ids = pts.map(nodeFor);
     for (let i = 0; i < pts.length - 1; i++) {
-      const a = nodeFor(pts[i]), b = nodeFor(pts[i + 1]);
+      const a = ids[i], b = ids[i + 1];
       if (a === b) continue;
       const key = a < b ? `${a}-${b}` : `${b}-${a}`;
       if (edgeKeys.has(key)) continue; // the same stretch drawn twice
@@ -189,6 +209,7 @@ export function buildGraph(features: WayFeature[], origin?: Position): Graph {
         length: dist(nodes[a].xy, nodes[b].xy),
         kind: props.kind, modes: props.modes, stepFree: props.step_free,
         roadClass: props.road_class, name: props.name,
+        rise: nodes[a].ele != null && nodes[b].ele != null ? nodes[b].ele! - nodes[a].ele! : null,
       };
       nodes[a].edges.push(edges.length);
       nodes[b].edges.push(edges.length);
@@ -196,6 +217,19 @@ export function buildGraph(features: WayFeature[], origin?: Position): Graph {
     }
   }
   return { nodes, edges, origin: o };
+}
+
+/** Insert evenly spaced points so no segment is longer than `max` metres (in place). */
+function densify(pts: [number, number][], max: number, synthetic: WeakSet<[number, number]>) {
+  for (let i = 0; i < pts.length - 1; i++) {
+    const [p, q] = [pts[i], pts[i + 1]];
+    const n = Math.ceil(dist(p, q) / max);
+    if (n <= 1) continue;
+    const extra: [number, number][] = [];
+    for (let k = 1; k < n; k++) { const xy: [number, number] = [p[0] + (q[0] - p[0]) * k / n, p[1] + (q[1] - p[1]) * k / n]; synthetic.add(xy); extra.push(xy); }
+    pts.splice(i + 1, 0, ...extra);
+    i += extra.length;
+  }
 }
 
 // ── connectivity ────────────────────────────────────────────────────────────
@@ -236,6 +270,7 @@ export function connectIslands(graph: Graph, maxGap = Infinity) {
     const edge: Edge = {
       id: `connector:${added.length}`, wayId: 'connector', a: best.a, b: best.b, length: best.d,
       kind: 'walkway', modes: 'walk', stepFree: true, roadClass: null, name: null,
+      rise: graph.nodes[best.a].ele != null && graph.nodes[best.b].ele != null ? graph.nodes[best.b].ele! - graph.nodes[best.a].ele! : null,
     };
     graph.nodes[best.a].edges.push(graph.edges.length);
     graph.nodes[best.b].edges.push(graph.edges.length);

@@ -320,3 +320,46 @@ test('door notes: "not here this week" ends by itself; semester off lasts the se
   assert.ok(Date.parse(s.body.note_until) > Date.parse(r.body.note_until));
   await send('/api/people/harit-satt/presence', { status: 'keep', note: null, note_kind: null }, user, 'PUT');
 });
+
+test('by car: drive to the best car park, park, walk the rest', async () => {
+  const { status, body } = await send('/api/route', { from: PLAZA, to_place_id: 'building-11', mode: 'drive' });
+  assert.equal(status, 200, JSON.stringify(body));
+  assert.equal(body.mode, 'drive');
+  assert.match(body.park.place_id, /^car-park-/);
+  assert.ok(body.steps.some((s: { text: string }) => s.text === `Park at ${body.park.name}`), 'a "Park at" step');
+  assert.equal(body.steps.at(-1).turn, 'arrive');
+  assert.equal(body.destination.place_id, 'building-11', 'the walk ends at the building, not the car park');
+  const kinds = body.segments.map((s: { kind: string }) => s.kind);
+  assert.equal(kinds[0], 'drive');
+  assert.ok(kinds.includes('path') || kinds.includes('road'), 'then on foot');
+  assert.equal(body.duration_s, body.park.drive_s + body.park.walk_s);
+  // driving to a car park itself: no walk after
+  const direct = (await send('/api/route', { from: PLAZA, to_place_id: body.park.place_id, mode: 'drive' })).body;
+  assert.equal(direct.park.walk_s, 0);
+  assert.ok(direct.segments.every((s: { kind: string }) => s.kind === 'drive'));
+});
+
+test('routes report their slope; step-free never climbs more steeply than walking', async () => {
+  const walk = (await send('/api/route', { from: PLAZA, to_place_id: 'grounds-and-maintenance', mode: 'walk' })).body;
+  const wheels = (await send('/api/route', { from: PLAZA, to_place_id: 'grounds-and-maintenance', mode: 'step_free' })).body;
+  for (const r of [walk, wheels]) assert.ok(r.slope && typeof r.slope.max_grade === 'number', JSON.stringify(r.slope));
+  assert.ok(wheels.slope.steep_m <= walk.slope.steep_m);
+  assert.ok(wheels.slope.max_grade <= walk.slope.max_grade);
+});
+
+test('the step-free view: every walkable stretch is gentle, moderate, steep or stairs', async () => {
+  const { status, body } = await get('/api/geo/slopes');
+  assert.equal(status, 200);
+  const classes = new Set(body.features.map((f: { properties: { class: string } }) => f.properties.class));
+  for (const c of ['gentle', 'moderate', 'steep', 'stairs']) assert.ok(classes.has(c), `has ${c}`);
+  const gentle = body.features.filter((f: { properties: { class: string } }) => f.properties.class === 'gentle').length;
+  assert.ok(gentle > body.features.length / 2, 'most of campus is gentle');
+});
+
+test('surveyed buildings (data/additional-buildings.geojson) are drawn and replace the rough traces they cover', async () => {
+  const { body } = await get('/api/geo/extra-buildings');
+  const surveyed = body.features.filter((f: { properties: { source: string } }) => f.properties.source === 'survey');
+  const traced = body.features.filter((f: { properties: { source: string } }) => f.properties.source === 'trace');
+  assert.equal(surveyed.length, 19, 'all but the one the basemap already draws');
+  assert.ok(traced.length < 32, `superseded traces are gone (${traced.length} left)`);
+});

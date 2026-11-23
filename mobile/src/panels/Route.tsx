@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown, FadeInUp, LinearTransition } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -8,6 +8,7 @@ import type { RouteMode } from '../api/types';
 import { fmtDistanceT, fmtMinutesT } from '../ar/geo';
 import { useT } from '../i18n';
 import { trStep } from '../i18n/steps';
+import { useMap } from '../map/MapContext';
 import { useApp, useLocation } from '../state/app';
 import { useNav } from '../state/navigation';
 import { usePanels } from '../state/panels';
@@ -29,10 +30,16 @@ export function RoutePreview({ said, reply }: { said?: string; reply?: string })
   const r = nav.route;
   const close = () => { nav.stop(); pop(); };
   const startAR = () => { nav.start(); openAR(); replace({ name: 'go' }); };
-  const modes: { id: RouteMode | 'indoor'; name: string; icon: IconName }[] = [
-    { id: 'walk', name: t('Walk'), icon: 'walk' }, { id: 'step_free', name: t('Step-free'), icon: 'wheel' }, { id: 'indoor', name: t('Indoor'), icon: 'building' },
+  // three ways to get there: on foot (campus paths), step-free (no stairs, no steep hills), by car (park, then walk)
+  const modes: { id: RouteMode; name: string; icon: IconName }[] = [
+    { id: 'walk', name: t('Walk'), icon: 'walk' }, { id: 'step_free', name: t('Step-free'), icon: 'wheel' }, { id: 'drive', name: t('Car'), icon: 'car' },
   ];
-  const [indoorNote, setIndoorNote] = useState(false);
+  // the map shows what matters for the way chosen: how hard paths are on wheels, or where cars go
+  const map = useMap();
+  const before = useRef({ access: map.layers.access, cars: map.layers.cars });
+  useEffect(() => { map.setLayers({ access: before.current.access || nav.mode === 'step_free', cars: before.current.cars || nav.mode === 'drive' }); }, [nav.mode]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => () => map.setLayers(before.current), []); // eslint-disable-line react-hooks/exhaustive-deps
+  const slope = r?.slope;
 
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
@@ -74,11 +81,11 @@ export function RoutePreview({ said, reply }: { said?: string; reply?: string })
       </Animated.View>
 
       {/* no close button: tap the map, or swipe this down, to leave the directions */}
-      <Sheet snaps={[0.44, 0.86]} onClose={close}>
+      <Sheet snaps={[0.44, 0.8]} onClose={close}>
         {nav.status === 'loading' ? <Loading label={t('Finding the way')} /> : nav.status === 'error' || !r ? (
           <View style={{ padding: 20, gap: 12 }}>
             <Notice tone="missing" icon="ban" text={nav.error ?? t('No route found on the mapped paths.')} />
-            {nav.mode === 'step_free' && <Btn title={t('Show the walking route instead')} kind="secondary" onPress={() => nav.setMode('walk')} />}
+            {nav.mode !== 'walk' && <Btn title={t('Show the walking route instead')} kind="secondary" onPress={() => nav.setMode('walk')} />}
           </View>
         ) : (
           <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: insets.bottom + 24, gap: 14 }}>
@@ -86,16 +93,14 @@ export function RoutePreview({ said, reply }: { said?: string; reply?: string })
               {modes.map(m => {
                 const on = m.id === nav.mode;
                 return (
-                  <Pressable key={m.id} accessibilityRole="button" accessibilityState={{ selected: on, disabled: m.id === 'indoor' }}
-                    onPress={() => (m.id === 'indoor' ? setIndoorNote(true) : nav.setMode(m.id))}
-                    style={[styles.option, on && { backgroundColor: color.ink, borderColor: color.ink }, m.id === 'indoor' && { opacity: 0.55 }]}>
+                  <Pressable key={m.id} accessibilityRole="button" accessibilityState={{ selected: on }} onPress={() => nav.setMode(m.id)}
+                    style={[styles.option, on && { backgroundColor: color.ink, borderColor: color.ink }]}>
                     <Icon name={m.icon} size={17} stroke={on ? '#fff' : color.ink2} />
                     <T weight="semibold" style={{ fontSize: 13.5, color: on ? '#fff' : color.ink2 }}>{m.name}</T>
                   </Pressable>
                 );
               })}
             </View>
-            {indoorNote && <Notice tone="info" icon="building" text={t('Indoor shortcuts need ground-floor plans, which GoMap does not have yet. Walk and step-free routes stay outdoors.')} />}
             <Animated.View layout={LinearTransition} style={{ flexDirection: 'row', alignItems: 'baseline', gap: 10 }}>
               <T weight="bold" style={{ fontSize: 28, letterSpacing: -0.6, color: color.greenDeep }}>{fmtMinutes(r.duration_s)}</T>
               <T style={{ fontSize: 14, color: color.muted }}>{fmtDistance(r.distance_m)} · {t('arrive {time}', { time: arriveAt(r.duration_s) })}</T>
@@ -103,7 +108,15 @@ export function RoutePreview({ said, reply }: { said?: string; reply?: string })
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
               {r.crossings.length > 0 && <Fact icon="crossing" text={r.crossings.length > 1 ? t('{n} road crossings · cars', { n: r.crossings.length }) : t('1 road crossing · cars')} />}
               {!r.uses_roads && <Fact icon="walk" text={t('Walkways the whole way')} tone="green" />}
+              {r.park && <Fact icon="car" text={t('Park at {name}', { name: r.park.name })} tone="blue" />}
+              {r.park && r.park.walk_s > 0 && <Fact icon="walk" text={t('{drive} by car, then {walk} on foot', { drive: fmtMinutes(r.park.drive_s), walk: fmtMinutes(r.park.walk_s) })} />}
               {r.mode === 'step_free' && <Fact icon="wheel" text={t('No stairs on this route')} tone="green" />}
+              {/* slopes (estimated from contour lines): what a wheelchair needs to know, and the climb for everyone */}
+              {slope && r.mode === 'step_free' && (slope.steep_m > 0
+                ? <Fact icon="slope" text={t('{m} m steeper than a ramp (about {g}%)', { m: slope.steep_m, g: Math.round(slope.max_grade) })} tone="amber" />
+                : slope.max_grade <= 5 ? <Fact icon="slope" text={t('Gentle slopes all the way')} tone="green" />
+                : <Fact icon="slope" text={t('Steepest stretch about {g}%', { g: Math.round(slope.max_grade) })} />)}
+              {slope && r.mode !== 'step_free' && slope.climb_m >= 5 && <Fact icon="slope" text={t('Climb {n} m', { n: slope.climb_m })} />}
               {r.approximate && <Fact icon="warn" text={t('The last stretch is not on a mapped path: walk straight to the door')} tone="blue" />}
               {r.destination.entrance && <Fact icon="door" text={`${t(r.destination.entrance)}${r.destination.entrance_estimated ? ` (${t('position estimated')})` : ''}`} tone="blue" />}
             </View>
@@ -122,7 +135,7 @@ export function RoutePreview({ said, reply }: { said?: string; reply?: string })
                 </View>
               ))}
             </View>
-            <T style={{ fontSize: 11, color: color.muted }}>{t('Paths and roads © Mapbox © OpenStreetMap contributors. Check them on site: some campus paths may be missing.')}</T>
+            <T style={{ fontSize: 11, color: color.muted }}>{t('Paths and roads © Mapbox © OpenStreetMap contributors. Check them on site: some campus paths may be missing.')}{slope ? ` ${t('Slopes are estimated from the terrain (10 m contours): a built ramp can be gentler.')}` : ''}</T>
           </ScrollView>
         )}
       </Sheet>
@@ -130,8 +143,8 @@ export function RoutePreview({ said, reply }: { said?: string; reply?: string })
   );
 }
 
-function Fact({ icon, text, tone = 'grey' }: { icon: IconName; text: string; tone?: 'grey' | 'green' | 'blue' }) {
-  const [bg, fg] = { grey: ['#F2F3F0', '#3A3D42'], green: ['#E6F4EC', '#0B6B3F'], blue: ['#E8EEFB', '#2563EB'] }[tone];
+function Fact({ icon, text, tone = 'grey' }: { icon: IconName; text: string; tone?: 'grey' | 'green' | 'blue' | 'amber' }) {
+  const [bg, fg] = { grey: ['#F2F3F0', '#3A3D42'], green: ['#E6F4EC', '#0B6B3F'], blue: ['#E8EEFB', '#2563EB'], amber: ['#FFF3DB', '#8A5A00'] }[tone];
   return <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 10, height: 32, borderRadius: 9, backgroundColor: bg }}><Icon name={icon} size={15} stroke={fg} /><T weight="semibold" style={{ fontSize: 12.5, color: fg }}>{text}</T></View>;
 }
 

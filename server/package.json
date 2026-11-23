@@ -9,6 +9,7 @@
     "test": "node --import tsx --test test/*.test.ts",
     "check": "tsc --noEmit -p tsconfig.json",
     "geo:import": "tsx src/scripts/import-geo.ts",
+    "geo:terrain": "tsx src/scripts/import-terrain.ts",
     "graph:check": "tsx src/scripts/graph-check.ts",
     "gemini:check": "tsx src/scripts/check-gemini.ts",
     "seed": "tsx src/scripts/seed.ts",

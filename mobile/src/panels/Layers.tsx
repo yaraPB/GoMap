@@ -30,13 +30,14 @@ export default function Layers() {
     { key: 'crowding', label: 'Busy paths now', sub: 'Only busy paths are coloured; quiet ones stay as they are', icon: 'flame' },
     { key: 'threeD', label: '3D buildings', sub: 'See buildings rise from the map as you zoom in', icon: 'building' },
     { key: 'cars', label: 'Show where cars go', sub: 'Roads as a solid band, paths stay dotted', icon: 'car' },
+    { key: 'access', label: 'Step-free view', sub: 'Paths by how easy they are on wheels: green gentle, amber ramp-steep, red steeper or stairs', icon: 'wheel' },
     { key: 'labels', label: 'Building labels', sub: 'Numbers on the pins up close', icon: 'pin' },
   ];
   const look = ROLE_LOOK[user.role] ?? ROLE_LOOK.student;
   // the map stays live above: watch the style change, tap the map when done
   const header = <View style={{ paddingHorizontal: 20, paddingBottom: 10 }}><T weight="bold" style={{ fontSize: 18 }}>{t('Map style and layers')}</T></View>;
   return (
-    <Sheet snaps={[0.66, 0.94]} onClose={pop} header={header}>
+    <Sheet snaps={[0.66, 0.8]} onClose={pop} header={header}>
       <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 32, gap: 20 }}>
         <View>
           <Label style={{ marginBottom: 8 }}>{t('Map')}</Label>

@@ -10,7 +10,7 @@ import {
   DoorOpen, Dumbbell, Ellipsis, Eye, FileText, Flag, FlagTriangleRight, Flame, Footprints, Globe, GraduationCap, Hourglass, House, Info,
   Keyboard, Laptop, Layers, LayoutGrid, Lightbulb, LocateFixed, Mail, LockKeyhole, Map, MapPin, Mic, Moon, Navigation, Palmtree, Phone, Plane, Plus,
   Presentation, Satellite, ScanEye, School, Search, SendHorizontal, Settings, ShieldCheck, Signpost, Soup, Sparkles, StickyNote, Sun,
-  Sunrise, Sunset, Thermometer, TrafficCone, TriangleAlert, User, Users, Utensils, Volume2, VolumeX, WifiOff, Wrench, X, Contrast, Armchair,
+  Sunrise, Sunset, Thermometer, TrafficCone, TriangleAlert, User, Users, Utensils, Volume2, VolumeX, WifiOff, Wrench, X, Contrast, Armchair, Mountain,
 } from 'lucide-react-native';
 
 export const LUCIDE = {
@@ -27,7 +27,7 @@ export const LUCIDE = {
   sunrise: Sunrise, sun: Sun, sunset: Sunset, moon: Moon, lunch: Soup, book: BookOpen, sofa: Armchair, sign: Signpost, nav: Navigation,
   // door notes
   sick: Thermometer, laptop: Laptop, hourglass: Hourglass, note: StickyNote, plane: Plane, leave: Palmtree,
-  satellite: Satellite, contrast: Contrast,
+  satellite: Satellite, contrast: Contrast, slope: Mountain,
   // events, AR, door notes (new)
   events: CalendarDays, ticket: Ticket, party: PartyPopper, moved: PencilRuler, turnAround: RotateCcw, phone2: Smartphone, up: MoveUp, sound: Volume,
 } satisfies Record<string, LucideIcon>;
