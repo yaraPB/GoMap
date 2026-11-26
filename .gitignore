@@ -10,3 +10,5 @@ misc.txt
 react-native-mapbox-ar-master
 .claude
 .agents
+/mobile/node_modules
+/server/node_modules

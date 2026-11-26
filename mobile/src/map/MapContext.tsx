@@ -61,9 +61,9 @@ export function MapProvider({ children }: { children: React.ReactNode }) {
   const listeners = useRef(new Set<(e: MapEvent) => void>());
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [style, setStyleState] = useState<MapStyle>('default');
-  const styleRef = useRef<MapStyle>('default');
-  const [skin, setSkinState] = useState<MapSkin>('campus');
+  const [style, setStyleState] = useState<MapStyle>('satellite');
+  const styleRef = useRef<MapStyle>('satellite');
+  const [skin, setSkinState] = useState<MapSkin>('day');
   const [layers, setLayersState] = useState<MapLayers>({ threeD: true, labels: true, cars: false, crowding: false, access: false });
   // last value per "sticky" command, replayed after a style switch reloads the page's layers
   const sticky = useRef(new Map<string, string>());

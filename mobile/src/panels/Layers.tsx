@@ -17,7 +17,6 @@ const SKINS: { id: MapSkin; name: string; sub: string; colors: string[]; icon: I
   { id: 'campus', name: 'GoCampus', sub: 'The GoCampus look, following the campus clock', colors: ['#3E4C44', '#5B5068', '#2B3150'], icon: 'clock' },
   { id: 'day', name: 'Day', sub: 'Bright', colors: ['#EAF2FA', '#CFE3C4'], icon: 'sun' },
   { id: 'evening', name: 'Evening', sub: 'Golden hour', colors: ['#F9C78B', '#D9773F'], icon: 'sunset' },
-  { id: 'night', name: 'Dark', sub: 'Lights on in open buildings', colors: ['#1B2433', '#3B4A66'], icon: 'moon' },
 ];
 
 /** Board 05: map style, time-of-day skin, layers, language and the demo view. */
@@ -63,7 +62,7 @@ export default function Layers() {
             {SKINS.map(s => {
               const on = map.skin === s.id;
               return (
-                <Pressable key={s.id} accessibilityRole="radio" accessibilityState={{ selected: on, disabled: map.style === 'satellite' }} accessibilityHint={t(s.sub)} onPress={() => map.setSkin(s.id)} style={{ flex: 1, gap: 6, opacity: map.style === 'satellite' ? 0.45 : 1 }}>
+                <Pressable key={s.id} accessibilityRole="radio" accessibilityState={{ selected: on, disabled: false }} accessibilityHint={t(s.sub)} onPress={() => map.setSkin(s.id)} style={{ flex: 1, gap: 6, opacity: 1 }}>
                   <View style={{ height: 52, borderRadius: 12, overflow: 'hidden', borderWidth: on ? 3 : 1, borderColor: on ? color.blue : color.line, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
                     {s.colors.map(c => <View key={c} style={{ flex: 1, alignSelf: 'stretch', backgroundColor: c }} />)}
                     <View style={{ position: 'absolute' }}><Icon name={s.icon} size={18} stroke={s.id === 'night' ? '#FFE2A8' : '#15171A'} /></View>
@@ -73,16 +72,16 @@ export default function Layers() {
               );
             })}
           </View>
-          <T style={{ fontSize: 12, color: color.muted, marginTop: 6 }}>{map.style === 'satellite' ? t('Satellite photos are always shown in daylight.') : t(SKINS.find(s => s.id === map.skin)?.sub ?? '')}</T>
+          <T style={{ fontSize: 12, color: color.muted, marginTop: 6 }}>{map.style === 'satellite' ? t('Satellite imagery with the selected time-of-day filter.') : t(SKINS.find(s => s.id === map.skin)?.sub ?? '')}</T>
         </View>
 
         <View>
           {toggles.map(tg => (
             <View key={tg.key} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: color.hairline }}>
               <Icon name={tg.icon} size={20} stroke={color.ink2} />
-              <View style={{ flex: 1 }}><T weight="semibold" style={{ fontSize: 15 }}>{t(tg.label)}</T><T style={{ fontSize: 12.5, color: color.muted }}>{tg.key === 'threeD' && map.style === 'satellite' ? t('Off on satellite: the photo already shows the roofs') : t(tg.sub)}</T></View>
+              <View style={{ flex: 1 }}><T weight="semibold" style={{ fontSize: 15 }}>{t(tg.label)}</T><T style={{ fontSize: 12.5, color: color.muted }}>{tg.key === 'threeD' && map.style === 'satellite' ? t('Raised building preview over satellite imagery') : t(tg.sub)}</T></View>
               {/* react-native-web draws switches broken in right-to-left: keep them left-to-right there */}
-              <View style={Platform.OS === 'web' ? { direction: 'ltr' } : undefined}><Switch accessibilityLabel={t(tg.label)} disabled={tg.key === 'threeD' && map.style === 'satellite'} value={tg.key === 'threeD' && map.style === 'satellite' ? false : map.layers[tg.key]} onValueChange={v => map.setLayers({ [tg.key]: v })} trackColor={{ true: color.blue, false: '#D5D7D2' }} /></View>
+              <View style={Platform.OS === 'web' ? { direction: 'ltr' } : undefined}><Switch accessibilityLabel={t(tg.label)} value={map.layers[tg.key]} onValueChange={v => map.setLayers({ [tg.key]: v })} trackColor={{ true: color.blue, false: '#D5D7D2' }} /></View>
             </View>
           ))}
           <Pressable accessibilityRole="button" onPress={() => { pop(); push({ name: 'crowding' }); }} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: color.hairline }}>

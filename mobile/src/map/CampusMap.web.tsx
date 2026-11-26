@@ -2,16 +2,18 @@ import React, { createElement, useEffect, useMemo, useRef } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useMap, type MapEvent } from './MapContext';
 import { mapHtml } from './mapHtml';
+import { cesiumHtml } from './cesiumHtml';
+const GOOGLE_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAP_TILES_KEY || '';
 
 export const MAPBOX_TOKEN = process.env.EXPO_PUBLIC_MAPBOX_TOKEN || '';
 
 export default function CampusMap({ flyIn }: { flyIn: boolean }) {
   const map = useMap();
   const frame = useRef<HTMLIFrameElement | null>(null);
-  const html = useMemo(() => (MAPBOX_TOKEN.startsWith('pk.') ? mapHtml(MAPBOX_TOKEN, { flyIn }) : ''), []); // eslint-disable-line react-hooks/exhaustive-deps
+  const html = useMemo(() => (map.style === 'satellite' && GOOGLE_KEY ? cesiumHtml(GOOGLE_KEY) : MAPBOX_TOKEN.startsWith('pk.') ? mapHtml(MAPBOX_TOKEN, { flyIn: false }) : ''), [map.style]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (!MAPBOX_TOKEN.startsWith('pk.')) map._emit({ type: 'error', detail: 'The map isn’t connected yet. Please ask the person setting up GoMap to finish connecting it.' });
+    if (!GOOGLE_KEY && !MAPBOX_TOKEN.startsWith('pk.')) map._emit({ type: 'error', detail: 'The map isn’t connected yet. Please ask the person setting up GoMap to finish connecting it.' });
     map._attach(msg => frame.current?.contentWindow?.postMessage(msg, '*'));
     const onMessage = (e: MessageEvent) => {
       if (e.source !== frame.current?.contentWindow || typeof e.data !== 'string') return;

@@ -47,7 +47,7 @@ export const usePeople = (q: string) => useQuery({ queryKey: ['people', q], quer
 export const useWalkways = () => useQuery({ queryKey: ['walkways'], queryFn: api.walkways, staleTime: 10 * 60_000 });
 export const useSlopes = (enabled = true) => useQuery({ queryKey: ['slopes'], queryFn: api.slopes, staleTime: 10 * 60_000, enabled });
 export const useClosures = () => useQuery({ queryKey: ['closures'], queryFn: api.closures });
-export const useCrowding = (weekday: number, hour: number, enabled: boolean) => useQuery({ queryKey: ['crowding', weekday, hour], queryFn: () => api.crowding(weekday, hour), enabled, staleTime: 10 * 60_000 });
+export const useCrowding = (weekday: number, hour: number, enabled: boolean) => useQuery({ queryKey: ['crowding', 'scenario-2026-11-26', weekday, hour], queryFn: () => api.crowding(weekday, hour), enabled, staleTime: 10 * 60_000 });
 export const useMyReports = (enabled: boolean) => useQuery({ queryKey: ['myReports'], queryFn: api.myReports, enabled, refetchInterval: enabled ? 60_000 : false });
 export const useServices = (q = '') => useQuery({ queryKey: ['services', q], queryFn: () => api.services(q || undefined) });
 export const useCampus = () => useQuery({ queryKey: ['campus'], queryFn: api.campus, staleTime: 5 * 60_000 });

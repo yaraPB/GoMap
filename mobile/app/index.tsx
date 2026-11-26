@@ -31,7 +31,7 @@ import { useT } from '../src/i18n';
 function campusSlot() {
   const p = new Intl.DateTimeFormat('en-GB', { timeZone: 'Africa/Casablanca', weekday: 'short', hour: '2-digit', hourCycle: 'h23' }).formatToParts(new Date());
   const wd = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].indexOf(p.find(x => x.type === 'weekday')?.value ?? 'Mon');
-  return { weekday: Math.max(0, wd), hour: Math.min(20, Math.max(8, Number(p.find(x => x.type === 'hour')?.value ?? 12))) };
+  return { weekday: Math.max(0, wd), hour: Number(p.find(x => x.type === 'hour')?.value ?? 12) };
 }
 
 /** Keeps the map in step with app state: places, walkways, closures, you, and the route. */

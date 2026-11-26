@@ -122,7 +122,7 @@ export default function Home({ chipsDelay, raised = 0 }: { chipsDelay: number; r
           <Animated.View entering={rise} exiting={FadeOut.duration(150)}>
             <Pressable accessibilityRole="button" onPress={() => push({ name: 'crowding' })} style={[styles.banner, { backgroundColor: '#fff' }]}>
               <View style={styles.legend}>{['#FDE68A', '#F59E0B', '#B45309'].map(c => <View key={c} style={[styles.legendDot, { backgroundColor: c }]} />)}</View>
-              <T style={{ flex: 1, fontSize: 12.5 }}>{t('Busy paths right now · quiet paths are left as they are')}</T>
+              <T style={{ flex: 1, fontSize: 12.5 }}>{t('Estimated foot traffic · workbook schedule')}</T>
               <T weight="bold" style={{ fontSize: 12.5, color: color.blue }}>{t('By hour')}</T>
             </Pressable>
           </Animated.View>

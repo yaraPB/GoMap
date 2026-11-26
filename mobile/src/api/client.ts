@@ -2,7 +2,11 @@ import { Platform } from 'react-native';
 import type { AuthConfig, SignedInUser, CampusEvent, Answer, CampusInfo, Service, SttSession, Closure, CrowdingCollection, Lang, OfficeList, Person, PlaceDetail, PlaceLite, Position, Procedure, ReportKind, Route, RouteMode, WalkwayCollection } from './types';
 
 const local = Platform.OS === 'android' ? 'http://10.0.2.2:4000' : 'http://localhost:4000';
-export const API_URL = (process.env.EXPO_PUBLIC_API_URL || local).replace(/\/$/, '');
+const configuredApi = process.env.EXPO_PUBLIC_API_URL || local;
+const browserApi = Platform.OS === 'web' && typeof window !== 'undefined'
+  ? configuredApi.replace(/(localhost|127\.0\.0\.1)/, window.location.hostname)
+  : configuredApi;
+export const API_URL = browserApi.replace(/\/$/, '');
 
 /** The mock account in use (no SSO yet). Sent on every request. TODO: replace with GoCampus SSO */
 let currentUser = 'demo-student';

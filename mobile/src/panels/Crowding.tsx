@@ -10,7 +10,7 @@ import { dayName, useLang, useT } from '../i18n';
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const DAY_KEYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
-const HOURS = Array.from({ length: 13 }, (_, i) => 8 + i);
+const HOURS = Array.from({ length: 24 }, (_, i) => i);
 
 /** Board 21: historic footfall per walkway segment, by hour. No live tracking, no identities. */
 export default function Crowding() {
@@ -20,12 +20,12 @@ export default function Crowding() {
   const map = useMap();
   const now = new Date();
   const [weekday, setWeekday] = useState((now.getDay() + 6) % 7);
-  const [hour, setHour] = useState(Math.min(20, Math.max(8, now.getHours())));
+  const [hour, setHour] = useState(now.getHours());
   const { data, isLoading, isError } = useCrowding(weekday, hour, true);
 
   // show density while scrubbing; on the way out, leave the 'busy paths now' overlay as the person had it
   useEffect(() => { const was = map.layers.crowding; map.setLayers({ crowding: true }); return () => map.setLayers({ crowding: was }); }, []); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { if (data) map.send({ type: 'crowding', data, fit: hour === Math.min(20, Math.max(8, now.getHours())) }); }, [data]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (data) map.send({ type: 'crowding', data, fit: hour === now.getHours() }); }, [data]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const summary = useMemo(() => {
     const f = data?.features ?? [];
@@ -37,7 +37,7 @@ export default function Crowding() {
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
       <View style={[styles.top, { top: insets.top + 8 }]}>
-        <View style={styles.title}><T weight="bold" style={{ fontSize: 15 }}>{t("Crowding by walkway")}</T><T style={{ fontSize: 12, color: color.muted }}>{t('Typical {day}, past four weeks', { day: dayName(DAY_KEYS[weekday], lang, true) })}</T></View>
+        <View style={styles.title}><T weight="bold" style={{ fontSize: 15 }}>{t("Crowding by walkway")}</T><T style={{ fontSize: 12, color: color.muted }}>{t('Estimated traffic · {day}', { day: dayName(DAY_KEYS[weekday], lang, true) })}</T></View>
       </View>
       <Animated.View entering={FadeInDown.duration(320)} style={[styles.sheet, { paddingBottom: insets.bottom + 16 }]}>
         <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' }}>
@@ -68,7 +68,7 @@ export default function Crowding() {
           <Label>{t('Busy')}</Label>
         </View>
         {isError ? <View style={{ marginTop: 12 }}><Notice tone="missing" icon="wifiOff" text={t("Crowding needs a connection.")} /></View>
-          : <T style={{ fontSize: 11.5, color: color.muted, marginTop: 12, lineHeight: 16 }}>{t('Historic and anonymous, by path segment, never by person.')} {data?.basis.includes('simulated') ? t('Simulated until real anonymous traces exist.') : ''}</T>}
+          : <T style={{ fontSize: 11.5, color: color.muted, marginTop: 12, lineHeight: 16 }}>{t('Workbook estimates, not live traffic. Route locations are approximate.')} {data?.basis.includes('simulated') ? t('Simulated until real anonymous traces exist.') : ''}</T>}
       </Animated.View>
     </View>
   );

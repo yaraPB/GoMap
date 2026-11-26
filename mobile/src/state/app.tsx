@@ -38,7 +38,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [online, setOnline] = useState(true);
   const [reduceMotion, setReduceMotion] = useState(false);
   const [firstSession, setFirstSession] = useState(true);
-  useEffect(() => NetInfo.addEventListener(s => setOnline(s.isConnected !== false && s.isInternetReachable !== false)), []);
+  useEffect(() => {
+    if (Platform.OS === 'web') {
+      const update = () => setOnline(navigator.onLine);
+      update();
+      window.addEventListener('online', update);
+      window.addEventListener('offline', update);
+      return () => {
+        window.removeEventListener('online', update);
+        window.removeEventListener('offline', update);
+      };
+    }
+    return NetInfo.addEventListener(s => setOnline(s.isConnected !== false && s.isInternetReachable !== false));
+  }, []);
   useEffect(() => {
     AccessibilityInfo.isReduceMotionEnabled().then(setReduceMotion).catch(() => {});
     const sub = AccessibilityInfo.addEventListener('reduceMotionChanged', setReduceMotion);

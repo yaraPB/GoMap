@@ -1,3 +1,4 @@
+import { trafficEstimate, trafficBasis } from './services/trafficEstimates.js';
 import express, { type NextFunction, type Request, type Response } from 'express';
 import multer from 'multer';
 import { randomUUID } from 'node:crypto';
@@ -394,15 +395,16 @@ export function createApp(ctx: AppContext) {
   app.get('/api/crowding', (req, res) => {
     const today = (new Date().getDay() + 6) % 7;
     const weekday = Math.max(0, Math.min(6, num(req.query.weekday) ?? today));
-    const hour = Math.max(8, Math.min(20, num(req.query.hour) ?? 12));
-    const loads = new Map((db.prepare('SELECT edge_id, load FROM crowding WHERE weekday = ? AND hour = ?').all(weekday, hour) as { edge_id: string; load: number }[]).map(r => [r.edge_id, r.load]));
-    const features = campus.walkways.filter(w => loads.has(w.properties.id)).map(w => {
-      const load = loads.get(w.properties.id)!;
+    const hour = Math.max(0, Math.min(23, num(req.query.hour) ?? 12));
+    const features = campus.walkways.filter(w => w.properties.modes !== 'drive').flatMap(w => {
+      const estimate = trafficEstimate(w.geometry.coordinates[Math.floor(w.geometry.coordinates.length / 2)], weekday, hour);
+      if (!estimate) return [];
+      const load = estimate.load;
       let len = 0; const c = w.geometry.coordinates;
       for (let i = 1; i < c.length; i++) len += Math.hypot((c[i][0] - c[i - 1][0]) * 92700, (c[i][1] - c[i - 1][1]) * 110540);
-      return { type: 'Feature', geometry: w.geometry, properties: { id: w.properties.id, load, delay_s: Math.round(len / 1.3 * load * 0.6), level: load > 0.66 ? 'high' : load > 0.33 ? 'medium' : 'low' } };
+      return { type: 'Feature', geometry: w.geometry, properties: { id: w.properties.id, ...estimate, load, delay_s: Math.round(len / 1.3 * load * 0.6), level: load > 0.66 ? 'high' : load > 0.33 ? 'medium' : 'low' } };
     });
-    res.json({ type: 'FeatureCollection', weekday, hour, basis: 'Typical weekday, past four weeks (simulated until GPS traces exist)', features });
+    res.json({ type: 'FeatureCollection', weekday, hour, basis: trafficBasis, features });
   });
 
   app.post('/api/assistant/ask', wrap(async (req, res) => {
