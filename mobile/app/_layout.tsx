@@ -34,6 +34,8 @@ export default function RootLayout() {
                       <Stack.Screen name="index" />
                       {/* the 2D map stays mounted underneath, so switching back is instant */}
                       <Stack.Screen name="ar" options={{ presentation: 'fullScreenModal', animation: 'fade' }} />
+                      {/* campus in photorealistic 3D (Google tiles): a view to look around, the map stays underneath */}
+                      <Stack.Screen name="view3d" options={{ presentation: 'fullScreenModal', animation: 'fade' }} />
                       <Stack.Screen name="faculty-status" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
                     </Stack>
                   </PanelProvider>

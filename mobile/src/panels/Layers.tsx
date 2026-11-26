@@ -8,6 +8,7 @@ import { usePanels } from '../state/panels';
 import { Icon, Label, Sheet, T } from '../ui/kit';
 import { color, type IconName } from '../ui/theme';
 import { ROLE_LOOK } from './Views';
+import { has3D } from '../map/Campus3D';
 
 const STYLES: { id: MapStyle; name: string; swatch: string[]; icon: IconName }[] = [
   { id: 'default', name: 'Map', swatch: ['#3E4C44', '#2B3150'], icon: 'map' },
@@ -55,6 +56,14 @@ export default function Layers() {
               );
             })}
           </View>
+          {/* Google's photographed 3D campus: its own view (their buildings cannot sit on this map) */}
+          {has3D() && (
+            <Pressable accessibilityRole="button" onPress={() => router.push('/view3d')} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 12, padding: 14, borderRadius: 14, backgroundColor: color.surface }}>
+              <Icon name="building" size={20} stroke={color.ink2} />
+              <View style={{ flex: 1 }}><T weight="semibold" style={{ fontSize: 15 }}>{t('Campus in 3D')}</T><T style={{ fontSize: 12.5, color: color.muted }}>{t('The real buildings, photographed in 3D. Look around and tap a pin.')}</T></View>
+              <Icon name="chevron" size={16} stroke={color.muted} />
+            </Pressable>
+          )}
         </View>
 
         <View>

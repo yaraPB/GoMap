@@ -77,7 +77,9 @@ const serverEnv = { MONGODB_URI: '', GOMAP_DB: db, PORT: '4000', ADMIN_TOKEN: 'e
   GEMINI_API_KEY: '', ANTHROPIC_API_KEY: '', SONIOX_API_KEY: '' };
 start('api', 'npx', ['tsx', 'src/server.ts'], join(root, 'server'), serverEnv);
 if (want('admin') || want('dev')) start('admin', 'npx', ['vite', '--port', '5173', '--strictPort'], join(root, 'admin'), { VITE_API_URL: API });
-if (want('app') || want('ar') || want('signin')) start('app', 'npx', ['expo', 'start', '--web', '--port', '8081'], join(root, 'mobile'), { EXPO_PUBLIC_API_URL: API, CI: '1', BROWSER: 'none' });
+if (want('app') || want('ar') || want('signin')) start('app', 'npx', ['expo', 'start', '--web', '--port', '8081'], join(root, 'mobile'), { EXPO_PUBLIC_API_URL: API, CI: '1', BROWSER: 'none',
+  // a fake Google key: the 3D view is offered, and Google refuses it, so the "could not load" path is tested
+  EXPO_PUBLIC_GOOGLE_MAP_TILES_KEY: process.env.E2E_GOOGLE_KEY || 'e2e-fake-google-key' });
 try {
   await waitFor(`${API}/api/health`, 'API');
   if (want('admin') || want('dev')) await waitFor(ADMIN, 'admin');
@@ -331,6 +333,20 @@ if (want('app')) {
     await page.getByText(/^Park at /).first().waitFor({ state: 'detached', timeout: 15_000 });
     await tapMap(page);
     await page.getByText('Start').waitFor({ state: 'detached', timeout: 5_000 });
+  });
+  await check('app', 'campus in 3D: opens from a place, loads Cesium, says so when the Google key is refused, and goes back', page, async () => {
+    await page.getByLabel('Search the campus').click();
+    await page.getByPlaceholder('A place, a professor, an office').fill('library');
+    await page.getByText('Mohammed VI Library').first().click();
+    await page.getByLabel('See it in 3D').click();
+    await page.getByLabel('Back to the map').waitFor({ timeout: 15_000 });
+    // with a real key (E2E_GOOGLE_KEY) the buildings load; with the fake one Google refuses and the screen says so
+    if (process.env.E2E_GOOGLE_KEY) await page.getByText('Drag to look around').waitFor({ timeout: 60_000 });
+    else await page.getByText('The 3D view could not load').waitFor({ timeout: 60_000 });
+    await sleep(1500); await shot(page, 'app-campus-3d');
+    await page.getByLabel('Back to the map').click();
+    await page.getByLabel('Search the campus').waitFor({ timeout: 10_000 });
+    await tapMap(page);
   });
   await check('app', 'Building 14 has a route (the old "no path" bug)', page, async () => {
     await page.getByLabel('Ask GoMap').first().click();

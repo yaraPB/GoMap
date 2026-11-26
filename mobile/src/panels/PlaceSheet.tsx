@@ -15,6 +15,7 @@ import { Btn, Icon, IconBtn, Label, Loading, Notice, Provenance, Sheet, StatusPi
 import { categoryColor, categoryName, color, schools } from '../ui/theme';
 import { formatHours, useLang, useT } from '../i18n';
 import { fmtMinutesT } from '../ar/geo';
+import { has3D } from '../map/Campus3D';
 
 export default function PlaceSheet({ id }: { id: string }) {
   const { push, pop, replace } = usePanels();
@@ -64,6 +65,7 @@ export default function PlaceSheet({ id }: { id: string }) {
             <View style={{ flexDirection: 'row', gap: 10 }}>
               <Btn title={t('Directions')} icon="walk" onPress={() => go('walk')} style={{ flex: 1 }} loading={nav.status === 'loading'} />
               <IconBtn icon="ar" label={t('Guide me in AR')} onPress={() => go('ar')} size={50} float={false} style={{ borderRadius: 14, borderWidth: 1, borderColor: color.line }} />
+              {has3D() && <IconBtn icon="building" label={t('See it in 3D')} onPress={() => router.push({ pathname: '/view3d', params: { place: place.id } })} size={50} float={false} style={{ borderRadius: 14, borderWidth: 1, borderColor: color.line }} />}
               <IconBtn icon="flag" label={t('Report a problem here')} onPress={() => push({ name: 'report', at: place.coordinates })} size={50} float={false} style={{ borderRadius: 14, borderWidth: 1, borderColor: color.line }} />
             </View>
           )}
