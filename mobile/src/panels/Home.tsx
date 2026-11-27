@@ -115,6 +115,7 @@ export default function Home({ chipsDelay, raised = 0 }: { chipsDelay: number; r
         {loc.reason === 'no-permission' && (loc.insecureWeb
           ? <Banner icon="locate" text={t('This browser blocks location on a network address. Open GoMap in Expo Go, or on localhost.')} />
           : <Banner icon="locate" text={loc.blocked ? t('Location is turned off for this app. Turn it on in Settings for directions.') : t('Turn on location for directions. Browsing works without it.')} action={loc.blocked ? t('Open settings') : t('Allow')} onAction={loc.request} />)}
+        {loc.reason === 'imprecise' && <Banner icon="locate" tone="dark" text={t('This device can only guess your location (about ±{m} m), so it is not shown and routes start from the main plaza. On a phone, GPS is accurate to a few metres.', { m: Math.round((loc.rawAccuracy ?? 0) / 10) * 10 })} />}
         {loc.reason === 'off-campus' && <Banner icon="locate" tone="dark" text={t("You're away from AUI · routes start from the main plaza (demo position)")} />}
         {!guest && nextUp && category === 'all' && (
           <Animated.View entering={FadeIn.duration(260)} exiting={FadeOut.duration(150)}>

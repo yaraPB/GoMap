@@ -20,8 +20,55 @@ type NativeStream = {
 };
 type StreamCtor = new (o: { sampleRate: number; channels: number; encoding: string }) => NativeStream;
 
+/**
+ * The browser's microphone as the same kind of stream: 16-bit PCM chunks for Soniox's live socket.
+ * So the web app gets live words in English, French and Arabic mixed, like a dev build, instead of the
+ * browser's own recognition (one language at a time).
+ */
+class WebMicStream implements NativeStream {
+  sampleRate = 16000;
+  private media: MediaStream | null = null;
+  private ctx: AudioContext | null = null;
+  private nodes: AudioNode[] = [];
+  private cbs: ((b: Buffer) => void)[] = [];
+  constructor(o: { sampleRate: number }) { this.sampleRate = o.sampleRate; }
+  addListener(_event: 'audioStreamBuffer', cb: (b: Buffer) => void) {
+    this.cbs.push(cb);
+    return { remove: () => { this.cbs = this.cbs.filter(x => x !== cb); } };
+  }
+  async start() {
+    this.media = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+    // ask for 16 kHz; a browser that cannot resample keeps its own rate, which is sent to Soniox as is
+    try { this.ctx = new AudioContext({ sampleRate: this.sampleRate }); } catch { this.ctx = new AudioContext(); }
+    this.sampleRate = this.ctx.sampleRate;
+    const src = this.ctx.createMediaStreamSource(this.media);
+    // ScriptProcessor: deprecated but everywhere, and needs no separate worklet file
+    const proc = this.ctx.createScriptProcessor(4096, 1, 1);
+    proc.onaudioprocess = e => {
+      const f = e.inputBuffer.getChannelData(0);
+      const pcm = new Int16Array(f.length);
+      for (let i = 0; i < f.length; i++) { const v = Math.max(-1, Math.min(1, f[i])); pcm[i] = v < 0 ? v * 0x8000 : v * 0x7fff; }
+      for (const cb of this.cbs) cb({ data: pcm.buffer, sampleRate: this.sampleRate, channels: 1 });
+    };
+    src.connect(proc);
+    proc.connect(this.ctx.destination); // silent: nothing is written to the output
+    this.nodes = [src, proc];
+  }
+  stop() {
+    for (const n of this.nodes) { try { n.disconnect(); } catch { /* already */ } }
+    this.nodes = [];
+    this.media?.getTracks().forEach(t => t.stop());
+    this.media = null;
+    this.ctx?.close().catch(() => {});
+    this.ctx = null;
+  }
+}
+
 function streamCtor(): StreamCtor | null {
-  if (Platform.OS === 'web') return null;
+  if (Platform.OS === 'web') {
+    const ok = typeof navigator !== 'undefined' && !!navigator.mediaDevices?.getUserMedia && typeof AudioContext !== 'undefined';
+    return ok ? (WebMicStream as unknown as StreamCtor) : null;
+  }
   try {
     const mod = requireOptionalNativeModule<{ AudioStream?: StreamCtor }>('ExpoAudio');
     return typeof mod?.AudioStream === 'function' ? mod.AudioStream : null;

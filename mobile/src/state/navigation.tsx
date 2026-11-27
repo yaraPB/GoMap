@@ -9,7 +9,7 @@ import type { Position, Route, RouteMode, Step } from '../api/types';
 import * as Location from 'expo-location';
 import { distance, lineLength, pointAlong, snapToLine } from '../ar/geo';
 import { CAMPUS_CENTER } from '../map/mapHtml';
-import { DEMO_POSITION, OFF_CAMPUS_M, useApp, useLocation } from './app';
+import { DEMO_POSITION, IMPRECISE_M, OFF_CAMPUS_M, useApp, useLocation } from './app';
 
 export type Destination = { placeId: string; name: string; coordinates: Position; category?: string };
 /** "from the library to building 11": a route that starts at a place, not where the student stands. */
@@ -88,7 +88,7 @@ export function NavigationProvider({ children }: { children: React.ReactNode }) 
       ]);
       const live = locRef.current.realCoord; // the watcher may have answered first
       if (live) return locRef.current.realOnCampus ? live : null;
-      if (!p) return null;
+      if (!p || (p.coords.accuracy ?? 0) > IMPRECISE_M) return null;
       const c: Position = [p.coords.longitude, p.coords.latitude];
       return distance(c, CAMPUS_CENTER) <= OFF_CAMPUS_M ? c : null;
     } catch { return null; }

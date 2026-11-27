@@ -93,7 +93,7 @@ export type Fix = {
   insecureWeb: boolean;
   /** true only when a simulated walk is active */
   simulated: boolean;
-  reason: 'off-campus' | 'no-permission' | 'walk' | null;
+  reason: 'off-campus' | 'no-permission' | 'imprecise' | 'walk' | null;
   /** the fix as the phone reported it, before smoothing and snapping */
   rawCoord: Position | null;
   /** the phone's own filtered position, even while a walk is simulated; null before the first fix */
@@ -111,6 +111,9 @@ const Loc = createContext<LocCtx | null>(null);
 
 const DEMO_POSITION: Position = [-5.10655, 33.53925]; // main plaza, by the library
 const OFF_CAMPUS_M = 2000;
+/** Worse than this, a fix is a guess (a computer's browser locates by Wi-Fi or IP, often hundreds of metres off):
+ * it is not drawn as "you are here" and routes do not start from it. Phone GPS is a few metres. */
+const IMPRECISE_M = 150;
 
 export function LocationProvider({ children }: { children: React.ReactNode }) {
   const [real, setReal] = useState<{ coord: Position; accuracy: number | null; timestamp: number; raw: Position; rawAccuracy: number | null; speed: number; course: number | null; onPath: boolean } | null>(null);
@@ -197,18 +200,20 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const value = useMemo<LocCtx>(() => {
-    const offCampus = real ? distance(real.coord, CAMPUS_CENTER) > OFF_CAMPUS_M : false;
+    const imprecise = !!real && (real.rawAccuracy ?? real.accuracy ?? 0) > IMPRECISE_M;
+    const offCampus = real && !imprecise ? distance(real.coord, CAMPUS_CENTER) > OFF_CAMPUS_M : false;
     let coord: Position | null = real?.coord ?? null;
     let simulated = false;
     let reason: Fix['reason'] = null;
     if (walk) { coord = walk; simulated = true; reason = 'walk'; }
+    else if (imprecise) { coord = null; reason = 'imprecise'; }
     else if (offCampus) { reason = 'off-campus'; }
     else if (permission === 'denied') { coord = null; reason = 'no-permission'; }
     return {
       coord, accuracy: simulated ? 4 : real?.accuracy ?? null, timestamp: simulated ? Date.now() : real?.timestamp ?? null,
       heading: heading?.smooth ?? null, rawHeading: heading?.raw ?? null, headingAccuracy: heading?.acc ?? null,
       permission, blocked, insecureWeb, simulated, reason, request, setSimulated: setWalk,
-      realCoord: real?.coord ?? null, realOnCampus: !!real && !offCampus,
+      realCoord: real?.coord ?? null, realOnCampus: !!real && !offCampus && !imprecise,
       rawCoord: real?.raw ?? null, rawAccuracy: real?.rawAccuracy ?? null, speed: simulated ? 1.25 : real?.speed ?? 0, course: simulated ? null : real?.course ?? null, onPath: simulated || !!real?.onPath,
     };
   }, [real, heading, permission, blocked, insecureWeb, walk, request]);
@@ -219,4 +224,4 @@ export function useLocation() {
   if (!c) throw new Error('useLocation outside LocationProvider');
   return c;
 }
-export { DEMO_POSITION, OFF_CAMPUS_M };
+export { DEMO_POSITION, IMPRECISE_M, OFF_CAMPUS_M };
