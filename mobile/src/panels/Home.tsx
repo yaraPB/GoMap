@@ -112,7 +112,9 @@ export default function Home({ chipsDelay, raised = 0 }: { chipsDelay: number; r
       {/* edge states, compact: they keep the map usable and say what is missing */}
       <View style={{ position: 'absolute', top: stripTop + (category !== 'all' ? 48 : 0), left: 14, right: 14, gap: 8 }} pointerEvents="box-none">
         {!online && <Banner icon="wifiOff" tone="dark" text={t("No connection · the map works, crowding, open-now and questions don't")} />}
-        {loc.reason === 'no-permission' && <Banner icon="locate" text={t('Turn on location for directions. Browsing works without it.')} action={t('Allow')} onAction={loc.request} />}
+        {loc.reason === 'no-permission' && (loc.insecureWeb
+          ? <Banner icon="locate" text={t('This browser blocks location on a network address. Open GoMap in Expo Go, or on localhost.')} />
+          : <Banner icon="locate" text={loc.blocked ? t('Location is turned off for this app. Turn it on in Settings for directions.') : t('Turn on location for directions. Browsing works without it.')} action={loc.blocked ? t('Open settings') : t('Allow')} onAction={loc.request} />)}
         {loc.reason === 'off-campus' && <Banner icon="locate" tone="dark" text={t("You're away from AUI · routes start from the main plaza (demo position)")} />}
         {!guest && nextUp && category === 'all' && (
           <Animated.View entering={FadeIn.duration(260)} exiting={FadeOut.duration(150)}>

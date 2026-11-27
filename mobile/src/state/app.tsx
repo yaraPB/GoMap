@@ -1,5 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { AccessibilityInfo, Platform, View } from 'react-native';
+import { AccessibilityInfo, AppState, Linking, Platform, View } from 'react-native';
 import { LangContext, isRTL } from '../i18n';
 import * as Location from 'expo-location';
 import NetInfo from '@react-native-community/netinfo';
@@ -87,6 +87,10 @@ export type Fix = {
   rawHeading: number | null;
   headingAccuracy: number | null;
   permission: 'unknown' | 'granted' | 'denied';
+  /** the system will not show its dialog again (refused before): only the phone's settings can turn location on */
+  blocked: boolean;
+  /** a browser on a plain http:// network address never allows location (only localhost or https) */
+  insecureWeb: boolean;
   /** true only when a simulated walk is active */
   simulated: boolean;
   reason: 'off-campus' | 'no-permission' | 'walk' | null;
@@ -152,16 +156,42 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
     } catch { /* location services off */ }
   }, []);
 
+  const [blocked, setBlocked] = useState(false);
+  const insecureWeb = Platform.OS === 'web' && typeof window !== 'undefined' && window.isSecureContext === false;
+  const started = useRef(false);
+  const run = useCallback(async () => { started.current = true; await start(); }, [start]);
+
+  /** Ask for location. Refused before, the system no longer shows its dialog: open the app's settings page instead. */
   const request = useCallback(async () => {
+    const before = await Location.getForegroundPermissionsAsync().catch(() => null);
+    if (before && before.status !== 'granted' && !before.canAskAgain && Platform.OS !== 'web') {
+      setBlocked(true);
+      await Linking.openSettings().catch(() => {});
+      return; // checked again when the student comes back to the app
+    }
     const r = await Location.requestForegroundPermissionsAsync().catch(() => null);
     const granted = r?.status === 'granted';
     setPermission(granted ? 'granted' : 'denied');
-    if (granted) await start();
-  }, [start]);
+    setBlocked(!granted && !!r && !r.canAskAgain);
+    if (granted) await run();
+  }, [run]);
+
+  // back from the settings page (or the system dialog): pick up a permission granted there
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', s => {
+      if (s !== 'active') return;
+      Location.getForegroundPermissionsAsync().then(r => {
+        if (r.status === 'granted') { setPermission('granted'); setBlocked(false); if (!started.current) run(); }
+      }).catch(() => {});
+    });
+    return () => sub.remove();
+  }, [run]);
 
   useEffect(() => {
     Location.getForegroundPermissionsAsync().then(r => {
-      if (r.status === 'granted') { setPermission('granted'); start(); } else request();
+      if (r.status === 'granted') { setPermission('granted'); run(); }
+      else if (!r.canAskAgain && Platform.OS !== 'web') { setPermission('denied'); setBlocked(true); } // no dialog to show: the banner offers settings
+      else request();
     }).catch(() => setPermission('denied'));
     return () => subs.current.forEach(s => s.remove());
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -177,11 +207,11 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
     return {
       coord, accuracy: simulated ? 4 : real?.accuracy ?? null, timestamp: simulated ? Date.now() : real?.timestamp ?? null,
       heading: heading?.smooth ?? null, rawHeading: heading?.raw ?? null, headingAccuracy: heading?.acc ?? null,
-      permission, simulated, reason, request, setSimulated: setWalk,
+      permission, blocked, insecureWeb, simulated, reason, request, setSimulated: setWalk,
       realCoord: real?.coord ?? null, realOnCampus: !!real && !offCampus,
       rawCoord: real?.raw ?? null, rawAccuracy: real?.rawAccuracy ?? null, speed: simulated ? 1.25 : real?.speed ?? 0, course: simulated ? null : real?.course ?? null, onPath: simulated || !!real?.onPath,
     };
-  }, [real, heading, permission, walk, request]);
+  }, [real, heading, permission, blocked, insecureWeb, walk, request]);
   return <Loc.Provider value={value}>{children}</Loc.Provider>;
 }
 export function useLocation() {

@@ -13,7 +13,7 @@ import { peopleFromDirectory } from './people.js';
 import { procedureSeeds } from './procedures.js';
 import { ACCOUNT_SEEDS, campusHours, issuesFromJson, servicesFromJson, type IssueJson, type ServiceJson, type WorkingHoursJson } from './services.js';
 
-const SEED_VERSION = '2026-11-27';
+const SEED_VERSION = '2026-11-27b';
 const readJson = <T>(file: string): T => JSON.parse(readFileSync(file, 'utf8')) as T;
 
 /**

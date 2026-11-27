@@ -47,6 +47,16 @@ const native = forced === 'recorded' || forced === 'soniox' ? null : loadNative(
 const trySoniox = forced !== 'native' && forced !== 'recorded';
 export const SPEECH_ENGINE: SpeechEngine = native ? 'native' : 'recorded';
 
+/**
+ * On-device recognition (the phone's or the browser's) listens in ONE language, so "Where is le bureau des
+ * admissions?" comes out wrong. Soniox follows English, French and Arabic in the same sentence. So when the
+ * server transcribes with Soniox, a recording sent to it beats on-device recognition (words appear on release
+ * instead of live). Asked once per app run.
+ */
+let serverVoice: Promise<string | null> | null = null;
+const serverTranscriber = () => (serverVoice ??= api.voice().then(v => v.transcription).catch(() => { serverVoice = null; return null; }));
+if (native) serverTranscriber();
+
 const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
 
 export function useSpeech(handlers: { onLevel: (level: number) => void; onPartial: (text: string) => void; onEndpoint?: () => void }) {
@@ -62,6 +72,8 @@ export function useSpeech(handlers: { onLevel: (level: number) => void; onPartia
   h.current = handlers;
   const langRef = useRef<Lang>('en');
   const nativeRunning = useRef(false);
+  /** the recorder (clip for the server) is the engine running right now */
+  const recording = useRef(false);
   const generation = useRef(0);
 
   // native engine events
@@ -117,7 +129,10 @@ export function useSpeech(handlers: { onLevel: (level: number) => void; onPartia
       setError(null);
       setEngine(SPEECH_ENGINE); // fall back for this and later sessions
     }
-    if (native) {
+    // mixed languages: record for Soniox on the server rather than single-language on-device recognition
+    const multilingual = native ? (await serverTranscriber()) === 'soniox' : false;
+    if (attempt !== generation.current) return false;
+    if (native && !multilingual) {
       const perm = await native.requestPermissionsAsync();
       if (attempt !== generation.current) return false;
       if (!perm.granted) { setError('Microphone permission is off.'); setState('error'); return false; }
@@ -134,6 +149,8 @@ export function useSpeech(handlers: { onLevel: (level: number) => void; onPartia
     await recorder.prepareToRecordAsync();
     if (attempt !== generation.current) { await setAudioModeAsync({ allowsRecording: false }).catch(() => {}); return false; }
     recorder.record();
+    recording.current = true;
+    setEngine('recorded');
     setState('listening');
     // dBFS: silence ≈ -60, speech ≈ -35…-10
     meter.current = setInterval(() => {
@@ -158,7 +175,7 @@ export function useSpeech(handlers: { onLevel: (level: number) => void; onPartia
       setState('idle');
       return text;
     }
-    if (native) {
+    if (native && !recording.current) {
       if (!nativeRunning.current) { setState('idle'); return transcript.current; }
       return new Promise<string>((resolve, reject) => {
         final.current = { resolve, reject };
@@ -170,6 +187,7 @@ export function useSpeech(handlers: { onLevel: (level: number) => void; onPartia
     if (meter.current) clearInterval(meter.current);
     meter.current = null;
     h.current.onLevel(0);
+    recording.current = false;
     try {
       await recorder.stop();
       await setAudioModeAsync({ allowsRecording: false }).catch(() => {});
@@ -190,8 +208,9 @@ export function useSpeech(handlers: { onLevel: (level: number) => void; onPartia
   const cancel = useCallback(async () => {
     generation.current++;
     if (soniox.current) { soniox.current.abort(); soniox.current = null; await setAudioModeAsync({ allowsRecording: false }).catch(() => {}); }
-    else if (native) { nativeRunning.current = false; native.abort(); }
+    else if (native && !recording.current) { nativeRunning.current = false; native.abort(); }
     else {
+      recording.current = false;
       if (meter.current) clearInterval(meter.current);
       meter.current = null;
       if (recorder.isRecording) await recorder.stop().catch(() => {});

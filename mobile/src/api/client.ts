@@ -84,4 +84,5 @@ export const api = {
   changePassword: (current: string, password: string) => request<{ ok: true }>('/api/auth/password', { method: 'POST', body: JSON.stringify({ current, password }) }),
   me: () => request<SignedInUser>('/api/auth/me'),
   sttSession: () => request<SttSession>('/api/assistant/stt-session', { method: 'POST' }),
+  voice: () => request<{ transcription: 'soniox' | 'gemini' | null }>('/api/assistant/voice'),
 };

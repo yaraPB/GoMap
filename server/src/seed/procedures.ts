@@ -38,12 +38,14 @@ export function procedureSeeds(retrievedOn: string): ProcedureSeed[] {
     },
     {
       id: 'change-major', title: 'Change your major', owner_office: 'Registrar (Registration Office)', place_id: 'building-1', contact_email: 's.moujahid@aui.ma',
-      summary: 'Changing major, specialization, concentration or catalog year goes through the Registrar in Building 1, after your advisor agrees.',
+      summary: 'To change your major, your academic advisor and the coordinator of the new major both sign the change form; then you hand it in at the Registrar in Building 1.',
       steps: [
-        { title: 'Talk to your advisor', body: 'Check how the change affects your degree plan and graduation date.' },
-        { title: 'Request the change at the Registrar', body: 'Building 1, ext. 2175, s.moujahid@aui.ma.' },
+        { title: 'Talk to your advisor', body: 'Check how the change affects your degree plan and graduation date, and get the change-of-major form signed.' },
+        { title: 'Get the coordinator to sign', body: 'The coordinator of the major you are moving to signs the form too.' },
+        { title: 'Hand it in at the Registrar', body: 'Bring the signed form to the Registrar, Building 1, Monday to Friday 9:00–17:30 (closed 13:00–14:00), ext. 2175.' },
       ],
-      match_phrases: ['change major', 'change my major', 'switch major', 'change specialization', 'change catalog year', 'changer de majeure'],
+      match_phrases: ['change major', 'change my major', 'change majors', 'changing major', 'changing my major', 'switch major', 'switch majors', 'switch my major', 'switching majors', 'switching major',
+        'move to another major', 'change of major', 'change specialization', 'change catalog year', 'changer de majeure', 'changer de filiere', 'changer ma majeure', 'تغيير التخصص'],
       source: `Offices and services list (aui.ma), retrieved ${retrievedOn}`, status: 'review', verified_at: retrievedOn,
     },
     {

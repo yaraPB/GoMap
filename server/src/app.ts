@@ -416,6 +416,8 @@ export function createApp(ctx: AppContext) {
 
   /** Live speech: a 5-minute Soniox key for the phone's WebSocket. 404 when Soniox is not set up. */
   let sttKeys = 0, sttWindow = Date.now();
+  // which engine turns speech into text on the server: the app avoids single-language on-device recognition when it is Soniox
+  app.get('/api/assistant/voice', (_req, res) => { res.json({ transcription: config.sonioxKey ? 'soniox' : config.geminiKey ? 'gemini' : null }); });
   app.post('/api/assistant/stt-session', wrap(async (_req, res) => {
     if (!config.sonioxKey) throw new HttpError(404, 'Live transcription is not configured (SONIOX_API_KEY).');
     if (Date.now() - sttWindow > 60000) { sttWindow = Date.now(); sttKeys = 0; }
