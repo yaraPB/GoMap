@@ -73,7 +73,7 @@ export function RoutePreview({ said, reply }: { said?: string; reply?: string })
               <View style={[styles.fromDot]} /><View style={styles.dash} /><Icon name="pin" size={16} stroke={color.green} />
             </View>
             <View style={{ flex: 1, gap: 10 }}>
-              <T style={{ fontSize: 14, color: color.muted }}>{nav.startedFromDemo ? t('Main plaza (demo position)') : t('Where you are now')}</T>
+              <T style={{ fontSize: 14, color: color.muted }}>{nav.origin ? nav.origin.name : nav.startedFromDemo ? t('Main plaza (demo position)') : t('Where you are now')}</T>
               <T weight="semibold" style={{ fontSize: 15 }} numberOfLines={1}>{nav.dest?.name ?? '…'}{r?.destination.entrance ? ` · ${r.destination.entrance}` : ''}</T>
             </View>
           </View>
@@ -120,6 +120,7 @@ export function RoutePreview({ said, reply }: { said?: string; reply?: string })
               {r.approximate && <Fact icon="warn" text={t('The last stretch is not on a mapped path: walk straight to the door')} tone="blue" />}
               {r.destination.entrance && <Fact icon="door" text={`${t(r.destination.entrance)}${r.destination.entrance_estimated ? ` (${t('position estimated')})` : ''}`} tone="blue" />}
             </View>
+            {nav.origin && <Notice tone="info" icon="locate" text={t('This route starts at {place}, not where you are.', { place: nav.origin.name })} />}
             {nav.startedFromDemo && <Notice tone="info" icon="locate" text={loc.reason === 'no-permission' ? t('Location is off, so this starts from the main plaza.') : t('You are away from AUI, so this starts from the main plaza. Use "Simulate walk" during the trip to try it.')} />}
             <View style={{ flexDirection: 'row', gap: 10 }}>
               <Btn title={t('Start')} icon="arrowUp" kind="green" style={{ flex: 1 }} onPress={() => { nav.start(); replace({ name: 'go' }); }} />

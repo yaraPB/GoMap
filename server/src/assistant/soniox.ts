@@ -15,8 +15,8 @@ export async function transcribeSoniox(audio: Buffer, mime: string, lang: string
     jobId = ((await (await request('/transcriptions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model, file_id: fileId, language_hints: [lang], context: { terms: ['GoMap', 'AUI', 'Al Akhawayn', 'Ifrane', 'registrar'] } }) })).json()) as { id: string }).id;
     const deadline = Date.now() + 60000;
     while (Date.now() < deadline) {
-      const job = await (await request(`/transcriptions/${encodeURIComponent(jobId)}`)).json() as { status: string };
-      if (job.status === 'error') { terminal = true; throw new Error('Soniox could not transcribe this recording.'); }
+      const job = await (await request(`/transcriptions/${encodeURIComponent(jobId)}`)).json() as { status: string; error_message?: string };
+      if (job.status === 'error') { terminal = true; throw new Error(`Soniox could not transcribe this recording${job.error_message ? `: ${job.error_message.replace(/\.$/, '')}` : ''}.`); }
       if (job.status === 'completed') {
         terminal = true;
         const result = await (await request(`/transcriptions/${encodeURIComponent(jobId)}/transcript`)).json() as { text: string };

@@ -6,7 +6,7 @@ import Fuse from 'fuse.js';
 
 export type Lang = 'en' | 'fr' | 'ar';
 export type Intent = 'place' | 'person' | 'procedure' | 'service' | 'issue' | 'rule' | 'help';
-export type Match = { intent: Intent; id: string; score: number; mode: 'walk' | 'step_free' | 'ar' | null };
+export type Match = { intent: Intent; id: string; score: number; mode: 'walk' | 'step_free' | 'ar' | 'drive' | null };
 
 const NUMBER_WORDS: Record<string, string> = {
   one: '1', two: '2', three: '3', four: '4', five: '5', six: '6', seven: '7', eight: '8', nine: '9', ten: '10',
@@ -42,6 +42,7 @@ export function modeFrom(text: string): Match['mode'] {
   const t = normalise(text);
   if (/step[- ]?free|wheelchair|no stairs|without stairs|accessible|sans marches|fauteuil|كرسي/.test(t)) return 'step_free';
   if (/\bar\b|camera|augmented|realite augmentee/.test(t)) return 'ar';
+  if (/\b(by car|drive|driving|in my car|with my car|en voiture)\b|بالسيارة|بالطوموبيل/.test(t)) return 'drive';
   return null;
 }
 
@@ -131,10 +132,17 @@ export class IntentRouter {
     const place = this.best(this.places, list, exact);
     const person = this.best(this.people, list.filter(w => w.length > 2), exact);
     // procedures: a known phrase anywhere in the sentence ("how do I declare a minor") is exact
-    const procExact = this.procedureDocs.find(d => d.keys.some(k => k.length > 5 && t.includes(k)));
-    const proc = procExact ? { id: procExact.id, score: 0.001 } : this.best(this.procedures, list, () => false);
-    const service = this.phrase(this.serviceDocs, t) ?? this.best(this.services, list, exact);
-    const issue = this.phrase(this.issueDocs, t) ?? this.best(this.issues, list, exact);
+    // ('how do I declare MY minor' says the same as 'declare a minor': compare without the filler words too)
+    const tBare = stripFiller(t);
+    const procExact = this.procedureDocs.find(d => d.keys.some(k => k.length > 5 && (t.includes(k) || tBare.includes(k))));
+    // score 0: an exact procedure phrase beats an office that merely handles it ('add drop' → the steps, not just the Registrar)
+    const proc = procExact ? { id: procExact.id, score: 0 } : this.best(this.procedures, list, () => false);
+    const servicePhrase = this.phrase(this.serviceDocs, t), issuePhrase = this.phrase(this.issueDocs, t);
+    const service = servicePhrase ?? this.best(this.services, list, exact);
+    const issue = issuePhrase ?? this.best(this.issues, list, exact);
+    // "how do I…" favours procedures, but a loose procedure match never beats an office's exact phrase
+    // ('how do I change my grade' is the Registrar's grade appeals, not 'change my major')
+    const procCue = procExact || (CUES.procedure.test(t) && !(servicePhrase || issuePhrase)) ? 0.15 : 0;
     // the admin's hand-written answers: a trigger phrase inside the sentence counts as exact
     const ruleHit = this.ruleDocs.find(d => d.keys.some(k => k.length > 3 && ` ${t} `.includes(` ${k} `)));
     const rule = ruleHit ? { id: ruleHit.id, score: 0 } : this.best(this.rules, list, exact);
@@ -145,7 +153,7 @@ export class IntentRouter {
     const fullName = !!person?.exact && person.w.includes(' ');
     const everydayWord = !!person && !fullName && COMMON_WORDS.has(person.w) && !CUES.person.test(t) && !new RegExp(`\\b${person.w[0].toUpperCase()}${person.w.slice(1)}\\b`).test(text);
     if (person) cands.push({ intent: 'person', id: person.id, score: person.score + 0.0008 - (CUES.person.test(t) ? 0.1 : 0) - (fullName ? 0.12 : 0) + (everydayWord ? 0.3 : 0), mode });
-    if (proc) cands.push({ intent: 'procedure', id: proc.id, score: proc.score - (CUES.procedure.test(t) ? 0.15 : 0), mode });
+    if (proc) cands.push({ intent: 'procedure', id: proc.id, score: proc.score - procCue, mode });
     // an office is a place you go to, and its card says more than the building's: it wins ties
     if (service) cands.push({ intent: 'service', id: service.id, score: service.score + 0.0002 - (CUES.place.test(t) ? 0.08 : 0), mode });
     if (issue) cands.push({ intent: 'issue', id: issue.id, score: issue.score + 0.0004 - (CUES.issue.test(t) ? 0.06 : 0), mode });

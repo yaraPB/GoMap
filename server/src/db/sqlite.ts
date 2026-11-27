@@ -173,6 +173,7 @@ export function openSqlite(file: string): Sql {
   addColumn(db, 'people', 'lunch', 'TEXT'); // JSON ["13:00","14:00"], NULL = campus default
   addColumn(db, 'office_notes', 'kind', 'TEXT'); // sick | online | appointment | email | back_soon | away_week | semester_off | … | custom
   addColumn(db, 'office_notes', 'expires_at', 'TEXT'); // "not here this week" ends by itself; NULL = until removed
+  addColumn(db, 'procedures', 'channel', "TEXT NOT NULL DEFAULT 'in_person'"); // in_person | online (student portal) | mixed
   db.exec(`
     -- Campus events: talks, matches, fairs. Shown on the map, in the visitor card and by the assistant.
     CREATE TABLE IF NOT EXISTS events (

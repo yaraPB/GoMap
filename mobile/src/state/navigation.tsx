@@ -10,6 +10,8 @@ import { distance, lineLength, pointAlong, snapToLine } from '../ar/geo';
 import { DEMO_POSITION, useApp, useLocation } from './app';
 
 export type Destination = { placeId: string; name: string; coordinates: Position; category?: string };
+/** "from the library to building 11": a route that starts at a place, not where the student stands. */
+export type Origin = { placeId: string; name: string; coordinates: Position };
 export type NavStatus = 'idle' | 'loading' | 'preview' | 'active' | 'arrived' | 'error';
 export type Progress = {
   stepIndex: number;          // index of the NEXT maneuver in route.steps
@@ -24,7 +26,9 @@ export type Progress = {
 type Ctx = {
   dest: Destination | null; mode: RouteMode; route: Route | null; status: NavStatus; error: string | null;
   progress: Progress; muted: boolean; simulating: boolean; startedFromDemo: boolean;
-  preview: (d: Destination, mode?: RouteMode) => Promise<boolean>;
+  /** set when the route starts at a named place */
+  origin: Origin | null;
+  preview: (d: Destination, mode?: RouteMode, origin?: Origin | null) => Promise<boolean>;
   setMode: (m: RouteMode) => void;
   start: () => void; stop: () => void; setMuted: (m: boolean) => void; toggleSimulate: () => void;
   /** cumulative distance along the route of each step's start */
@@ -53,6 +57,8 @@ export function NavigationProvider({ children }: { children: React.ReactNode }) 
   const [muted, setMuted] = useState(false);
   const [simulating, setSimulating] = useState(false);
   const [startedFromDemo, setStartedFromDemo] = useState(false);
+  const [origin, setOrigin] = useState<Origin | null>(null);
+  const originRef = useRef<Origin | null>(null);
   const offCount = useRef(0);
   const lastOffFix = useRef<number | null>(null);
   const rerouting = useRef(false);
@@ -82,21 +88,23 @@ export function NavigationProvider({ children }: { children: React.ReactNode }) 
     }
   }, []);
 
-  const preview = useCallback(async (d: Destination, m: RouteMode = 'walk') => {
+  const preview = useCallback(async (d: Destination, m: RouteMode = 'walk', o: Origin | null = null) => {
     setDest(d); setModeState(m); setStatus('loading');
     routeRef.current = null;
     setRoute(null);
-    demoRef.current = !loc.coord || loc.simulated || loc.reason === 'off-campus';
-    setStartedFromDemo(demoRef.current);
-    const r = await fetchRoute(d, m, from);
+    originRef.current = o; setOrigin(o);
+    // starting somewhere else: the walk is simulated from there, unless the student is already standing at it
+    demoRef.current = o ? !(loc.coord && !loc.simulated && loc.reason !== 'off-campus' && distance(loc.coord, o.coordinates) < 60) : !loc.coord || loc.simulated || loc.reason === 'off-campus';
+    setStartedFromDemo(!o && demoRef.current);
+    const r = await fetchRoute(d, m, o?.coordinates ?? from);
     if (r !== undefined) setStatus(r ? 'preview' : 'error');
     return !!r;
   }, [fetchRoute, from, loc.coord, loc.simulated, loc.reason]);
 
   const setMode = useCallback((m: RouteMode) => {
     setModeState(m);
-    if (dest) { setStatus(s => (s === 'active' ? s : 'loading')); fetchRoute(dest, m, from).then(r => { if (r !== undefined) setStatus(s => (r ? (s === 'active' ? 'active' : 'preview') : 'error')); }); }
-  }, [dest, fetchRoute, from]);
+    if (dest) { setStatus(s => (s === 'active' ? s : 'loading')); fetchRoute(dest, m, originRef.current && status !== 'active' ? originRef.current.coordinates : from).then(r => { if (r !== undefined) setStatus(s => (r ? (s === 'active' ? 'active' : 'preview') : 'error')); }); }
+  }, [dest, fetchRoute, from, status]);
 
   const stopSim = useCallback(() => { if (simTimer.current) clearInterval(simTimer.current); simTimer.current = null; setSimulating(false); loc.setSimulated(null); }, [loc]);
 
@@ -106,7 +114,7 @@ export function NavigationProvider({ children }: { children: React.ReactNode }) 
     spoken.current = { step: -1, near: false, at: false };
     offCount.current = 0;
     lastOffFix.current = null;
-    if (demoRef.current && !loc.simulated) loc.setSimulated(DEMO_POSITION);
+    if (demoRef.current && (!loc.simulated || originRef.current)) loc.setSimulated(originRef.current?.coordinates ?? DEMO_POSITION);
     setStatus('active');
     Haptics.selectionAsync().catch(() => {});
     if (!muted && current.steps[0]) speak(current.steps[1] ? makeT(lang)('{first}. Then {next}', { first: trStep(current.steps[0].text, makeT(lang)), next: trStep(current.steps[1].text, makeT(lang)).toLowerCase() }) : trStep(current.steps[0].text, makeT(lang)), lang);
@@ -117,6 +125,7 @@ export function NavigationProvider({ children }: { children: React.ReactNode }) 
     requestId.current++;
     routeRef.current = null;
     setStatus('idle'); setRoute(null); setDest(null); setError(null);
+    originRef.current = null; setOrigin(null);
   }, [stopSim]);
 
   // where each step starts, measured along the line
@@ -184,8 +193,8 @@ export function NavigationProvider({ children }: { children: React.ReactNode }) 
   }, [route, progress.along, loc, stopSim]);
   useEffect(() => () => { if (simTimer.current) clearInterval(simTimer.current); }, []);
 
-  const value = useMemo<Ctx>(() => ({ dest, mode, route, status, error, progress, muted, simulating, startedFromDemo, preview, setMode, start, stop, setMuted, toggleSimulate, stepAlong }),
-    [dest, mode, route, status, error, progress, muted, simulating, startedFromDemo, preview, setMode, start, stop, toggleSimulate, stepAlong]);
+  const value = useMemo<Ctx>(() => ({ dest, mode, route, status, error, progress, muted, simulating, startedFromDemo, origin, preview, setMode, start, stop, setMuted, toggleSimulate, stepAlong }),
+    [dest, mode, route, status, error, progress, muted, simulating, startedFromDemo, origin, preview, setMode, start, stop, toggleSimulate, stepAlong]);
   return <Nav.Provider value={value}>{children}</Nav.Provider>;
 }
 

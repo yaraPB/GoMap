@@ -783,6 +783,8 @@ export function createApp(ctx: AppContext) {
     if (!Array.isArray(phrases) || phrases.some(p => typeof p !== 'string')) throw bad('match_phrases must be a list of strings');
     const status = (b.status ?? existing?.status ?? 'draft') as string;
     if (!['draft', 'review', 'live'].includes(status)) throw bad('status must be draft, review or live');
+    const channel = (b.channel ?? existing?.channel ?? 'in_person') as string;
+    if (!['in_person', 'online', 'mixed'].includes(channel)) throw bad('channel must be in_person, online or mixed');
     const row = {
       title: str(b.title) ?? existing?.title, summary: str(b.summary, 1000) ?? existing?.summary, owner_office: str(b.owner_office) ?? existing?.owner_office,
       place_id: b.place_id !== undefined ? (b.place_id as string | null) : existing?.place_id ?? null,
@@ -791,12 +793,12 @@ export function createApp(ctx: AppContext) {
       verified_at: b.verify === true || (status === 'live' && existing?.status !== 'live') ? now() : existing?.verified_at ?? null,
     };
     if (!row.title || !row.summary || !row.owner_office) throw bad('title, summary and owner_office are required');
-    db.prepare(`INSERT INTO procedures (id,title,summary,owner_office,place_id,contact_email,steps,match_phrases,source,status,verified_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+    db.prepare(`INSERT INTO procedures (id,title,summary,owner_office,place_id,contact_email,steps,match_phrases,source,status,verified_at,updated_at,channel) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
       ON CONFLICT(id) DO UPDATE SET title=excluded.title, summary=excluded.summary, owner_office=excluded.owner_office, place_id=excluded.place_id,
       contact_email=excluded.contact_email, steps=excluded.steps, match_phrases=excluded.match_phrases, source=excluded.source, status=excluded.status,
-      verified_at=excluded.verified_at, updated_at=excluded.updated_at`)
-      .run(id, row.title, row.summary, row.owner_office, row.place_id, row.contact_email, JSON.stringify(steps), JSON.stringify(phrases), row.source, status, row.verified_at, now());
-    changeLog('procedure', id, existing ? 'update' : 'create', { ...row, status }, 'admin');
+      verified_at=excluded.verified_at, updated_at=excluded.updated_at, channel=excluded.channel`)
+      .run(id, row.title, row.summary, row.owner_office, row.place_id, row.contact_email, JSON.stringify(steps), JSON.stringify(phrases), row.source, status, row.verified_at, now(), channel);
+    changeLog('procedure', id, existing ? 'update' : 'create', { ...row, status, channel }, 'admin');
   };
   admin.post('/procedures', wrap(async (req, res) => {
     const title = str(req.body?.title);
@@ -815,6 +817,17 @@ export function createApp(ctx: AppContext) {
     saveProcedure(id, req.body ?? {}, existing);
     await assistant.refresh();
     res.json(db.prepare('SELECT * FROM procedures WHERE id = ?').get(id));
+  }));
+  // where online procedures happen (add/drop, cash wallet, housing reservation): one name and link for all of them
+  admin.get('/student-portal', (_req, res) => { res.json(assistant.portal()); });
+  admin.put('/student-portal', wrap(async (req, res) => {
+    const name = str(req.body?.name, 80) ?? 'the student portal';
+    const url = str(req.body?.url, 300) ?? null;
+    if (url && !/^https:\/\/[^\s]+$/i.test(url)) throw bad('url must start with https://');
+    meta.set(db, 'student_portal', JSON.stringify({ name, url }));
+    changeLog('settings', 'student_portal', 'update', { name, url }, 'admin');
+    db.prepare('DELETE FROM assistant_cache').run();
+    res.json(assistant.portal());
   }));
   admin.post('/procedures/preview', wrap(async (req, res) => {
     // what a student would be told, without saving

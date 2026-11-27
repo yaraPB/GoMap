@@ -19,6 +19,28 @@ key in a chat or an issue.** When a step says "tell me", send the *result* (e.g.
 
 ## 0. What changed in this round (read first)
 
+**Assistant round (27 Nov 2026)**
+- **Two things only you can do:** turn on **billing** for the Google AI Studio project (section 1), and **top up Soniox**
+  (section 3: the account says "Organization balance exhausted"). Until then the assistant and voice still work, on
+  the fallbacks.
+- **The assistant stays on AUI.** Dangerous requests, attempts to change its rules ("ignore your instructions…"),
+  off-topic questions and gibberish get a fixed, polite refusal. Someone who mentions self-harm gets Counseling and
+  Security's 24/7 number, never a refusal. The obvious cases are caught on the server for free; the model has a
+  `decline` tool for the rest and never writes a refusal itself.
+- **New things it does:** "from the library to building 11" (the route starts at the library; EN/FR/AR/Darija);
+  "where can I eat / sports facilities / the dorms" switches the map's filter chip; "tell me about SSE" (school,
+  dean, programs, website); professors' office hours, whether they are in, and their email in one answer; housing
+  questions go to the Housing reception in **Building 38** (Building 39 mentioned too); greetings and "thanks".
+- **New procedures** (status *review*: confirm them in Admin → Procedures, then set them *live*): declare a
+  concentration, pre-registration clearance, and three **online** ones: add/drop, refilling the cash wallet, housing
+  reservation. Online answers say "on the student portal": name it and add its link in **Admin → Procedures →
+  Student portal**. Every procedure answer ends with who to contact.
+- **15 more starter tests** in Admin → Assistant → Tests (33 in all). They are added once to existing databases.
+- **Repeated questions are instant:** what the model resolved is reused for 6 hours (cleared on every admin edit),
+  except inside a conversation.
+
+**Previous round**
+
 - **New: Claude as the assistant model.** The server picks the model with `ASSISTANT_PROVIDER`:
   `auto` (default: Claude if `ANTHROPIC_API_KEY` is set, otherwise Gemini), `claude`, or `gemini`.
 - **New tables** (events, assistant rules, assistant tests, note expiry) are created automatically on the next start.
@@ -32,12 +54,13 @@ key in a chat or an issue.** When a step says "tell me", send the *result* (e.g.
 - **Atlas hiccups no longer crash the API.** A dropped connection (`ECONNRESET`) is logged and the driver reconnects
   by itself (section 4).
 
-## 1. The assistant model: Gemini (what you have), Claude optional
+## 1. The assistant model: Gemini 3.5 Flash, with flash-lite as the fallback
 
 **Why the model matters less than you'd think.** Most questions never reach it: your rules, places, people, offices,
 procedures and events are answered locally, for free, in ~50 ms. The model only resolves what is left, and it can only
-*choose* one of our records through tools (`campus_rule`, `find_place`, `get_person_office`, `get_procedure`,
-`find_service`, `whats_on`, `campus_info`). The facts on screen are built by the server from that record.
+*choose* one of our records through tools (`campus_rule`, `find_place`, `route_between`, `browse_category`,
+`get_person_office`, `get_procedure`, `find_service`, `find_department`, `whats_on`, `campus_info`, `decline`). The facts
+on screen are built by the server from that record.
 
 **What was measured on your key (15 Nov 2026).** `npm run assistant:eval -- --model-only <models>` sends 16 indirect
 questions (EN/FR/Darija, plus two off-topic ones) straight to each model and scores where the answer lands:
@@ -57,15 +80,21 @@ minute. So the model you already had is the right one; what was wrong was handli
 - moves to the next model in `GEMINI_FALLBACK_MODELS` when a model has no quota ("limit: 0") or was retired, and keeps
   using the one that works (the configured model is retried every 10 minutes).
 
-**Your `server/.env` (nothing to change; the second line is optional, these are the defaults):**
+**Now (27 Nov): `gemini-3.5-flash` is the configured model**, because it follows the scope rules and picks tools
+better than flash-lite. Your `server/.env` already says so (the second line is optional; these are the defaults):
 ```env
-GEMINI_MODEL=gemini-3.5-flash-lite
-GEMINI_FALLBACK_MODELS=gemini-3.5-flash-lite,gemini-3.1-flash-lite,gemini-flash-lite-latest
+GEMINI_MODEL=gemini-3.5-flash
+GEMINI_FALLBACK_MODELS=gemini-3.5-flash,gemini-3.5-flash-lite,gemini-3.1-flash-lite,gemini-flash-lite-latest
 ```
 
-**If students use it a lot,** the free tier will run out (you'd see "the assistant is busy"). Enable billing on the
-Google AI Studio project: the same key then gets real quotas, and `gemini-3.5-flash` becomes worth a re-test with the
-eval. Re-run `npm run assistant:eval` after any model change and **tell me** the score.
+**It needs billing.** Measured on your key today: `gemini-3.5-flash` never answers (no free quota; Google leaves the
+request hanging instead of saying 429), while `gemini-3.5-flash-lite` answers in 0.4–1 s. So the server gives a model
+8 seconds; if it hangs, it moves to the next one and skips the hung one for 10 minutes. Until billing is on, the first
+model question after a start takes ~9 s and then flash-lite answers in ~1 s. **To fix:** Google AI Studio → your
+project → **Set up billing**. The same key then reaches `gemini-3.5-flash` (very cheap at campus volume: most questions
+never reach the model). Then run `npm run assistant:eval` and **tell me** the score.
+
+**Faster:** the model uses Gemini's "low" thinking level (choosing a tool is not a reasoning task).
 
 **Claude (optional).** Set `ANTHROPIC_API_KEY` (and `ASSISTANT_PROVIDER=claude` or leave `auto`) to switch; `CLAUDE_MODEL`
 defaults to `claude-opus-5-5` (`claude-haiku-5-5` is cheaper). Gemini stays the voice fallback either way.
@@ -99,6 +128,11 @@ Two modes, same key:
 3. Restart the API. The voice screen says **"live words by Soniox"** when streaming works. **Tell me** if it doesn't.
 
 Without Soniox, recorded voice is transcribed by Gemini.
+
+**Your account is out of credit (checked 27 Nov).** The key and the models are fine, but Soniox answers every
+transcription with "Organization balance exhausted". Add funds or enable autopay at <https://console.soniox.com> →
+Billing. Meanwhile voice keeps working: recorded questions fall back to Gemini on the server, and a dev build that
+gets the same refusal on the live stream switches to the phone's own speech recognition for the rest of the session.
 
 ## 4. MongoDB Atlas: map data that persists
 

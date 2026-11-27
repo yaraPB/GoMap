@@ -40,14 +40,22 @@ export default function Assistant({ tab: initial }: { tab?: string }) {
   );
 }
 
+/** Why a question was refused (the reply itself is fixed text, written once in server/src/assistant/guard.ts). */
+const DECLINED: Record<NonNullable<TryAnswer['declined']>, string> = {
+  off_topic: 'refused: not about AUI', dangerous: 'refused: harmful request', injection: 'refused: tried to change the rules', nonsense: 'refused: no clear meaning',
+};
+
 function AnswerView({ a }: { a: TryAnswer }) {
-  const target = a.rule ? `rule: ${a.rule.title}` : a.place ? `place: ${a.place.name}` : a.service ? `office: ${a.service.short_name}` : a.procedure ? `procedure: ${a.procedure.title}` : a.person ? `person: ${a.person.name}` : a.events ? `${a.events.length} events` : null;
+  const target = a.rule ? `rule: ${a.rule.title}` : a.route_from && a.place ? `route: ${a.route_from.name} → ${a.place.name}` : a.department ? `school: ${a.department.name}` : a.browse ? `map filter: ${a.browse.category} (${a.browse.count})`
+    : a.place ? `place: ${a.place.name}` : a.service ? `office: ${a.service.short_name}` : a.procedure ? `procedure: ${a.procedure.title}` : a.person ? `person: ${a.person.name}` : a.events ? `${a.events.length} events` : null;
+  const refused = a.declined ? DECLINED[a.declined] : null;
   return (
     <div className="stack" style={{ gap: 10 }}>
       {a.alert && <Notice tone={a.alert.tone === 'urgent' ? 'miss' : 'warn'}>{a.alert.text}</Notice>}
       <div className="bubble">{a.text}</div>
       <div className="toolbar">
         <span className={`pill ${a.intent === 'unknown' ? 'miss' : 'ok'}`}>{a.intent}</span>
+        {refused && <span className="pill miss" title="The guard refused it with a fixed reply; nothing was invented">{refused}</span>}
         {target && <span className="pill blue">{target}</span>}
         <span className="pill">{a.answered_by === 'local' ? 'answered locally (free, instant)' : `answered with ${a.answered_by}`}</span>
         {a.trace && <span className="pill">{a.trace.ms} ms</span>}

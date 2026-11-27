@@ -13,7 +13,7 @@ import { peopleFromDirectory } from './people.js';
 import { procedureSeeds } from './procedures.js';
 import { ACCOUNT_SEEDS, campusHours, issuesFromJson, servicesFromJson, type IssueJson, type ServiceJson, type WorkingHoursJson } from './services.js';
 
-const SEED_VERSION = '2026-11-15';
+const SEED_VERSION = '2026-11-27';
 const readJson = <T>(file: string): T => JSON.parse(readFileSync(file, 'utf8')) as T;
 
 /**
@@ -127,9 +127,14 @@ export async function seedMongo(now: string, dataDir = DATA_DIR) {
   return geo.source;
 }
 
-type DirectoryJson = Parameters<typeof peopleFromDirectory>[0] & {
+type DirectoryJson = Omit<Parameters<typeof peopleFromDirectory>[0], 'departments'> & {
   working_hours?: WorkingHoursJson; offices_and_services?: ServiceJson[]; student_issue_routing?: IssueJson[];
+  university?: { name?: string; phone?: string; email?: string; website?: string; academic_catalog?: string };
+  departments: (Parameters<typeof peopleFromDirectory>[0]['departments'][number] & SchoolJson)[];
 };
+/** A school as the assistant describes it (find_department). */
+export type SchoolJson = { id: string; name?: string; location?: { main_building?: string; notes?: string }; website?: string; description?: string; programs?: string[]; services?: string[];
+  staff_contacts?: { name: string; role?: string; office?: string | null; hours?: string | null; phone?: string | null; email?: string | null }[] };
 
 /**
  * SQLite from data/aui_departments_faculty.json. Runs at every boot: empty tables are filled, and
@@ -152,12 +157,12 @@ export function seedSqlite(db: Sql, now: string, dataDir = DATA_DIR) {
       office_hours=excluded.office_hours, hours_raw=excluded.hours_raw, conflict=excluded.conflict, verified_at=excluded.verified_at,
       source=excluded.source, updated_at=excluded.updated_at WHERE people.admin_edited = 0`);
   // procedures the admin never touched are refreshed with the seed when the JSON changes
-  const procCols = `INSERT INTO procedures (id,title,summary,owner_office,place_id,contact_email,steps,match_phrases,source,status,verified_at,updated_at)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`;
+  const procCols = `INSERT INTO procedures (id,title,summary,owner_office,place_id,contact_email,steps,match_phrases,source,status,verified_at,updated_at,channel)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`;
   const proc = db.prepare(changed ? `${procCols}
       ON CONFLICT(id) DO UPDATE SET title=excluded.title, summary=excluded.summary, owner_office=excluded.owner_office, place_id=excluded.place_id,
       contact_email=excluded.contact_email, steps=excluded.steps, match_phrases=excluded.match_phrases, source=excluded.source, status=excluded.status,
-      verified_at=excluded.verified_at, updated_at=excluded.updated_at
+      verified_at=excluded.verified_at, updated_at=excluded.updated_at, channel=excluded.channel
       WHERE NOT EXISTS (SELECT 1 FROM change_log WHERE entity = 'procedure' AND entity_id = procedures.id)` : `${procCols} ON CONFLICT(id) DO NOTHING`);
   const service = db.prepare(`INSERT INTO services (id,name,short_name,category,handles,keywords,place_ids,location_text,room,email,extension,phone,hours,hours_raw,notes,sort,source,verified_at,updated_at)
       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
@@ -181,7 +186,7 @@ export function seedSqlite(db: Sql, now: string, dataDir = DATA_DIR) {
     }
     for (const p of procedureSeeds(dir.retrieved_on)) {
       proc.run(p.id, p.title, p.summary, p.owner_office, p.place_id, p.contact_email, JSON.stringify(p.steps), JSON.stringify(p.match_phrases),
-        p.source, p.status, p.verified_at, now);
+        p.source, p.status, p.verified_at, now, p.channel ?? 'in_person');
     }
     // the Registrar is in Building 1 (offices list), not Building 2 as the design brief guessed
     db.prepare(`UPDATE procedures SET place_id = 'building-1', contact_email = 's.moujahid@aui.ma', owner_office = 'Registrar (Registration Office)',
@@ -198,6 +203,10 @@ export function seedSqlite(db: Sql, now: string, dataDir = DATA_DIR) {
     }
     for (const a of ACCOUNT_SEEDS) account.run(a.id, a.name, a.role, a.person_id, a.description, a.sort);
     if (changed || !meta.get(db, 'campus_hours')) meta.set(db, 'campus_hours', JSON.stringify(campus));
+    // schools and the university's own contacts, for "tell me about SSE" and "who do I ask"
+    meta.set(db, 'schools', JSON.stringify(dir.departments.map(d => ({ id: d.id, name: d.name, location: d.location, website: d.website, description: d.description,
+      programs: d.programs ?? [], services: d.services ?? [], staff_contacts: d.staff_contacts ?? [] }))));
+    if (dir.university) meta.set(db, 'university', JSON.stringify(dir.university));
     meta.set(db, 'directory_hash', hash);
     db.exec('COMMIT');
   } catch (error) { db.exec('ROLLBACK'); throw error; }

@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { api, fmtDate, type Procedure } from '../api';
+import { api, fmtDate, type Procedure, type StudentPortal } from '../api';
 import { CampusMap, Notice, Tags, useLoad, type MapPoint } from '../ui';
 
-const EMPTY: Procedure = { id: 'new', title: '', summary: '', owner_office: '', place_id: null, contact_email: null, steps: [{ title: '', body: '' }], match_phrases: [], source: '', status: 'draft', verified_at: null, unverified: true };
+const EMPTY: Procedure = { id: 'new', title: '', summary: '', owner_office: '', place_id: null, contact_email: null, steps: [{ title: '', body: '' }], match_phrases: [], source: '', status: 'draft', verified_at: null, unverified: true, channel: 'in_person' };
+const CHANNEL: Record<NonNullable<Procedure['channel']>, string> = { in_person: 'In person', online: 'Online (student portal)', mixed: 'In person + online' };
 
 /** Board 27: the register the assistant answers from. Linking a place is what makes "guide me there" route. */
 export default function Procedures({ selected, select }: { selected?: string; select: (id: string) => void }) {
@@ -24,6 +25,7 @@ export default function Procedures({ selected, select }: { selected?: string; se
       <CampusMap points={points} selected={selected} onSelect={select} height={320}>
         <div className="glass"><div className="legend"><span><i className="dot" style={{ background: '#0B7A47' }} />Live</span><span><i className="dot" style={{ background: '#E0841F' }} />In review</span><span><i className="dot" style={{ background: '#D63B2F' }} />Draft</span></div></div>
       </CampusMap>
+      {!selected && <PortalSettings />}
       {!selected && <ProcedureTable list={list.data ?? []} select={select} />}
       <div className="split">
         <div className="card" style={{ padding: 10 }}>
@@ -49,11 +51,12 @@ function ProcedureTable({ list, select }: { list: Procedure[]; select: (id: stri
   return (
     <div className="card tablewrap" style={{ padding: 6, marginBottom: 16 }}>
       <table>
-        <thead><tr><th>Procedure</th><th>Office</th><th>Where</th><th>Contact</th><th>Steps</th><th>Status</th><th>Verified</th></tr></thead>
+        <thead><tr><th>Procedure</th><th>How</th><th>Office</th><th>Where</th><th>Contact</th><th>Steps</th><th>Status</th><th>Verified</th></tr></thead>
         <tbody>
           {list.map(p => (
             <tr key={p.id} style={{ cursor: 'pointer' }} onClick={() => select(p.id)}>
               <td><b>{p.title}</b></td>
+              <td>{p.channel && p.channel !== 'in_person' ? <span className="pill blue">{CHANNEL[p.channel]}</span> : CHANNEL.in_person}</td>
               <td>{p.owner_office}</td>
               <td>{name(p.place_id)}</td>
               <td>{p.contact_email ?? <span className="pill miss">not published</span>}</td>
@@ -76,7 +79,7 @@ function Editor({ initial, onSaved }: { initial: Procedure | null; onSaved: (id:
   const [preview, setPreview] = useState<Awaited<ReturnType<typeof api.preview>> | null>(null);
   useEffect(() => { setF(initial); setQuestion(initial?.match_phrases[0] ?? ''); }, [initial?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!f) return <div className="card empty">Loading…</div>;
-  const body = () => ({ title: f.title, summary: f.summary, owner_office: f.owner_office, place_id: f.place_id, contact_email: f.contact_email ?? '', steps: f.steps.filter(s => s.title.trim()), match_phrases: f.match_phrases, source: f.source ?? '', status: f.status });
+  const body = () => ({ title: f.title, summary: f.summary, owner_office: f.owner_office, place_id: f.place_id, contact_email: f.contact_email ?? '', steps: f.steps.filter(s => s.title.trim()), match_phrases: f.match_phrases, source: f.source ?? '', status: f.status, channel: f.channel ?? 'in_person' });
   const save = async (extra: Record<string, unknown> = {}) => {
     setMsg(null);
     try {
@@ -100,6 +103,9 @@ function Editor({ initial, onSaved }: { initial: Procedure | null; onSaved: (id:
         <div className="grid2">
           <label className="f">Title<input className="i" value={f.title} onChange={e => setF({ ...f, title: e.target.value })} /></label>
           <label className="f">Owning office<input className="i" value={f.owner_office} onChange={e => setF({ ...f, owner_office: e.target.value })} /></label>
+          <label className="f">How it is done (online ones say so, with the student portal)<select className="i" value={f.channel ?? 'in_person'} onChange={e => setF({ ...f, channel: e.target.value as Procedure['channel'] })}>
+            {Object.entries(CHANNEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+          </select></label>
           <label className="f">Where it happens (makes “guide me there” work)<select className="i" value={f.place_id ?? ''} onChange={e => setF({ ...f, place_id: e.target.value || null })}>
             <option value="">No place</option>{(places.data ?? []).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select></label>
@@ -137,6 +143,31 @@ function Editor({ initial, onSaved }: { initial: Procedure | null; onSaved: (id:
           ) : <p className="sub">Save, then ask a question to see the real answer.</p>}
         </div>
       </div>
+    </div>
+  );
+}
+
+/** Where online procedures happen. The assistant names it in every online answer, and links to it when a URL is set. */
+function PortalSettings() {
+  const portal = useLoad(api.studentPortal);
+  const [f, setF] = useState<StudentPortal | null>(null);
+  const [msg, setMsg] = useState<{ tone: 'ok' | 'miss'; text: string } | null>(null);
+  useEffect(() => { if (portal.data) setF(portal.data); }, [portal.data]);
+  if (!f) return null;
+  const save = async () => {
+    try { setF(await api.saveStudentPortal({ name: f.name.trim() || 'the student portal', url: f.url?.trim() || null })); setMsg({ tone: 'ok', text: 'Saved. Online procedures now point there.' }); }
+    catch (e) { setMsg({ tone: 'miss', text: e instanceof Error ? e.message : 'Could not save' }); }
+  };
+  return (
+    <div className="card" style={{ marginBottom: 16 }}>
+      <h3 style={{ marginTop: 0 }}>Student portal (online procedures)</h3>
+      <p className="sub">Add/drop, refilling the cash wallet and housing reservation are done online. The assistant says “on {f.name}” and shows an Open button when a link is set.</p>
+      <div className="toolbar" style={{ alignItems: 'flex-end' }}>
+        <label className="f" style={{ flex: 1 }}>Name<input className="i" value={f.name} onChange={e => setF({ ...f, name: e.target.value })} placeholder="the student portal" /></label>
+        <label className="f" style={{ flex: 2 }}>Link (optional, https://…)<input className="i" value={f.url ?? ''} onChange={e => setF({ ...f, url: e.target.value })} placeholder="https://" /></label>
+        <button className="btn dark" onClick={save}>Save</button>
+      </div>
+      {msg && <Notice tone={msg.tone}>{msg.text}</Notice>}
     </div>
   );
 }

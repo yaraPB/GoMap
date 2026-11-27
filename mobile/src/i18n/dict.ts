@@ -4,6 +4,14 @@
  * Place, people and office names are never translated.
  */
 const fr: Record<string, string> = {
+  // assistant: procedures done online, map filters, routes from a place, schools
+  'Dean: {name}': 'Doyen(ne) : {name}',
+  'Done online · {portal}': 'En ligne · {portal}',
+  'In person and online · {portal}': 'Sur place et en ligne · {portal}',
+  'Show all {n} on the map · {chip}': 'Voir les {n} sur la carte · {chip}',
+  'This route starts at {place}, not where you are.': 'Cet itinéraire part de {place}, pas de votre position.',
+  'Website': 'Site web',
+  'the student portal': 'le portail étudiant',
   '1 office': '1 bureau',
   '1 road crossing · cars': '1 traversée de route · voitures',
   '1 spot on the map. Pick another to switch it up.': '1 lieu sur la carte. Choisissez-en un autre pour changer.',
@@ -627,6 +635,14 @@ const fr: Record<string, string> = {
 };
 
 const ar: Record<string, string> = {
+  // assistant: procedures done online, map filters, routes from a place, schools
+  'Dean: {name}': 'العميد: {name}',
+  'Done online · {portal}': 'عبر الإنترنت · {portal}',
+  'In person and online · {portal}': 'حضوريًا وعبر الإنترنت · {portal}',
+  'Show all {n} on the map · {chip}': 'اعرض الـ{n} على الخريطة · {chip}',
+  'This route starts at {place}, not where you are.': 'يبدأ هذا المسار من {place}، وليس من موقعك.',
+  'Website': 'الموقع الإلكتروني',
+  'the student portal': 'بوابة الطالب',
   '1 office': 'مكتب واحد',
   '1 road crossing · cars': 'عبور طريق واحد · سيارات',
   '1 spot on the map. Pick another to switch it up.': 'مكان واحد على الخريطة. اختر غيره للتبديل.',

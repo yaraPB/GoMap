@@ -2226,9 +2226,11 @@
       "handles": [
         "Room assignments and changes",
         "Dorm maintenance issues",
-        "Residence rules and hall directors"
+        "Residence rules and hall directors",
+        "Dorm information, keys, check-in and check-out",
+        "Housing reservation questions"
       ],
-      "location": "Building 38 & Building 39",
+      "location": "Building 38 (Housing reception); also Building 39",
       "email": "housingservices@aui.ma",
       "extension": "3333",
       "phone": "+212 535-86-3333",
@@ -2549,9 +2551,10 @@
       "location": "Building 10"
     },
     {
-      "issue": "Housing, room change, dorm maintenance",
+      "issue": "Housing, dorm information, room change, dorm maintenance",
       "go_to": "Housing & Residential Life",
-      "location": "Building 39"
+      "location": "Building 38",
+      "notes": "The Housing reception is in Building 38; the Housing office in Building 39 can also help."
     },
     {
       "issue": "Feeling sick, injury, medical certificate for absence",

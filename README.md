@@ -138,19 +138,25 @@ use), orange on stairs, amber where it is steeper than a ramp.
 
 ### Assistant: local first, AI model second, admin rules above both
 
+0. **Scope guard** (`guard.ts`, before everything) — dangerous requests, attempts to rewrite the rules and (after the
+   router misses) off-topic questions and gibberish get a fixed refusal, for free; self-harm gets Counseling and
+   Security's 24/7 line. The model calls a `decline` tool for subtler cases; it never writes a refusal.
 1. **Admin rules** — answers the admin writes word for word (EN/FR/AR), with optional directions, office card or
    procedure steps. They win every tie. One example ships (Emergency → Security 24/7, a number already in the data).
 2. **Local router** (`router.ts`, Fuse.js + phrase matching) over places, people, offices, issue routing, procedures and
-   events. Handles Darija/French/Arabic number words, "8 b" → "8B", Arabic digits. Free and ~50 ms.
+   events, plus routes between two places ("from the library to building 11", EN/FR/AR/Darija), kinds of place that
+   switch the map filter ("where can I eat?"), schools and departments, greetings. Handles Darija/French/Arabic number
+   words, "8 b" → "8B", Arabic digits. Free and ~50 ms.
 3. **AI model** only for what is left, through tools that run on our records. Provider adapter (`assistant/llm.ts`):
    - **Claude** (`claude-opus-5-5` by default, official `@anthropic-ai/sdk`) when `ANTHROPIC_API_KEY` is set: most
      reliable tool choice on mixed-language questions, prompt-cached system prompt, effort `low` (this is routing, not
      reasoning), server-side refusal fallbacks on.
-   - **Gemini** otherwise — the current setup. Measured on the project's free-tier key with `npm run assistant:eval`:
-     `gemini-3.5-flash-lite` got every question it answered right and was fastest; the bigger models have no free
-     quota. The client retries short rate limits and falls back along `GEMINI_FALLBACK_MODELS` instead of failing.
+   - **Gemini** otherwise — the current setup: `gemini-3.5-flash` (needs billing on the AI Studio project), low thinking
+     level, falling back to `gemini-3.5-flash-lite` when a model has no quota, is retired, or hangs (8 s). The client
+     retries short rate limits and falls back along `GEMINI_FALLBACK_MODELS` instead of failing. What the model
+     resolved is cached for 6 hours (not inside a conversation).
      Gemini is also always the voice-transcription fallback (Claude has no audio input).
-4. **Tests** — 18 starter questions with the record they must land on, editable in Admin → Assistant → Tests and run
+4. **Tests** — 33 starter questions with the record they must land on (refusals included), editable in Admin → Assistant → Tests and run
    in CI (`server/test/api.test.ts`), plus `npm run assistant:eval`: 16 indirect questions scored per model. Running
    them found and fixed five misroutes ("park my car" → *Careers*, "Harit Satt's office" → *Business Office*,
    "World Cup" → *ITS* via "password", "I would *love* to study in Spain" → a professor named Love, "start a student

@@ -24,6 +24,10 @@ export class Gemini implements Llm {
   private chain: string[];
   private active = 0;
   private activeSince = 0;
+  /** model → until when it is skipped after hanging */
+  private stalled = new Map<string, number>();
+  /** per request: a tool choice takes ~1 s; a model that has not answered in 8 s is not going to */
+  timeoutMs = 8000;
   constructor(private apiKey: string, model: string, private fetchImpl: typeof fetch = fetch, fallbacks: string[] = []) {
     this.chain = [...new Set([model, ...fallbacks].filter(Boolean))];
   }
@@ -38,15 +42,24 @@ export class Gemini implements Llm {
    * the model was retired: next model. The working model stays in use; the configured one is retried
    * every 10 minutes.
    */
-  private async generate(body: unknown) {
+  private async generate(body: unknown, timeoutMs = this.timeoutMs) {
     if (!this.apiKey) throw new LlmUnavailable('The AI assistant is not configured on the server (GEMINI_API_KEY).');
     if (this.active && Date.now() - this.activeSince > 10 * 60_000) this.active = 0;
     for (let i = this.active; i < this.chain.length; i++) {
+      // a model that hung recently is skipped for a while, so students do not wait on it again
+      if ((this.stalled.get(this.chain[i]) ?? 0) > Date.now()) continue;
       for (let attempt = 0; attempt < 2; attempt++) {
-        const response = await this.fetchImpl(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(this.chain[i])}:generateContent`, {
-          method: 'POST', headers: { 'content-type': 'application/json', 'x-goog-api-key': this.apiKey },
-          body: JSON.stringify(body), signal: AbortSignal.timeout(20000),
-        });
+        let response: Response;
+        try {
+          response = await this.fetchImpl(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(this.chain[i])}:generateContent`, {
+            method: 'POST', headers: { 'content-type': 'application/json', 'x-goog-api-key': this.apiKey },
+            body: JSON.stringify(body), signal: AbortSignal.timeout(timeoutMs),
+          });
+        } catch (error) {
+          // Free-tier keys can leave a model with no quota hanging instead of answering 429: next model
+          if (error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError')) { this.stalled.set(this.chain[i], Date.now() + 10 * 60_000); break; }
+          throw new LlmUnavailable('Could not reach Gemini (network).');
+        }
         if (response.ok) {
           if (i !== this.active) { this.active = i; this.activeSince = Date.now(); }
           const data = await response.json() as { candidates?: { content?: { parts?: Part[] } }[] };
@@ -59,6 +72,14 @@ export class Gemini implements Llm {
           break; // no quota on this model, or a long wait: try the next model
         }
         if (response.status === 404) break;
+        // a model that does not take a thinking level: ask again without it
+        if (response.status === 400 && /thinking/i.test(text) && body && typeof body === 'object' && (body as { generationConfig?: { thinkingConfig?: unknown } }).generationConfig?.thinkingConfig) {
+          const { thinkingConfig: _drop, ...generationConfig } = (body as { generationConfig: Record<string, unknown> }).generationConfig;
+          void _drop;
+          body = { ...(body as object), generationConfig };
+          attempt--;
+          continue;
+        }
         throw new LlmUnavailable(`Gemini request failed (${response.status}).`);
       }
     }
@@ -75,7 +96,9 @@ export class Gemini implements Llm {
     for (let turn = 0; turn < 4; turn++) {
       const parts = await this.generate({
         systemInstruction: { parts: [{ text: SYSTEM(lang) }] }, contents, tools: TOOLS,
-        generationConfig: { temperature: 0.2, maxOutputTokens: 300 },
+        // low thinking: this is choosing a tool, not reasoning, and students are waiting.
+        // The budget covers the thinking tokens too, so a tool call is never cut off.
+        generationConfig: { temperature: 0.2, maxOutputTokens: 1024, thinkingConfig: { thinkingLevel: 'low' } },
       });
       const fnCalls = parts.filter(p => p.functionCall);
       if (!fnCalls.length) {
@@ -108,7 +131,7 @@ export class Gemini implements Llm {
         { inlineData: { mimeType, data: audio.toString('base64') } },
       ] }],
       generationConfig: { temperature: 0, maxOutputTokens: 200 },
-    });
+    }, 12_000); // a short question clip takes longer than a tool choice, but not much
     return parts.map(p => p.text ?? '').join('').trim();
   }
 }

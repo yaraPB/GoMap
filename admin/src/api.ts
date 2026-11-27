@@ -52,7 +52,10 @@ export type CampusHours = { open: string; close: string; lunch: [string, string]
 export type OfficeTimeRow = { id: string; name: string; department: string | null; place: { id: string; name: string } | null; office_number: string | null; hours: Hours | null; hours_text: string | null;
   published_min: number; in_min: number; busy_min: number; sessions: number; by_day: Record<string, number>; ratio: number | null; heat: number[][] | null };
 export type Procedure = { id: string; title: string; summary: string; owner_office: string; place_id: string | null; contact_email: string | null;
-  steps: { title: string; body: string }[]; match_phrases: string[]; source: string | null; status: 'draft' | 'review' | 'live'; verified_at: string | null; unverified: boolean };
+  steps: { title: string; body: string }[]; match_phrases: string[]; source: string | null; status: 'draft' | 'review' | 'live'; verified_at: string | null; unverified: boolean;
+  /** in_person: at an office · online: on the student portal · mixed: both */
+  channel?: 'in_person' | 'online' | 'mixed' };
+export type StudentPortal = { name: string; url: string | null };
 export type ReportCluster = {
   cluster_id: string; status: string; kind: string; count: number; coordinates: [number, number]; place: { id: string; name: string } | null;
   closure: { from: string; until: string | null; reason: string; radius_m: number } | null; first_at: string; last_at: string;
@@ -74,7 +77,9 @@ export type Rule = { id: string; title: string; triggers: string[]; answer: stri
   procedure_id: string | null; urgent: boolean; enabled: boolean; hits: number; updated_at: string };
 export type Trace = { candidates: { intent: string; id: string; score: number }[]; tools: { name: string; args: Record<string, string>; found: boolean }[]; ms: number; model: string | null };
 export type TryAnswer = { intent: string; text: string; answered_by: string; rule?: { id: string; title: string }; place?: { id: string; name: string }; service?: { id: string; short_name: string };
-  procedure?: { id: string; title: string }; person?: { id: string; name: string }; events?: CampusEvent[]; alert?: { tone: string; text: string }; trace?: Trace; unverified?: boolean };
+  procedure?: { id: string; title: string }; person?: { id: string; name: string }; events?: CampusEvent[]; alert?: { tone: string; text: string }; trace?: Trace; unverified?: boolean;
+  department?: { id: string; name: string }; browse?: { category: string; count: number }; route_from?: { id: string; name: string };
+  declined?: 'off_topic' | 'dangerous' | 'injection' | 'nonsense' };
 export type TestResult = { pass: boolean; why: string[]; intent: string; id: string | null; text: string; answered_by: string; trace: Trace | null; at: string };
 export type AssistantTest = { id: string; question: string; lang: string; expect_intent: string | null; expect_id: string | null; expect_text: string | null; last_result: TestResult | null; updated_at: string };
 export type FootprintFC = { type: 'FeatureCollection'; features: { type: 'Feature'; geometry: unknown; properties: { id: string; place_id: string | null; place_name: string | null; source: string } }[] };
@@ -109,6 +114,8 @@ export const api = {
   procedures: () => req<Procedure[]>('/api/procedures'),
   saveProcedure: (id: string, b: Record<string, unknown>) => put<unknown>(`/api/admin/procedures/${id}`, b),
   createProcedure: (b: Record<string, unknown>) => post<{ id: string }>('/api/admin/procedures', b),
+  studentPortal: () => req<StudentPortal>('/api/admin/student-portal'),
+  saveStudentPortal: (b: StudentPortal) => put<StudentPortal>('/api/admin/student-portal', b),
   preview: (question: string) => post<{ intent: string; text: string; procedure?: { title: string; steps: { title: string; body: string }[] }; place?: { name: string; hours: string | null }; unverified?: boolean; source?: string; answered_by: string }>('/api/admin/procedures/preview', { question }),
   reports: (status?: string) => req<ReportCluster[]>(`/api/admin/reports${status ? `?status=${status}` : ''}`),
   confirm: (cluster: string, b: { from: string; until: string | null; reason: string; radius_m: number; close_place: boolean }) => post<{ notified: string[]; closed_edges: number }>(`/api/admin/reports/${cluster}/confirm`, b),

@@ -41,6 +41,23 @@ test('Gemini free tier: a model with no quota ("limit: 0") hands over to the nex
   assert.deepEqual(asked, ['gemini-3.8-flash', 'gemini-3.5-flash-lite', 'gemini-3.5-flash-lite'], 'the empty model is not retried on every question');
 });
 
+test('Gemini free tier: a model that hangs (no quota, no answer) hands over to the next one and is skipped after that', async () => {
+  const asked: string[] = [];
+  const mock = (async (url: string | URL | Request, init?: RequestInit) => {
+    const m = modelOf(url); asked.push(m);
+    if (m === 'gemini-3.5-flash') {
+      // never answers: rejects when the request's timeout fires, as fetch does
+      return new Promise<Response>((_, reject) => init?.signal?.addEventListener('abort', () => reject(Object.assign(new Error('timed out'), { name: 'TimeoutError' }))));
+    }
+    return ok(`answer from ${m}`);
+  }) as typeof fetch;
+  const g = new Gemini('k', 'gemini-3.5-flash', mock, ['gemini-3.5-flash-lite']);
+  g.timeoutMs = 50;
+  assert.equal((await g.ask('hi', 'en', [], async () => ({}))).text, 'answer from gemini-3.5-flash-lite');
+  await g.ask('again', 'en', [], async () => ({}));
+  assert.deepEqual(asked, ['gemini-3.5-flash', 'gemini-3.5-flash-lite', 'gemini-3.5-flash-lite'], 'the hung model is not waited on twice');
+});
+
 test('Gemini free tier: a short per-minute limit is waited out once on the same model', async () => {
   let calls = 0;
   const mock = (async () => (++calls === 1 ? quota(15, '0.05s') : ok('after the wait'))) as typeof fetch;

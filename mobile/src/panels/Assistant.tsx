@@ -6,17 +6,18 @@ import { router } from 'expo-router';
 import { openAR } from '../ar/open';
 import { api, ApiError } from '../api/client';
 import type { Answer, Lang } from '../api/types';
-import { fmtMinutesT } from '../ar/geo';
+import { fmtDistanceT, fmtMinutesT } from '../ar/geo';
 import { SUGGESTIONS } from '../i18n/strings';
 import { formatHours, useLang, useT } from '../i18n';
 import { useApp, useLocation } from '../state/app';
 import { chat, useChat } from '../state/chat';
-import { useNav } from '../state/navigation';
+import { useNav, type Origin } from '../state/navigation';
+import { mapFilter } from '../state/mapFilter';
 import { usePanels } from '../state/panels';
 import { whenText } from './Events';
 import { availabilityText, availabilityTone, fmtDate } from '../ui/bits';
 import { Avatar, Btn, Icon, IconBtn, Label, Notice, Sheet, StatusPill, T } from '../ui/kit';
-import { categoryColor, color, font } from '../ui/theme';
+import { categoryColor, categoryIcon, categoryName, color, font } from '../ui/theme';
 import { speak, stopSpeaking, useSpeaking } from '../voice/speak';
 import { StickyNote } from '../ui/StickyNote';
 import { dayName } from '../i18n';
@@ -24,13 +25,18 @@ import { dayName } from '../i18n';
 /** "where is…", "take me to…": the student wants to go there, so directions open by themselves. */
 const GO = /\b(where|take me|bring me|guide me|directions?|way to|navigate|go to|get to)\b|ou est|emm[eè]ne|وين|أين|خذني|فين/i;
 
+/** The answer's route mode, as directions understand it (AR opens on top of a walking route). */
+export const routeMode = (m: 'walk' | 'step_free' | 'ar' | 'drive') => (m === 'step_free' ? 'step_free' : m === 'drive' ? 'drive' : 'walk');
+/** "from the library to building 11": the route starts at the library. */
+export const originOf = (a: Answer): Origin | null => (a.route_from ? { placeId: a.route_from.id, name: a.route_from.name, coordinates: a.route_from.coordinates } : null);
+
 export default function Assistant({ ask }: { ask?: string }) {
   const insets = useSafeAreaInsets();
   const { height: screenH } = useWindowDimensions();
   const { lang, setLang, user, online } = useApp();
   const loc = useLocation();
   const nav = useNav();
-  const { push, replace, pop, top } = usePanels();
+  const { push, replace, pop, reset, top } = usePanels();
   const { turns, talk, voice, pending } = useChat();
   const t = useT();
   const speaking = useSpeaking();
@@ -60,13 +66,18 @@ export default function Assistant({ ask }: { ask?: string }) {
       const answer = await api.ask(question, lang, loc.reason === 'off-campus' ? null : loc.coord, history);
       chat.add({ role: 'assistant', answer });
       const target = answer.place;
-      const wantsToGo = answer.action?.type === 'route' && target && (answer.intent === 'place' || (answer.intent === 'service' && GO.test(question)));
+      const wantsToGo = answer.action?.type === 'route' && target && (answer.intent === 'place' || ((answer.intent === 'service' || answer.intent === 'department') && GO.test(question)));
       if (wantsToGo) {
         // leaving the chat for directions: the conversation stays here for when they come back
         const a = answer.action as Extract<Answer['action'], { type: 'route' }>;
-        const ready = await nav.preview({ placeId: target.id, name: target.name, coordinates: target.coordinates, category: target.category }, a.mode === 'step_free' ? 'step_free' : 'walk');
+        const ready = await nav.preview({ placeId: target.id, name: target.name, coordinates: target.coordinates, category: target.category }, routeMode(a.mode), originOf(answer));
         if (a.mode === 'ar' && ready) { nav.start(); replace({ name: 'go' }); openAR(); }
         else { say(answer.text, false); push({ name: 'route', said: question, reply: answer.text }); }
+      } else if (answer.action?.type === 'filter') {
+        // "where can I eat?": the map switches to that chip, and the chat steps aside to show it (it is kept)
+        mapFilter.setCategory(answer.action.category);
+        say(answer.text, false);
+        reset();
       } else {
         say(answer.alert?.tone === 'urgent' ? `${answer.alert.text} ${answer.text}` : answer.text, true);
       }
@@ -168,15 +179,19 @@ function SpeakingBars() {
 
 /** One card per intent: place, person, procedure, office/service, help, unknown (boards 13–15). */
 export function AnswerCard({ a, onAsk, onReplay }: { a: Answer; onAsk: (q: string) => void; onReplay?: () => void }) {
-  const { push } = usePanels();
+  const { push, reset } = usePanels();
   const nav = useNav();
   const lang = useLang();
   const t = useT();
   const guide = async (placeId: string, name: string, coordinates: [number, number], category?: string) => {
-    await nav.preview({ placeId, name, coordinates, category });
+    const mode = a.action?.type === 'route' ? routeMode(a.action.mode) : 'walk';
+    await nav.preview({ placeId, name, coordinates, category }, mode, a.place?.id === placeId ? originOf(a) : null);
     push({ name: 'route' });
   };
+  const showOnMap = (category: string) => { mapFilter.setCategory(category); reset(); };
   const s = a.service;
+  const d = a.department;
+  const online = a.procedure?.channel === 'online' || a.procedure?.channel === 'mixed';
   return (
     <View style={styles.card}>
       {a.alert && (
@@ -204,6 +219,16 @@ export function AnswerCard({ a, onAsk, onReplay }: { a: Answer; onAsk: (q: strin
             </Pressable>
           ))}
           <Btn title={t('All events')} icon="events" small kind="secondary" onPress={() => push({ name: 'events' })} />
+        </View>
+      )}
+
+      {a.intent === 'procedure' && a.procedure && online && (
+        <View style={styles.online}>
+          <Icon name="laptop" size={16} stroke={color.blue} />
+          <T weight="semibold" style={{ flex: 1, fontSize: 13, color: color.blue }}>
+            {a.procedure.channel === 'online' ? t('Done online · {portal}', { portal: a.portal?.name ?? t('the student portal') }) : t('In person and online · {portal}', { portal: a.portal?.name ?? t('the student portal') })}
+          </T>
+          {!!a.portal?.url && <Btn title={t('Open')} icon="globe" small kind="secondary" onPress={() => Linking.openURL(a.portal!.url!)} />}
         </View>
       )}
 
@@ -247,7 +272,7 @@ export function AnswerCard({ a, onAsk, onReplay }: { a: Answer; onAsk: (q: strin
         </View>
       )}
 
-      {a.place && !s && a.intent !== 'place' && (
+      {a.place && !s && a.intent !== 'place' && a.intent !== 'department' && (
         <View style={styles.where}>
           <Label>{t('Where this happens')}</Label>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 8 }}>
@@ -264,6 +289,56 @@ export function AnswerCard({ a, onAsk, onReplay }: { a: Answer; onAsk: (q: strin
       {a.intent === 'place' && a.place?.status === 'closed' && <Notice tone="missing" icon="ban" text={t('{place} is closed{reason}. Routes avoid it.', { place: a.place.name, reason: a.place.closed_reason ? `: ${a.place.closed_reason}` : '' })} />}
       {a.intent === 'place' && a.place && a.place.status !== 'closed' && !a.action && (
         <Btn title={t("Guide me there")} icon="walk" small kind="secondary" onPress={() => guide(a.place!.id, a.place!.name, a.place!.coordinates, a.place!.category)} style={{ alignSelf: 'flex-start' }} />
+      )}
+
+      {a.intent === 'browse' && a.browse && (
+        <View style={{ gap: 8, marginTop: 2 }}>
+          {a.browse.places.slice(0, 6).map(p => (
+            <Pressable key={p.id} accessibilityRole="button" onPress={() => push({ name: 'place', id: p.id })} style={({ pressed }) => [styles.browseRow, pressed && { opacity: 0.8 }]}>
+              <View style={[styles.dot, { width: 28, height: 28, backgroundColor: categoryColor(p.category) }]}><Icon name={categoryIcon(p.category)} size={14} stroke="#fff" /></View>
+              <T weight="semibold" numberOfLines={1} style={{ flex: 1, fontSize: 14 }}>{p.name}</T>
+              {p.distance_m != null && <T style={{ fontSize: 12, color: color.muted }}>{fmtDistanceT(p.distance_m, t)}</T>}
+              <Icon name="chevron" size={14} stroke={color.muted} />
+            </Pressable>
+          ))}
+          <Btn title={t('Show all {n} on the map · {chip}', { n: a.browse.count, chip: t(categoryName(a.browse.category)) })} icon="map" small kind="secondary" onPress={() => showOnMap(a.browse!.category)} />
+        </View>
+      )}
+
+      {a.intent === 'department' && d && (
+        <View style={styles.where}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <View style={[styles.dot, { backgroundColor: categoryColor('academic') }]}><Icon name="cap" size={16} stroke="#fff" /></View>
+            <View style={{ flex: 1 }}>
+              <T weight="semibold" style={{ fontSize: 14.5 }}>{d.name}</T>
+              <T style={{ fontSize: 12.5, color: color.muted }}>{[d.building, a.route ? t('{time} walk', { time: fmtMinutesT(a.route.duration_s, t) }) : null].filter(Boolean).join(' · ')}</T>
+            </View>
+          </View>
+          {d.dean && <T style={{ fontSize: 13, marginTop: 8 }}>{t('Dean: {name}', { name: d.dean.name })}{d.dean.office ? ` · ${d.dean.office}` : ''}</T>}
+          {!!d.programs.length && (
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+              {d.programs.slice(0, 6).map(p => <View key={p} style={styles.handle}><T style={{ fontSize: 11.5, color: color.ink2 }}>{p}</T></View>)}
+            </View>
+          )}
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
+            {a.action?.type === 'route' && a.place && <Btn title={t('Guide me there')} icon="walk" small onPress={() => guide(a.place!.id, a.place!.name, a.place!.coordinates, a.place!.category)} />}
+            {d.website && <Btn title={t('Website')} icon="globe" small kind="secondary" onPress={() => Linking.openURL(d.website!)} />}
+            {d.dean?.email && <Btn title={t('Email')} icon="mail" small kind="secondary" onPress={() => Linking.openURL(`mailto:${d.dean!.email!.split(/[ ;,/]/)[0]}`)} />}
+          </View>
+        </View>
+      )}
+
+      {a.intent === 'place' && a.route_from && a.place && (
+        <View style={[styles.where, { flexDirection: 'row', alignItems: 'center', gap: 10 }]}>
+          <View style={{ alignItems: 'center', gap: 3 }}>
+            <View style={styles.fromDot} /><View style={styles.dash} /><Icon name="pin" size={14} stroke={color.green} />
+          </View>
+          <View style={{ flex: 1, gap: 6 }}>
+            <T style={{ fontSize: 13, color: color.muted }} numberOfLines={1}>{a.route_from.name}</T>
+            <T weight="semibold" style={{ fontSize: 14 }} numberOfLines={1}>{a.place.name}</T>
+          </View>
+          <Btn title={t('Guide me there')} icon="walk" small onPress={() => guide(a.place!.id, a.place!.name, a.place!.coordinates, a.place!.category)} />
+        </View>
       )}
 
       {a.intent === 'person' && a.person && (
@@ -312,6 +387,10 @@ const styles = StyleSheet.create({
   stepNum: { width: 24, height: 24, borderRadius: 12, backgroundColor: color.ink, alignItems: 'center', justifyContent: 'center', marginTop: 1 },
   where: { padding: 12, borderRadius: 13, backgroundColor: '#fff', borderWidth: 1, borderColor: color.hairline },
   handle: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999, backgroundColor: color.surface },
+  online: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 10, borderRadius: 12, backgroundColor: '#EEF4FF' },
+  browseRow: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 10, borderRadius: 12, backgroundColor: '#fff', borderWidth: 1, borderColor: color.hairline },
+  fromDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: color.blue, borderWidth: 2, borderColor: '#fff' },
+  dash: { width: 2, height: 10, backgroundColor: color.hairline },
   dot: { width: 32, height: 32, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
   speaking: { flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 12, marginBottom: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, backgroundColor: '#EEF4FF' },
   composer: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingTop: 8, borderTopWidth: 1, borderTopColor: color.hairline, backgroundColor: '#fff' },

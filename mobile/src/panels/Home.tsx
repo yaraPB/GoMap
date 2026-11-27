@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown, FadeOut, LinearTransition } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -7,6 +7,7 @@ import { useT } from '../i18n';
 import { useMap } from '../map/MapContext';
 import { useApp, useLocation } from '../state/app';
 import { useNav } from '../state/navigation';
+import { mapFilter, useMapFilter } from '../state/mapFilter';
 import { usePanels } from '../state/panels';
 import { Chip, Icon, IconBtn, T, rise } from '../ui/kit';
 import { categories, color, schools, shadow, type IconName } from '../ui/theme';
@@ -44,8 +45,9 @@ export default function Home({ chipsDelay, raised = 0 }: { chipsDelay: number; r
   const { online, user } = useApp();
   const loc = useLocation();
   const places = usePlaces();
-  const [category, setCategory] = useState<string>('all');
-  const [school, setSchool] = useState<string>('all');
+  // shared with the assistant: "where can I eat?" switches these chips too
+  const { category, school } = useMapFilter();
+  const setCategory = mapFilter.setCategory, setSchool = mapFilter.setSchool;
   const guest = user.role === 'guest';
   const density = map.layers.crowding;
 
@@ -55,7 +57,10 @@ export default function Home({ chipsDelay, raised = 0 }: { chipsDelay: number; r
   const events = useRoleEvents();
   const upcoming = events.data ?? [];
   const nextUp = upcoming.find(e => e.state === 'now' || e.state === 'today') ?? null;
-  useEffect(() => { setCategory('all'); setSchool('all'); }, [guest]);
+  // a visitor and a student see different chips: start clean when the role changes (not on every mount,
+  // or a filter the assistant just switched on would be cleared)
+  const wasGuest = useRef(guest);
+  useEffect(() => { if (wasGuest.current !== guest) { wasGuest.current = guest; mapFilter.clear(); } }, [guest]);
 
   const count = useMemo(() => (places.data ?? []).filter(p => (category === 'all' || p.category === category) && (category !== 'academic' || school === 'all' || p.schools.includes(school as never))).length, [places.data, category, school]);
   const chips = guest ? GUEST_CHIPS : categories;

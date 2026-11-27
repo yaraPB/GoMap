@@ -16,6 +16,7 @@ import { color } from '../ui/theme';
 import { useSpeech } from '../voice/useSpeech';
 import { speak, speechLevel, stopSpeaking, useSpeaking } from '../voice/speak';
 import { chat } from '../state/chat';
+import { originOf, routeMode } from './Assistant';
 import Waveform from '../voice/Waveform';
 
 const LANG_LABEL: Record<Lang, string> = { en: 'English', fr: 'Français', ar: 'العربية' };
@@ -121,7 +122,7 @@ export default function Voice({ auto = false }: { auto?: boolean }) {
     try {
       const a = await api.ask(text, lang, loc.reason === 'off-campus' ? null : loc.coord, [], true);
       if (a.intent === 'place' && a.action?.type === 'route' && a.place) {
-        const ready = await nav.preview({ placeId: a.place.id, name: a.place.name, coordinates: a.place.coordinates, category: a.place.category }, a.action.mode === 'step_free' ? 'step_free' : 'walk');
+        const ready = await nav.preview({ placeId: a.place.id, name: a.place.name, coordinates: a.place.coordinates, category: a.place.category }, routeMode(a.action.mode), originOf(a));
         if (a.action.mode === 'ar' && ready) { nav.start(); replace({ name: 'go' }); openAR(); }
         else { if (a.text && chat.get().voice) speak(a.text, lang); chat.add({ role: 'user', text }); chat.add({ role: 'assistant', answer: a }); replace({ name: 'route', said: text, reply: a.text }); }
       } else toAssistant(text);

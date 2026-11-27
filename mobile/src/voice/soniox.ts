@@ -97,7 +97,12 @@ export class SonioxSession {
       ws.onmessage = e => {
         let msg: { tokens?: { text: string; is_final: boolean }[]; finished?: boolean; error_message?: string };
         try { msg = JSON.parse(String(e.data)); } catch { return; }
-        if (msg.error_message) { this.h.onError(msg.error_message); this.finish(); return; }
+        if (msg.error_message) {
+          // refused before a single word (no credit left on the account, bad key…): use the phone's own
+          // recognition or the recorded path for the rest of this session instead of failing every time
+          if (!this.text()) serverHasSoniox = false;
+          this.h.onError(msg.error_message); this.finish(); return;
+        }
         if (msg.tokens?.length) {
           let partial = '';
           let endpoint = false;

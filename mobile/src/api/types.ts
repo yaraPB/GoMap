@@ -75,15 +75,31 @@ export type CampusInfo = { open: string; close: string; lunch: [string, string];
 export type SttSession = { provider: 'soniox'; url: string; model: string; api_key: string; expires_at: string };
 
 export type Lang = 'en' | 'fr' | 'ar';
-export type AnswerAction = { type: 'route'; place_id: string; mode: 'walk' | 'step_free' | 'ar' } | { type: 'person'; person_id: string } | { type: 'help'; topic: 'walkthrough' } | { type: 'events' };
+export type AnswerAction =
+  | { type: 'route'; place_id: string; mode: 'walk' | 'step_free' | 'ar' | 'drive'; from_place_id?: string }
+  | { type: 'person'; person_id: string } | { type: 'help'; topic: 'walkthrough' } | { type: 'events' }
+  /** "where can I eat?": switch the map's category chip */
+  | { type: 'filter'; category: Category };
+export type Department = {
+  id: string; name: string; building: string | null; place_id: string | null; website: string | null; description: string | null; programs: string[]; services: string[];
+  dean: { name: string; office: string | null; email: string | null } | null; contacts: { name: string; role: string | null; office: string | null; email: string | null; phone: string | null }[];
+};
 export type Answer = {
-  id: string; intent: 'place' | 'person' | 'procedure' | 'service' | 'info' | 'events' | 'help' | 'unknown'; lang: Lang; text: string;
+  id: string; intent: 'place' | 'person' | 'procedure' | 'service' | 'info' | 'events' | 'help' | 'department' | 'browse' | 'unknown'; lang: Lang; text: string;
   events?: CampusEvent[]; rule?: { id: string; title: string };
   service?: Service; issue?: { id: string; issue: string; go_to: string; notes: string | null }; alert?: { tone: 'urgent' | 'closed' | 'info'; text: string };
   place?: { id: string; name: string; category: Category; status: string; closed_reason: string | null; hours: string | null; open: string; coordinates: Position };
   route?: { distance_m: number; duration_s: number; mode: string } | null;
+  /** "from the library to building 11": the route starts here, not where the student is */
+  route_from?: { id: string; name: string; coordinates: Position };
   person?: Person;
-  procedure?: { id: string; title: string; owner_office: string; steps: { title: string; body: string }[]; status: string };
+  procedure?: { id: string; title: string; owner_office: string; steps: { title: string; body: string }[]; status: string; channel?: 'in_person' | 'online' | 'mixed' };
+  /** online procedures: where students do them (name and link set in the admin) */
+  portal?: { name: string; url: string | null };
+  department?: Department;
+  browse?: { category: Category; count: number; places: { id: string; name: string; category: Category; coordinates: Position; distance_m: number | null }[] };
+  /** the question was refused: not about AUI, harmful, an attempt to change the rules, or meaningless */
+  declined?: 'off_topic' | 'dangerous' | 'injection' | 'nonsense';
   contact?: { email: string | null; phone: string | null };
   source?: string; verified_at?: string | null; unverified?: boolean; action?: AnswerAction;
   answered_by: 'local' | 'gemini' | 'claude' | 'cache' | 'none'; suggestions?: string[]; translation_review?: boolean;
