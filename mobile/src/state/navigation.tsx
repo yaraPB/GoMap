@@ -6,8 +6,10 @@ import { speakableStep, trStep } from '../i18n/steps';
 import { Platform } from 'react-native';
 import { api, ApiError } from '../api/client';
 import type { Position, Route, RouteMode, Step } from '../api/types';
+import * as Location from 'expo-location';
 import { distance, lineLength, pointAlong, snapToLine } from '../ar/geo';
-import { DEMO_POSITION, useApp, useLocation } from './app';
+import { CAMPUS_CENTER } from '../map/mapHtml';
+import { DEMO_POSITION, OFF_CAMPUS_M, useApp, useLocation } from './app';
 
 export type Destination = { placeId: string; name: string; coordinates: Position; category?: string };
 /** "from the library to building 11": a route that starts at a place, not where the student stands. */
@@ -68,8 +70,29 @@ export function NavigationProvider({ children }: { children: React.ReactNode }) 
   const demoRef = useRef(false);
   const requestId = useRef(0);
 
-  // Campus-only graph: keep the real blue dot, but clearly label a demo route from the plaza.
-  const from = !loc.coord || loc.reason === 'off-campus' ? DEMO_POSITION : loc.coord;
+  // Campus-only graph: routes start where the student really is when that is on campus. Only with no
+  // location at all, or far from AUI, do they start from the plaza (clearly labelled as a demo).
+  const startRef = useRef<Position>(DEMO_POSITION);
+  const locRef = useRef(loc);
+  locRef.current = loc;
+
+  /** The real position on campus. Right after opening the app the first GPS fix can take a few seconds: wait for it. */
+  const realStart = useCallback(async (): Promise<Position | null> => {
+    const l = locRef.current;
+    if (l.realCoord) return l.realOnCampus ? l.realCoord : null;
+    if (l.permission === 'denied') return null;
+    try {
+      const p = await Promise.race([
+        Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High }),
+        new Promise<null>(r => setTimeout(() => r(null), 4000)),
+      ]);
+      const live = locRef.current.realCoord; // the watcher may have answered first
+      if (live) return locRef.current.realOnCampus ? live : null;
+      if (!p) return null;
+      const c: Position = [p.coords.longitude, p.coords.latitude];
+      return distance(c, CAMPUS_CENTER) <= OFF_CAMPUS_M ? c : null;
+    } catch { return null; }
+  }, []);
 
   const fetchRoute = useCallback(async (d: Destination, m: RouteMode, origin: Position, keepOnFailure = false) => {
     const id = ++requestId.current;
@@ -93,18 +116,30 @@ export function NavigationProvider({ children }: { children: React.ReactNode }) 
     routeRef.current = null;
     setRoute(null);
     originRef.current = o; setOrigin(o);
+    // a simulated walk from an earlier trip is not where the student is
+    if (locRef.current.simulated && !simTimer.current) locRef.current.setSimulated(null);
+    const real = await realStart();
     // starting somewhere else: the walk is simulated from there, unless the student is already standing at it
-    demoRef.current = o ? !(loc.coord && !loc.simulated && loc.reason !== 'off-campus' && distance(loc.coord, o.coordinates) < 60) : !loc.coord || loc.simulated || loc.reason === 'off-campus';
+    demoRef.current = o ? !(real && distance(real, o.coordinates) < 60) : !real;
     setStartedFromDemo(!o && demoRef.current);
-    const r = await fetchRoute(d, m, o?.coordinates ?? from);
+    startRef.current = o?.coordinates ?? real ?? DEMO_POSITION;
+    const r = await fetchRoute(d, m, startRef.current);
     if (r !== undefined) setStatus(r ? 'preview' : 'error');
     return !!r;
-  }, [fetchRoute, from, loc.coord, loc.simulated, loc.reason]);
+  }, [fetchRoute, realStart]);
+
+  // GPS arrived after the preview started from the plaza: redo it from where the student really is
+  useEffect(() => {
+    if (status !== 'preview' || !demoRef.current || originRef.current || !dest || !loc.realCoord || !loc.realOnCampus) return;
+    demoRef.current = false; setStartedFromDemo(false);
+    startRef.current = loc.realCoord;
+    fetchRoute(dest, mode, loc.realCoord, true);
+  }, [loc.realCoord, loc.realOnCampus, status, dest, mode, fetchRoute]);
 
   const setMode = useCallback((m: RouteMode) => {
     setModeState(m);
-    if (dest) { setStatus(s => (s === 'active' ? s : 'loading')); fetchRoute(dest, m, originRef.current && status !== 'active' ? originRef.current.coordinates : from).then(r => { if (r !== undefined) setStatus(s => (r ? (s === 'active' ? 'active' : 'preview') : 'error')); }); }
-  }, [dest, fetchRoute, from, status]);
+    if (dest) { setStatus(s => (s === 'active' ? s : 'loading')); fetchRoute(dest, m, status === 'active' && loc.coord ? loc.coord : startRef.current).then(r => { if (r !== undefined) setStatus(s => (r ? (s === 'active' ? 'active' : 'preview') : 'error')); }); }
+  }, [dest, fetchRoute, status, loc.coord]);
 
   const stopSim = useCallback(() => { if (simTimer.current) clearInterval(simTimer.current); simTimer.current = null; setSimulating(false); loc.setSimulated(null); }, [loc]);
 
@@ -114,11 +149,14 @@ export function NavigationProvider({ children }: { children: React.ReactNode }) 
     spoken.current = { step: -1, near: false, at: false };
     offCount.current = 0;
     lastOffFix.current = null;
+    // only simulate the walk when there is truly no real position to follow
+    if (demoRef.current && !originRef.current && loc.realCoord && loc.realOnCampus) { demoRef.current = false; setStartedFromDemo(false); if (dest) fetchRoute(dest, current.mode, loc.realCoord, true); }
     if (demoRef.current && (!loc.simulated || originRef.current)) loc.setSimulated(originRef.current?.coordinates ?? DEMO_POSITION);
+    if (!demoRef.current && loc.simulated && !simTimer.current) loc.setSimulated(null);
     setStatus('active');
     Haptics.selectionAsync().catch(() => {});
     if (!muted && current.steps[0]) speak(current.steps[1] ? makeT(lang)('{first}. Then {next}', { first: trStep(current.steps[0].text, makeT(lang)), next: trStep(current.steps[1].text, makeT(lang)).toLowerCase() }) : trStep(current.steps[0].text, makeT(lang)), lang);
-  }, [muted, lang, loc]);
+  }, [muted, lang, loc, dest, fetchRoute]);
 
   const stop = useCallback(() => {
     stopSpeaking(); stopSim();

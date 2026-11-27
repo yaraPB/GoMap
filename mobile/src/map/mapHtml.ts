@@ -155,13 +155,18 @@ function campusLight(){if(sat())return 'day';var k=skinNow();return k==='day'?'d
 function isDark(){var k=skinNow();return k==='night'||k==='evening';}
 var FOG={campus:{color:'#556B5E','high-color':'#24304A'},day:{color:'#DFE9EE','high-color':'#7399BF'},evening:{color:'#F6C38E','high-color':'#D9773F'},night:{color:'#1B2433','high-color':'#0E1827'}};
 var BUILDING={day:'#C4C1BA',evening:'#E6C29A'};
+// Mapbox's own building colour, read once so the GoCampus and Dark scenes can go back to it
+var DEFAULT_BUILDINGS=null;
+/** Satellite: the basemap's buildings become invisible. Even with 3D off it draws their outlines as flat blocks,
+ * which float over the photo, out of line with the real roofs as soon as the map tilts. */
+function buildingColor(){if(sat())return 'rgba(0,0,0,0)';return BUILDING[skinNow()]||DEFAULT_BUILDINGS;}
 var EXTRA={campus:'#9A7A7C',day:'#C4C1BA',evening:'#C9A27E',night:'#2B3150'};
 var PATH={campus:'#8C95AC',day:'#5B6B60',evening:'#8A6B4E',night:'#5E6884'};
 function applyLight(){
   var k=skinNow();
   config('lightPreset',campusLight());
   // only Day and Evening tint the buildings; the GoCampus and Dark scenes keep Mapbox's own colours
-  if(!sat()&&BUILDING[k])config('colorBuildings',BUILDING[k]);
+  var bc=buildingColor();if(bc)config('colorBuildings',bc);
   try{map.setFog(Object.assign({'space-color':'#0E1827','horizon-blend':0.08,'star-intensity':k==='night'?0.35:0.1},FOG[k]));}catch(e){}
   document.body.classList.toggle('night',k==='night');
   document.body.classList.toggle('evening',k==='evening'&&!sat());
@@ -182,6 +187,8 @@ function applyLight(){
 function threeD(){
   var on=state.layers.threeD&&!sat();
   config('show3dObjects',on);
+  // newer Standard versions split 3D into parts: switch each one explicitly
+  config('show3dBuildings',on);config('show3dFacades',on);config('show3dLandmarks',on);config('show3dTrees',on);
   vis('extra-buildings',on);
 }
 function buildingsFC(){return state.buildings||emptyFC();}
@@ -195,6 +202,7 @@ function config(key,value){try{map.setConfigProperty('basemap',key,value);}catch
 /** Everything outside the campus outline, dimmed: the map is about AUI only. */
 function outsideFC(){return {type:'FeatureCollection',features:[{type:'Feature',properties:{},geometry:{type:'Polygon',coordinates:[[[-180,-85],[180,-85],[180,85],[-180,85],[-180,-85]],OUTLINE.slice().reverse()]}}]};}
 function addLayers(){
+  if(DEFAULT_BUILDINGS===null){try{DEFAULT_BUILDINGS=map.getConfigProperty('basemap','colorBuildings')||null;}catch(e){}}
   config('showPlaceLabels',state.layers.labels);
   config('showRoadLabels',state.layers.labels);config('showAdminBoundaries',false);config('lightPreset',campusLight());
   try{if(map.setWorldview)map.setWorldview('MA');}catch(e){}

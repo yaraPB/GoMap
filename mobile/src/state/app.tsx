@@ -92,6 +92,10 @@ export type Fix = {
   reason: 'off-campus' | 'no-permission' | 'walk' | null;
   /** the fix as the phone reported it, before smoothing and snapping */
   rawCoord: Position | null;
+  /** the phone's own filtered position, even while a walk is simulated; null before the first fix */
+  realCoord: Position | null;
+  /** that real position is on (or near) campus, so routes can start from it */
+  realOnCampus: boolean;
   rawAccuracy: number | null;
   /** walking speed (m/s) and direction of travel from the filter; course is null when standing */
   speed: number;
@@ -174,6 +178,7 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
       coord, accuracy: simulated ? 4 : real?.accuracy ?? null, timestamp: simulated ? Date.now() : real?.timestamp ?? null,
       heading: heading?.smooth ?? null, rawHeading: heading?.raw ?? null, headingAccuracy: heading?.acc ?? null,
       permission, simulated, reason, request, setSimulated: setWalk,
+      realCoord: real?.coord ?? null, realOnCampus: !!real && !offCampus,
       rawCoord: real?.raw ?? null, rawAccuracy: real?.rawAccuracy ?? null, speed: simulated ? 1.25 : real?.speed ?? 0, course: simulated ? null : real?.course ?? null, onPath: simulated || !!real?.onPath,
     };
   }, [real, heading, permission, walk, request]);
@@ -184,4 +189,4 @@ export function useLocation() {
   if (!c) throw new Error('useLocation outside LocationProvider');
   return c;
 }
-export { DEMO_POSITION };
+export { DEMO_POSITION, OFF_CAMPUS_M };

@@ -433,11 +433,20 @@ function newCampusMap(container: HTMLDivElement, center: [number, number], zoom:
   });
   return m;
 }
-/** Satellite on: photo layer visible, daylight, no 3D buildings over the photo. */
+const DEFAULT_BUILDINGS = new WeakMap<mapboxgl.Map, unknown>();
+/** Satellite on: photo layer visible, daylight, no 3D buildings over the photo, and the basemap's flat building
+ * outlines made invisible (otherwise they float over the photo, out of line with the real roofs). */
 function applySatellite(m: mapboxgl.Map, on: boolean) {
   const go = () => {
     if (m.getLayer('imagery')) m.setLayoutProperty('imagery', 'visibility', on ? 'visible' : 'none');
-    try { m.setConfigProperty('basemap', 'show3dObjects', !on); m.setConfigProperty('basemap', 'lightPreset', on ? 'day' : 'dusk'); } catch { /* style still loading */ }
+    try {
+      if (!DEFAULT_BUILDINGS.has(m)) DEFAULT_BUILDINGS.set(m, m.getConfigProperty('basemap', 'colorBuildings'));
+      for (const k of ['show3dObjects', 'show3dBuildings', 'show3dFacades', 'show3dLandmarks', 'show3dTrees']) m.setConfigProperty('basemap', k, !on);
+      const original = DEFAULT_BUILDINGS.get(m);
+      if (on) m.setConfigProperty('basemap', 'colorBuildings', 'rgba(0,0,0,0)');
+      else if (original != null) m.setConfigProperty('basemap', 'colorBuildings', original as never);
+      m.setConfigProperty('basemap', 'lightPreset', on ? 'day' : 'dusk');
+    } catch { /* style still loading */ }
   };
   if (m.isStyleLoaded()) go(); else m.once('style.load', go);
 }
