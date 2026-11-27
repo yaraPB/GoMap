@@ -20,9 +20,8 @@ key in a chat or an issue.** When a step says "tell me", send the *result* (e.g.
 ## 0. What changed in this round (read first)
 
 **Assistant round (27 Nov 2026)**
-- **Two things only you can do:** turn on **billing** for the Google AI Studio project (section 1), and **top up Soniox**
-  (section 3: the account says "Organization balance exhausted"). Until then the assistant and voice still work, on
-  the fallbacks.
+- **One thing only you can do:** turn on **billing** for the Google AI Studio project (section 1). Until then the
+  assistant answers with Gemini 3.5 Flash-Lite. (Soniox was topped up on 27 Nov and transcribes again.)
 - **The assistant stays on AUI.** Dangerous requests, attempts to change its rules ("ignore your instructions…"),
   off-topic questions and gibberish get a fixed, polite refusal. Someone who mentions self-harm gets Counseling and
   Security's 24/7 number, never a refusal. The obvious cases are caught on the server for free; the model has a
@@ -54,7 +53,7 @@ key in a chat or an issue.** When a step says "tell me", send the *result* (e.g.
 - **Atlas hiccups no longer crash the API.** A dropped connection (`ECONNRESET`) is logged and the driver reconnects
   by itself (section 4).
 
-## 1. The assistant model: Gemini 3.5 Flash, with flash-lite as the fallback
+## 1. The assistant model: Gemini 3.8 Flash, with flash-lite as the fallback
 
 **Why the model matters less than you'd think.** Most questions never reach it: your rules, places, people, offices,
 procedures and events are answered locally, for free, in ~50 ms. The model only resolves what is left, and it can only
@@ -80,19 +79,24 @@ minute. So the model you already had is the right one; what was wrong was handli
 - moves to the next model in `GEMINI_FALLBACK_MODELS` when a model has no quota ("limit: 0") or was retired, and keeps
   using the one that works (the configured model is retried every 10 minutes).
 
-**Now (27 Nov): `gemini-3.5-flash` is the configured model**, because it follows the scope rules and picks tools
-better than flash-lite. Your `server/.env` already says so (the second line is optional; these are the defaults):
+**Now (27 Nov): `gemini-3.8-flash` is the configured model**: a step above 3.5 Flash, and the cheapest of the
+better models (about $0.75 per million input tokens and $3.75 per million output through 31 Dec 2026; output $7.50
+from 1 Jan 2027). Gemini 4 Hydrogen costs about twice as much, Argon and Carbon more. A GoMap model question is
+~1,800 tokens in and ~100 out: about **$0.002**, and most questions never reach the model. Your `server/.env` already
+says so (the second line is optional; these are the defaults):
 ```env
-GEMINI_MODEL=gemini-3.5-flash
-GEMINI_FALLBACK_MODELS=gemini-3.5-flash,gemini-3.5-flash-lite,gemini-3.1-flash-lite,gemini-flash-lite-latest
+GEMINI_MODEL=gemini-3.8-flash
+GEMINI_FALLBACK_MODELS=gemini-3.8-flash,gemini-3.5-flash-lite,gemini-3.1-flash-lite,gemini-flash-lite-latest
 ```
 
-**It needs billing.** Measured on your key today: `gemini-3.5-flash` never answers (no free quota; Google leaves the
-request hanging instead of saying 429), while `gemini-3.5-flash-lite` answers in 0.4–1 s. So the server gives a model
-8 seconds; if it hangs, it moves to the next one and skips the hung one for 10 minutes. Until billing is on, the first
-model question after a start takes ~9 s and then flash-lite answers in ~1 s. **To fix:** Google AI Studio → your
-project → **Set up billing**. The same key then reaches `gemini-3.5-flash` (very cheap at campus volume: most questions
-never reach the model). Then run `npm run assistant:eval` and **tell me** the score.
+**It needs billing on the Gemini key** (Soniox billing is separate). Measured on your key on 27 Nov, every model
+above 3.5 Flash-Lite was blocked: Gemini 4 and Pro answer 429 "check your plan and billing"; 3.6/3.7/3.8 Flash and
+3.5 Flash are on the free tier's lowest priority (503 "high demand", or no answer in 45 s). `gemini-3.5-flash-lite`
+got 3/3 test questions right in under 1 s. So the server gives a model 8 seconds; if it hangs or says 503, it moves
+to the next one and skips the busy one for 10 minutes. Until billing is on, students get flash-lite, with one ~8 s
+wait every 10 minutes. **To fix:** Google AI Studio → your project → **Set up billing**; the same key then reaches
+`gemini-3.8-flash`. Then run `npm run assistant:eval -- --model-only gemini-3.8-flash gemini-3.5-flash-lite` and
+**tell me** the score and speed.
 
 **Faster:** the model uses Gemini's "low" thinking level (choosing a tool is not a reasoning task).
 

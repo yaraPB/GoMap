@@ -151,7 +151,7 @@ use), orange on stairs, amber where it is steeper than a ramp.
    - **Claude** (`claude-opus-5-5` by default, official `@anthropic-ai/sdk`) when `ANTHROPIC_API_KEY` is set: most
      reliable tool choice on mixed-language questions, prompt-cached system prompt, effort `low` (this is routing, not
      reasoning), server-side refusal fallbacks on.
-   - **Gemini** otherwise — the current setup: `gemini-3.5-flash` (needs billing on the AI Studio project), low thinking
+   - **Gemini** otherwise — the current setup: `gemini-3.8-flash` (needs billing on the AI Studio project), low thinking
      level, falling back to `gemini-3.5-flash-lite` when a model has no quota, is retired, or hangs (8 s). The client
      retries short rate limits and falls back along `GEMINI_FALLBACK_MODELS` instead of failing. What the model
      resolved is cached for 6 hours (not inside a conversation).

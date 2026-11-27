@@ -58,6 +58,18 @@ test('Gemini free tier: a model that hangs (no quota, no answer) hands over to t
   assert.deepEqual(asked, ['gemini-3.5-flash', 'gemini-3.5-flash-lite', 'gemini-3.5-flash-lite'], 'the hung model is not waited on twice');
 });
 
+test('Gemini: "high demand" (503) hands over to the next model at once, and the busy one is skipped for a while', async () => {
+  const asked: string[] = [];
+  const mock = (async (url: string | URL | Request) => {
+    const m = modelOf(url); asked.push(m);
+    return m === 'gemini-3.8-flash' ? new Response('{"error":{"code":503,"message":"This model is currently experiencing high demand."}}', { status: 503 }) : ok(`answer from ${m}`);
+  }) as typeof fetch;
+  const g = new Gemini('k', 'gemini-3.8-flash', mock, ['gemini-3.5-flash-lite']);
+  assert.equal((await g.ask('hi', 'en', [], async () => ({}))).text, 'answer from gemini-3.5-flash-lite');
+  await g.ask('again', 'en', [], async () => ({}));
+  assert.deepEqual(asked, ['gemini-3.8-flash', 'gemini-3.5-flash-lite', 'gemini-3.5-flash-lite']);
+});
+
 test('Gemini free tier: a short per-minute limit is waited out once on the same model', async () => {
   let calls = 0;
   const mock = (async () => (++calls === 1 ? quota(15, '0.05s') : ok('after the wait'))) as typeof fetch;

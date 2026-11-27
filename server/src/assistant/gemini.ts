@@ -72,6 +72,8 @@ export class Gemini implements Llm {
           break; // no quota on this model, or a long wait: try the next model
         }
         if (response.status === 404) break;
+        // "high demand" (503) or a server error: this model is unavailable for now, the next one answers
+        if (response.status >= 500) { this.stalled.set(this.chain[i], Date.now() + 10 * 60_000); break; }
         // a model that does not take a thinking level: ask again without it
         if (response.status === 400 && /thinking/i.test(text) && body && typeof body === 'object' && (body as { generationConfig?: { thinkingConfig?: unknown } }).generationConfig?.thinkingConfig) {
           const { thinkingConfig: _drop, ...generationConfig } = (body as { generationConfig: Record<string, unknown> }).generationConfig;

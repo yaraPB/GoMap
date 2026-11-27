@@ -31,9 +31,9 @@ export const config = {
   get mongoUri() { return process.env.MONGODB_URI || ''; },
   get sqliteFile() { return process.env.GOMAP_DB || join(SERVER_DIR, 'data', 'gomap.sqlite'); },
   get geminiKey() { return process.env.GEMINI_API_KEY || ''; },
-  get geminiModel() { return process.env.GEMINI_MODEL || 'gemini-3.5-flash'; },
+  get geminiModel() { return process.env.GEMINI_MODEL || 'gemini-3.8-flash'; },
   /** Tried in order when GEMINI_MODEL has no quota on this key (free tier) or is retired. */
-  get geminiFallbacks() { return (process.env.GEMINI_FALLBACK_MODELS ?? 'gemini-3.5-flash,gemini-3.5-flash-lite,gemini-3.1-flash-lite,gemini-flash-lite-latest').split(',').map(m => m.trim()).filter(Boolean); },
+  get geminiFallbacks() { return (process.env.GEMINI_FALLBACK_MODELS ?? 'gemini-3.8-flash,gemini-3.5-flash-lite,gemini-3.1-flash-lite,gemini-flash-lite-latest').split(',').map(m => m.trim()).filter(Boolean); },
   get anthropicKey() { return process.env.ANTHROPIC_API_KEY || ''; },
   get claudeModel() { return process.env.CLAUDE_MODEL || 'claude-opus-5-5'; },
   /** auto: Claude when ANTHROPIC_API_KEY is set, otherwise Gemini. */
