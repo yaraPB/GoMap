@@ -1,3 +1,6 @@
+/** English, French and Arabic/Darija, the app's language first: students mix them, even in one sentence. */
+export const hints = (lang: string) => [lang, ...['en', 'fr', 'ar'].filter(l => l !== lang)];
+
 /** Recorded speech transcription. The API key never leaves the server. */
 export async function transcribeSoniox(audio: Buffer, mime: string, lang: string, key: string, model: string, fetcher: typeof fetch = fetch): Promise<string> {
   const base = 'https://api.soniox.com/v1';
@@ -12,7 +15,7 @@ export async function transcribeSoniox(audio: Buffer, mime: string, lang: string
     const form = new FormData();
     form.append('file', new Blob([new Uint8Array(audio)], { type: mime }), mime.includes('webm') ? 'question.webm' : 'question.m4a');
     fileId = ((await (await request('/files', { method: 'POST', body: form })).json()) as { id: string }).id;
-    jobId = ((await (await request('/transcriptions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model, file_id: fileId, language_hints: [lang], context: { terms: ['GoMap', 'AUI', 'Al Akhawayn', 'Ifrane', 'registrar'] } }) })).json()) as { id: string }).id;
+    jobId = ((await (await request('/transcriptions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model, file_id: fileId, language_hints: hints(lang), enable_language_identification: true, context: { terms: ['GoMap', 'AUI', 'Al Akhawayn', 'Ifrane', 'registrar'] } }) })).json()) as { id: string }).id;
     const deadline = Date.now() + 60000;
     while (Date.now() < deadline) {
       const job = await (await request(`/transcriptions/${encodeURIComponent(jobId)}`)).json() as { status: string; error_message?: string };

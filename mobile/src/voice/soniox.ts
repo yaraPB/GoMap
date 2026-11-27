@@ -85,7 +85,10 @@ export class SonioxSession {
         ws.send(JSON.stringify({
           api_key: session.api_key, model: session.model, audio_format: 'pcm_s16le',
           sample_rate: this.stream?.sampleRate || 16000, num_channels: 1,
-          language_hints: [lang, ...(lang === 'en' ? [] : ['en'])], enable_endpoint_detection: true,
+          // students switch between English, French and Arabic/Darija, even inside one sentence: listen for all
+          // three whatever the app is set to (its language first, as a mild preference), and let Soniox label each word
+          language_hints: [lang, ...(['en', 'fr', 'ar'] as const).filter(l => l !== lang)], enable_language_identification: true,
+          enable_endpoint_detection: true,
           context: { terms: ['GoMap', 'AUI', 'Al Akhawayn', 'Ifrane', 'registrar', 'NAB', 'Building 8B', 'Pathways', 'OIP', 'CLE', 'ITS'] },
         }));
         this.ready = true;
